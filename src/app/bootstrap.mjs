@@ -12,7 +12,7 @@ import { animateElement, morphSurface, prefersReducedMotion } from '../../packag
 import { createLiveRuntime, stepMission, pauseMission, resumeMission } from '../live-runtime.mjs';
 import { createApiClient } from '../api-client.mjs';
 import { createSurfaceLifecycle } from '../surface-lifecycle.mjs';
-import { isUpstreamProjectionOnly, reconcileUpstreamSync } from '../backend-reconciliation.mjs';
+import { isUpstreamProjectionOnly, reconcileUpstreamSync, validateWorkspacePayload } from '../backend-reconciliation.mjs';
 import { AGSpace, AGSemanticZoom, AGDock, AGContextLens, reduceSpatialState, nextSemanticZoom } from '../../packages/spatial/index.mjs';
 import { derivePresence, AGPresenceRail } from '../../packages/presence/index.mjs';
 import { resolveInteraction } from '../../packages/interaction/index.mjs';
@@ -176,6 +176,7 @@ export function bootstrapAftergraph(){
         onStatus:phase=>setBackendPhase(phase),
         onError:backendSessionError,
         onMetric:metric=>{ui.resyncMetric=metric},
+        validatePayload:validateWorkspacePayload,
       });
       backendSession.start();
       void refreshFederation();

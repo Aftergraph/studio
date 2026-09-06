@@ -1,30 +1,26 @@
 # V8.1 Remediation Log
 
-## V81-007 — Runtime fixture separation
+## V81-015 — Backend contract boundary
 
-Status: RESOLVED in this slice.
+Status: IN PROGRESS → implementation complete, pending CI promotion.
 
-Audited finding: `src/state.mjs` exposed demo users, missions, approvals, agents, conversations, artifacts and telemetry through the same initializer used by runtime/server paths.
+Audited finding: backend payload consumers could accept partial or malformed state shapes and rely on scattered fallback behavior.
 
 Changes:
 
-- `createInitialState({ fixtures = true })` now makes fixture intent explicit.
-- `createInitialState({ fixtures: false })` returns an empty `runtime-empty` state with no demo records and unavailable telemetry.
-- Production `server.mjs` defaults to `fixtures: false`.
-- The bridge/browser smoke harnesses opt into `AFTERGRAPH_DEMO_FIXTURES=true` explicitly, preserving deterministic test fixtures without making them a production default.
-- Browser bootstrap uses fixture state only for non-HTTP harnesses and refuses to hydrate an HTTP runtime from stored demo state.
-- State carries `fixtureMode` and `source` provenance.
+- `validateWorkspacePayload()` is now the canonical structural boundary in `src/backend-reconciliation.mjs`.
+- The validator checks the payload envelope, canonical arrays, replay object and IDs on core records.
+- `createBackendSession()` accepts `validatePayload` and validates before `onState()` or `current` status.
+- Bootstrap injects `validateWorkspacePayload`; malformed backend state becomes stale and cannot become current truth.
+- Gate 25 added: `V8.1 Backend Contract Boundary Exit Gate`.
+- `tests/v81-backend-contract.test.mjs` covers valid, malformed, nested-record and non-mutation cases.
 
-Acceptance evidence:
+Acceptance evidence so far:
 
-- Focused state/server tests: 13/13 PASS.
-- Full Node suite: 477/477 PASS.
-- Monolithic release verification: 24/24 PASS.
-- Browser V4, V5, fullstack bridge and polyrepo bridge: PASS.
-- Accessibility gate: PASS.
-- No secrets or credentials introduced.
+- Focused contract/session tests: 10/10 PASS.
+- Full Node suite: 481/481 PASS.
+- Existing runtime/session tests remain green.
 
-Remaining boundary:
+Remaining verification:
 
-- `createInitialState()` retains `fixtures: true` as a backwards-compatible deterministic test default. New production callers must pass `fixtures: false` or use the production server entrypoint.
-- Existing audit artifacts remain historical evidence for the pre-remediation revision; this log records the exact remediation and fresh verification.
+- Monolithic release runner, browser/accessibility gates, exact-head CI and clean-tree verification after commit.

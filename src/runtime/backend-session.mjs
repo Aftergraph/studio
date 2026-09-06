@@ -17,7 +17,7 @@ function withTimeout(promise,timeoutMs){
 
 export function createBackendSession({
   api,onState=()=>{},onStatus=()=>{},onRuntime=()=>{},onError=()=>{},onMetric=()=>{},
-  resyncPolicy=DEFAULT_RESYNC_POLICY,now=()=>globalThis.performance?.now?.()??Date.now(),
+  resyncPolicy=DEFAULT_RESYNC_POLICY,now=()=>globalThis.performance?.now?.()??Date.now(),validatePayload=value=>value,
 }={}){
   if(!api)throw new Error('api required');
   const policy={...DEFAULT_RESYNC_POLICY,...resyncPolicy};
@@ -36,6 +36,7 @@ export function createBackendSession({
       const payloadBytes=Number.isFinite(result?.bytes)?result.bytes:byteLength(payload);
       onMetric({name:'state-resync',payloadBytes,latencyMs,latencyBudgetMs:policy.latencyBudgetMs,latencyBudgetExceeded:latencyMs>policy.latencyBudgetMs,maxPayloadBytes:policy.maxPayloadBytes});
       if(payloadBytes>policy.maxPayloadBytes){const error=new Error('state_payload_too_large');error.code='state_payload_too_large';throw error}
+      validatePayload(payload);
       if(token!==generation||!started)return false;
       onState(payload);if(payload?.runtimes)onRuntime(payload.runtimes);setPhase('current');return true;
     }catch(error){

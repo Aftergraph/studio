@@ -58,6 +58,19 @@ test('resync reports measured payload bytes and latency budget evidence',async()
   assert.equal(typeof metrics.at(-1).latencyBudgetExceeded,'boolean');
 });
 
+test('invalid payload is rejected before it can become current truth',async()=>{
+  let handlers={}; const states=[]; const statuses=[];
+  const api={
+    async stateWithMeta(){return {payload:{state:{version:10,missions:'bad'},runtimes:{}},bytes:100}},
+    subscribe(onMessage,onError,{onOpen}={}){handlers={onMessage,onError,onOpen};return ()=>{}},
+  };
+  const session=createBackendSession({api,onState:p=>states.push(p),onStatus:s=>statuses.push(s),validatePayload:p=>{if(typeof p?.state?.missions!=='object'||Array.isArray(p.state.missions)===false)throw new Error('invalid workspace state missions')}});
+  session.start(); const ok=await handlers.onOpen();
+  assert.equal(ok,false);
+  assert.equal(states.length,0);
+  assert.equal(session.status(),'stale');
+  assert.deepEqual(statuses.slice(-2),['resyncing','stale']);
+});
 test('resync timeout exits spinner state into degraded fallback',async()=>{
   let handlers={}; const statuses=[];
   const api={

@@ -1,3 +1,16 @@
+export function validateWorkspacePayload(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new TypeError('invalid workspace payload');
+  const state=payload.state;
+  if (!state || typeof state !== 'object' || Array.isArray(state)) throw new TypeError('invalid workspace state');
+  for (const key of ['missions','agents','conversations','approvals','needsYou','artifacts','memory','connections','events','spaces']) {
+    if (!Array.isArray(state[key])) throw new TypeError(`workspace state ${key} must be an array`);
+  }
+  if (!state.replay || typeof state.replay !== 'object' || Array.isArray(state.replay)) throw new TypeError('workspace state replay must be an object');
+  for (const [key,records] of Object.entries({missions:state.missions,agents:state.agents,conversations:state.conversations,approvals:state.approvals,artifacts:state.artifacts})) {
+    for (const record of records) if (!record || typeof record !== 'object' || !record.id) throw new TypeError(`workspace ${key} record requires id`);
+  }
+  return payload;
+}
 function stableMission(mission={}) {
   return {
     id:mission.id,title:mission.title,state:mission.state,risk:mission.risk,controlMode:mission.controlMode,
