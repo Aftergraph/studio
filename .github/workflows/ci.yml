@@ -27,7 +27,7 @@ jobs:
 
       - name: Install Python verification dependencies
         run: |
-          pip install playwright pillow
+          pip install playwright pillow numpy
           python -m playwright install --with-deps chromium
 
       - name: Run Node Unit & Invariant Tests
