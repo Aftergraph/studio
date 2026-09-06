@@ -1,0 +1,51 @@
+name: Aftergraph Studio — Continuous Integration & Quality Gates
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  verify:
+    name: Monolithic Release Verification (16 Gates)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python verification dependencies
+        run: |
+          pip install playwright pillow
+          python -m playwright install --with-deps chromium
+
+      - name: Run Node Unit & Invariant Tests
+        run: |
+          npm test
+
+      - name: Run Workspace Contract & Drift Verification
+        run: |
+          npm run verify
+
+      - name: Run Platform Source Contracts
+        run: |
+          npm run verify:platforms
+
+      - name: Run Secrets & Security Scan
+        run: |
+          npm run verify:secrets
+
+      - name: Run Full Release Verification Suite
+        run: |
+          node scripts/v6_release_verify.mjs

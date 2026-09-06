@@ -1,7 +1,7 @@
 {
-  "name": "Aftergraph Agentic Operating Environment",
-  "short_name": "Aftergraph",
-  "description": "Aftergraph V5 Agentic Operating Environment for spatial, governed human-agent work.",
+  "name": "Aftergraph Studio",
+  "short_name": "Studio",
+  "description": "Aftergraph Studio — Sovereign operating environment for governed AI intelligence, durable work, and verified outcomes.",
   "start_url": "/chat",
   "scope": "/",
   "display": "standalone",
