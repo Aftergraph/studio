@@ -6,6 +6,13 @@ export function AGAgentCard({agent}) {
   return `<article class="ag-agent-card" data-ag-component="agent-card" data-state="${attr(agent.state||'idle')}"><header><span class="ag-agent-card-orbit"><i></i>${AGIcon('agent',{size:16})}</span><span><strong>${esc(agent.name)}</strong><small>${esc(agent.role||'Agent')} · ${esc(agent.state||'idle')}</small></span><button type="button" data-agent="${attr(agent.id)}" aria-label="Inspect ${attr(agent.name)}">${AGIcon('inspect',{size:14})}</button></header><p>${esc(agent.task||'Available')}</p><dl><div><dt>Authority</dt><dd>${esc(agent.authority||'scoped')}</dd></div><div><dt>Spend</dt><dd>€${spend}</dd></div><div><dt>Evidence</dt><dd>${Number(agent.evidence)||0} evidence</dd></div></dl></article>`;
 }
 
+export function AGDelegationStrip({agents=[]}) {
+  const executor=agents.find(a=>/executor|operator|analyst|researcher/i.test(a.role||''))||agents[0];
+  const verifier=agents.find(a=>/verif|judge/i.test(a.role||''))||agents.find(a=>a.id!==executor?.id);
+  if(!executor||!verifier) return '';
+  return `<section class="ag-delegation-strip" data-ag-component="delegation-strip" aria-label="Agent delegation topology"><div><small>DELEGATION TOPOLOGY</small><strong>${esc(executor.name)} <span aria-hidden="true">→</span> ${esc(verifier.name)}</strong><p>Executor and verifier are independent. Authority: none.</p></div><span class="status-pill current">Verifier separated</span></section>`;
+}
+
 export function AGAgentCluster({agents=[],action='context-preview'}) {
   const visible=agents.slice(0,4);
   const initials=name=>String(name||'A').split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase();

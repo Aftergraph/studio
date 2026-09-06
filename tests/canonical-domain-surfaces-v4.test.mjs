@@ -24,6 +24,12 @@ test('canonical surfaces use first-party semantic rows and cards', () => {
   }
 });
 
+test('agent cards remain inspectable and delegation topology is explicit',()=>{
+  const ui=fs.readFileSync(new URL('../packages/ui/agents/agent-card.mjs',import.meta.url),'utf8');
+  assert.match(ui,/AGDelegationStrip/);
+  assert.match(ui,/data-ag-component="delegation-strip"/);
+  assert.match(ui,/Authority: none/);
+});
 test('domain design layer uses open rails and semantic rows rather than default card grids', () => {
   for (const hook of ['ag-domain-page','ag-domain-rail','ag-agent-card','ag-connection-row','ag-artifact-row','ag-event-row']) {
     assert.match(css,new RegExp(`\\.${hook}`));

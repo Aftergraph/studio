@@ -61,3 +61,49 @@ test('workspace compose returns typed plan without markup', async () => {
     assert.ok(!JSON.stringify(j.plan).includes('<'));
   } finally { srv.close(); await once(srv, 'close'); }
 });
+
+test('society team plus delegate plus execute plus verify chain', async () => {
+  const { createFederationKernel } = await import('../src/federation/federation-kernel.mjs');
+  const { createFederationApiHandler: mkHandler } = await import('../server/federation-routes.mjs');
+  const k = createFederationKernel();
+  const h = mkHandler({ kernel: k });
+  const srv = http.createServer((req, res) => {
+    const url = new URL(req.url, 'http://127.0.0.1');
+    if (!h(req, res, url)) { res.writeHead(404); res.end('{}'); }
+  });
+  srv.listen(0, '127.0.0.1');
+  await once(srv, 'listening');
+  const postRaw = (path, body) => fetch('http://127.0.0.1:' + srv.address().port + path, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const post = async (path, body) => {
+    const r = await postRaw(path, body);
+    assert.equal(r.status, 200);
+    return r.json();
+  };
+  try {
+    const members = [
+      { id: 'a-exec', role: 'executor' },
+      { id: 'a-verify', role: 'verifier' },
+      { id: 'a-coord', role: 'coordinator' },
+    ];
+    const team = await post('/api/v1/federation/society/team', { id: 't1', cellId: 'c1', members });
+    assert.equal(team.ok, true);
+    assert.equal(team.topology.authority, 'none');
+    const selfDealR = await postRaw('/api/v1/federation/society/delegate', { teamId: 't1', missionId: 'm1', from: 'a-exec', executorId: 'a-exec', verifierId: 'a-verify' });
+    const selfDeal = await selfDealR.json();
+    assert.equal(selfDeal.ok, false);
+    const d = await post('/api/v1/federation/society/delegate', { teamId: 't1', missionId: 'm1', from: 'a-coord', executorId: 'a-exec', verifierId: 'a-verify' });
+    assert.equal(d.ok, true);
+    assert.equal(d.delegation.status, 'delegated');
+    const earlyR = await postRaw('/api/v1/federation/society/verify', { teamId: 't1', missionId: 'm1', by: 'a-verify', verdict: 'pass' });
+    const early = await earlyR.json();
+    assert.equal(early.ok, false);
+    const e = await post('/api/v1/federation/society/execute', { teamId: 't1', missionId: 'm1', by: 'a-exec', evidenceRef: 'ev_1' });
+    assert.equal(e.ok, true);
+    const v = await post('/api/v1/federation/society/verify', { teamId: 't1', missionId: 'm1', by: 'a-verify', verdict: 'pass' });
+    assert.equal(v.ok, true);
+    assert.deepEqual(v.chain.map((x) => x.kind), ['delegated', 'executed', 'verified']);
+  } finally { srv.close(); await once(srv, 'close'); }
+});

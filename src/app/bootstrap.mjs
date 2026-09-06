@@ -6,7 +6,7 @@ import { escapeHtml, attentionCount, compactMoney, progressLabel } from '../ui-h
 import { PRIMARY_NAV, canonicalDomainForNav, commandDomainEntries } from '../workspace-shell.mjs';
 import { icon } from '../icons.mjs';
 import { AGIcon } from '../../packages/icons/index.mjs';
-import { AGTrajectory, AGArtifact, AGApproval, AGNeedYou, AGComposer, AGAgentPresence, AGAgentCluster, AGActionDock, AGOutcomeReceipt, AGCommandPalette, AGPulseRail, AGContextSummary, AGMemoryItem, AGWorkSummary, AGTelemetryStrip, AGAgentCard, AGConnectionRow, AGArtifactRow, AGEventRow, AGUpstreamServiceRow, AGExternalWorkRow, AGDetectionProposalRow, AGSourceTruthBadge } from '../../packages/ui/index.mjs';
+import { AGTrajectory, AGArtifact, AGApproval, AGNeedYou, AGComposer, AGAgentPresence, AGAgentCluster, AGActionDock, AGOutcomeReceipt, AGCommandPalette, AGPulseRail, AGContextSummary, AGMemoryItem, AGWorkSummary, AGTelemetryStrip, AGAgentCard, AGDelegationStrip, AGConnectionRow, AGArtifactRow, AGEventRow, AGUpstreamServiceRow, AGExternalWorkRow, AGDetectionProposalRow, AGSourceTruthBadge } from '../../packages/ui/index.mjs';
 import { composeLivingLayout } from '../../packages/runtime-ui/index.mjs';
 import { animateElement, morphSurface, prefersReducedMotion } from '../../packages/motion/index.mjs';
 import { createLiveRuntime, stepMission, pauseMission, resumeMission } from '../live-runtime.mjs';
@@ -509,7 +509,7 @@ export function bootstrapAftergraph(){
   function renderAgentsDomain(){
     const domain=getDomain('agents');
     const running=state.agents.filter(a=>a.state==='running').length;
-    return `<main id="main-content" class="ag-domain-page" data-domain-surface="agents">${renderDomainHeader(domain,'Agents','See who is acting, on what, with which authority, cost and evidence.',`${running} active · ${state.agents.length} total`)}<div class="ag-agent-domain-list">${state.agents.map(agent=>AGAgentCard({agent})).join('')}</div></main>`;
+    return `<main id="main-content" class="ag-domain-page" data-domain-surface="agents">${renderDomainHeader(domain,'Agents','See who is acting, on what, with which authority, cost and evidence.',`${running} active · ${state.agents.length} total`)}${AGDelegationStrip({agents:state.agents})}<div class="ag-agent-domain-list">${state.agents.map(agent=>AGAgentCard({agent})).join('')}</div></main>`;
   }
 
   function renderBrainDomain(){

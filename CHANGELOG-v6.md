@@ -116,3 +116,21 @@ Product Cell → mission (human-approved) → workforce execution → verifier s
   `ADAPTIVE_SURFACE_KINDS`); unknown types fall back, never invent.
 - Execute intent without grant omits action-bar with explicit reason.
 - Plan frozen; JSON contains zero markup.
+
+## [V7.2] — Agent Society
+
+### Added
+- `src/society/agent-society.mjs` — bounded team composition, coordinator-led
+  delegation, ordered handoffs, and verifier separation over V6.5 Workforce.
+- `server/society-routes.mjs` — team, delegate, execute, verify and chain
+  endpoints under `/api/v1/federation/society`.
+- `packages/ui/agents/agent-card.mjs` — `AGDelegationStrip` makes the
+  executor→verifier topology explicit in the existing AGENTS surface.
+- `tests/v7-2-agent-society.test.mjs` — 15 domain tests; server API coverage
+  verifies the full delegation chain.
+- `scripts/v6_release_verify.mjs` — Gate 21: V7.2 Agent Society Exit Gate.
+
+### Invariants
+- Agents cannot self-assign, self-promote, self-approve, or self-verify.
+- `verifier !== executor`; verification requires prior execution evidence.
+- Team topology and handoffs carry `authority: 'none'`.

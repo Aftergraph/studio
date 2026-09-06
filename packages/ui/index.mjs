@@ -13,7 +13,7 @@ export { AGApproval } from './trust/approval.mjs';
 export { AGNeedYou } from './trust/need-you.mjs';
 export { AGEvidence } from './trust/evidence.mjs';
 export { AGRisk } from './trust/risk.mjs';
-export { AGAgentCard, AGAgentCluster } from './agents/agent-card.mjs';
+export { AGAgentCard, AGAgentCluster, AGDelegationStrip } from './agents/agent-card.mjs';
 export { AGAgentPresence } from './agents/agent-presence.mjs';
 export { AGUpstreamServiceRow, AGExternalWorkRow, AGDetectionProposalRow } from './system/upstream-service-row.mjs';
 export { AGSourceTruthBadge } from './system/source-truth-badge.mjs';
@@ -21,4 +21,4 @@ export { AGEventRow, AGConnectionRow, AGMemoryItem } from './system/event-row.mj
 
 export const COMPONENTS = Object.freeze(['AGSurface','AGSplitSurface','AGInspector','AGSheet','AGArtifact','AGArtifactToolbar','AGTrajectory','AGProgress',
   'AGApproval','AGNeedYou','AGEvidence','AGComposer','AGAgentPresence','AGAgentCluster','AGActionDock','AGOutcomeReceipt','AGCommandPalette','AGPulseRail',
-  'AGButton','AGIconButton','AGInput','AGTabs','AGRow','AGMetric','AGNotice','AGSkeleton','AGContextSummary','AGMemoryItem','AGWorkSummary','AGTelemetryStrip','AGAgentCard','AGConnectionRow','AGArtifactRow','AGEventRow','AGUpstreamServiceRow','AGExternalWorkRow','AGDetectionProposalRow','AGSourceTruthBadge']);
+  'AGButton','AGIconButton','AGInput','AGTabs','AGRow','AGMetric','AGNotice','AGSkeleton','AGContextSummary','AGMemoryItem','AGWorkSummary','AGTelemetryStrip','AGAgentCard','AGDelegationStrip','AGConnectionRow','AGArtifactRow','AGEventRow','AGUpstreamServiceRow','AGExternalWorkRow','AGDetectionProposalRow','AGSourceTruthBadge']);
