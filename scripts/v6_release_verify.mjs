@@ -31,6 +31,7 @@ const GATES = [
   { name: 'V8.1-A Backend Contract Boundary Exit Gate', cmd: 'node', args: ['--test', 'tests/v81-backend-contract.test.mjs'] },
   { name: 'V8.1-A Destructive Action Guard Exit Gate', cmd: 'node', args: ['--test', 'tests/v81-destructive-action.test.mjs'] },
   { name: 'V8.1 Distributed Node Identity Exit Gate', cmd: 'node', args: ['--test', 'tests/v81-distributed-node-identity.test.mjs'] },
+  { name: 'V8.1 Distributed Convergence Exit Gate', cmd: 'node', args: ['--test', 'tests/v81-distributed-convergence.test.mjs'] },
   { name: 'Axe-Core 4.10.3 Accessibility Gate (WCAG 2.2 AA)', cmd: 'python', args: ['scripts/a11y_smoke.py'] }
 ];
 
