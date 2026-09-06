@@ -23,6 +23,7 @@ const GATES = [
   { name: 'V6.4 Research OS Exit Gate', cmd: 'node', args: ['--test', 'tests/v6-4-research-os.test.mjs'] },
   { name: 'V6.5 Venture OS Exit Gate', cmd: 'node', args: ['--test', 'tests/v6-5-venture-os.test.mjs'] },
   { name: 'V7.0 Intent Journey Exit Gate', cmd: 'node', args: ['--test', 'tests/v7-0-intent-journey.test.mjs'] },
+  { name: 'V7.1 Adaptive Workspace Exit Gate', cmd: 'node', args: ['--test', 'tests/v7-1-adaptive-workspace.test.mjs'] },
   { name: 'Axe-Core 4.10.3 Accessibility Gate (WCAG 2.2 AA)', cmd: 'python', args: ['scripts/a11y_smoke.py'] }
 ];
 

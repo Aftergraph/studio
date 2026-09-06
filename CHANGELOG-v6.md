@@ -98,3 +98,21 @@ Product Cell → mission (human-approved) → workforce execution → verifier s
 - Resolver never executes; `executing` requires every capability granted
   in the live registry; `completed` requires sealed evidenceRef;
   stages advance immediate-next only.
+
+## [V7.1] — Adaptive Workspace
+
+### Added
+- `src/workspace/adaptive-composer.mjs` — `composeAdaptive()` builds the
+  workspace from objectType + journeyStage + context + intent + grants.
+  Typed surface descriptors only, never markup, never authority.
+- `server/workspace-routes.mjs` — `GET /api/v1/federation/workspace/compose`
+  wired into federation routes (read-only composition endpoint).
+- `tests/v7-1-adaptive-workspace.test.mjs` — 13 tests incl. journey-driven
+  end-to-end composition (resolved vs approved renders differently).
+- `scripts/v6_release_verify.mjs` — Gate 20: V7.1 Adaptive Workspace Exit Gate.
+
+### Invariants
+- Only registered surface kinds emitted (closed vocabulary
+  `ADAPTIVE_SURFACE_KINDS`); unknown types fall back, never invent.
+- Execute intent without grant omits action-bar with explicit reason.
+- Plan frozen; JSON contains zero markup.

@@ -37,3 +37,27 @@ test('intent resolve opens a journey without granting', async () => withServer(a
     assert.equal(j.journey.executed, false);
   } finally { srv.close(); await once(srv, 'close'); }
 }));
+
+test('workspace compose returns typed plan without markup', async () => {
+  const { createFederationKernel } = await import('../src/federation/federation-kernel.mjs');
+  const { createFederationApiHandler: mkHandler } = await import('../server/federation-routes.mjs');
+  const k = createFederationKernel();
+  k.registerSurface({ id: 'mission-detail', sourceIntegration: 'works', objectTypes: ['mission'] });
+  k.registerSurface({ id: 'approval-gate', sourceIntegration: 'studio', objectTypes: [] });
+  const h = mkHandler({ kernel: k });
+  const srv = http.createServer((req, res) => {
+    const url = new URL(req.url, 'http://127.0.0.1');
+    if (!h(req, res, url)) { res.writeHead(404); res.end('{}'); }
+  });
+  srv.listen(0, '127.0.0.1');
+  await once(srv, 'listening');
+  try {
+    const b = `http://127.0.0.1:${srv.address().port}`;
+    const r = await fetch(`${b}/api/v1/federation/workspace/compose?objectType=mission&journeyStage=approved`);
+    assert.equal(r.status, 200);
+    const j = await r.json();
+    assert.equal(j.ok, true);
+    assert.equal(j.plan.surfaces[0].kind, 'approval-gate');
+    assert.ok(!JSON.stringify(j.plan).includes('<'));
+  } finally { srv.close(); await once(srv, 'close'); }
+});
