@@ -10,6 +10,6 @@ if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
   const host=process.env.HOST||'127.0.0.1';
   const stateFile=process.env.AFTERGRAPH_STATE_FILE||path.join(root,'.runtime','workspace-state.json');
   const runtimeIntervalMs=Number(process.env.AFTERGRAPH_RUNTIME_INTERVAL_MS||1250);
-  const server=createAppServer({root,stateFile,runtimeIntervalMs});
+  const server=createAppServer({root,stateFile,runtimeIntervalMs,fixtures:process.env.AFTERGRAPH_DEMO_FIXTURES==='true'});
   server.listen(port,host,()=>console.log(`Aftergraph Workspace v5 reference app: http://${host}:${port}`));
 }

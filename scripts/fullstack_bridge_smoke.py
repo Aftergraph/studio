@@ -85,7 +85,7 @@ def check(value,label):
 
 port=free_port();base=f'http://127.0.0.1:{port}'
 with tempfile.TemporaryDirectory(prefix='aftergraph-fullstack-bridge-') as td:
-    env=os.environ.copy();env.update({'PORT':str(port),'HOST':'127.0.0.1','AFTERGRAPH_STATE_FILE':str(Path(td)/'state.json'),'AFTERGRAPH_RUNTIME_INTERVAL_MS':'250'})
+    env=os.environ.copy();env.update({'PORT':str(port),'HOST':'127.0.0.1','AFTERGRAPH_STATE_FILE':str(Path(td)/'state.json'),'AFTERGRAPH_RUNTIME_INTERVAL_MS':'250','AFTERGRAPH_DEMO_FIXTURES':'true'})
     proc=subprocess.Popen(['node','server.mjs'],cwd=ROOT,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
     try:
         wait_health(base)

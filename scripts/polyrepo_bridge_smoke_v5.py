@@ -111,7 +111,7 @@ def check(v,label):
 upstream=ThreadingHTTPServer(('127.0.0.1',0),UpstreamHandler);thread=threading.Thread(target=upstream.serve_forever,daemon=True);thread.start();upbase=f'http://127.0.0.1:{upstream.server_address[1]}'
 port=free_port();base=f'http://127.0.0.1:{port}'
 with tempfile.TemporaryDirectory(prefix='aftergraph-polyrepo-browser-') as td:
-    env=os.environ.copy();env.update({'PORT':str(port),'HOST':'127.0.0.1','AFTERGRAPH_STATE_FILE':str(Path(td)/'state.json'),'AFTERGRAPH_TG_URL':upbase+'/tg','AFTERGRAPH_TG_TOKEN':'TG_BROWSER_SECRET','AFTERGRAPH_WORKS_URL':upbase+'/works','AFTERGRAPH_WORKS_TOKEN':'WORKS_BROWSER_SECRET','AFTERGRAPH_WORKS_BRAIN_PREFIX':'/org/acme/','AFTERGRAPH_AIE_URL':upbase+'/aie','AFTERGRAPH_WI_URL':upbase+'/wi','AFTERGRAPH_WI_TOKEN':'WI_BROWSER_SECRET'})
+    env=os.environ.copy();env.update({'PORT':str(port),'HOST':'127.0.0.1','AFTERGRAPH_STATE_FILE':str(Path(td)/'state.json'),'AFTERGRAPH_TG_URL':upbase+'/tg','AFTERGRAPH_TG_TOKEN':'TG_BROWSER_SECRET','AFTERGRAPH_WORKS_URL':upbase+'/works','AFTERGRAPH_WORKS_TOKEN':'WORKS_BROWSER_SECRET','AFTERGRAPH_WORKS_BRAIN_PREFIX':'/org/acme/','AFTERGRAPH_AIE_URL':upbase+'/aie','AFTERGRAPH_WI_URL':upbase+'/wi','AFTERGRAPH_WI_TOKEN':'WI_BROWSER_SECRET','AFTERGRAPH_DEMO_FIXTURES':'true'})
     proc=subprocess.Popen(['node','server.mjs'],cwd=ROOT,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
     try:
         wait_health(base)

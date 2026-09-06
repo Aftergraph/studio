@@ -5,7 +5,7 @@ import { API_VERSION, sendJson, readJson } from './http-utils.mjs';
 import { createSSEBroker } from './sse-broker.mjs';
 import { serveStatic } from './static-handler.mjs';
 import { isApiRequest, sendApiError } from './api-router.mjs';
-import { appendChatMessage, decideApproval, setTakeover } from '../src/state.mjs';
+import { appendChatMessage, decideApproval, setTakeover, createInitialState } from '../src/state.mjs';
 import { WorkspaceStateStore } from '../src/server-store.mjs';
 import { MissionRuntimeHub } from '../src/server-runtime-hub.mjs';
 import { reduceSpatialState } from '../packages/spatial/index.mjs';
@@ -46,9 +46,9 @@ export function upstreamConfigFromEnv(env=process.env) {
   };
 }
 
-export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, upstreamConfig = null, federation = null } = {}) {
+export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, upstreamConfig = null, federation = null, fixtures = true } = {}) {
   const rootDir = resolveRoot(root);
-  const store = new WorkspaceStateStore({ stateFile });
+  const store = new WorkspaceStateStore({ stateFile, initialState: createInitialState({ fixtures }) });
   const upstreamHub=createUpstreamHub(upstreamConfig || upstreamConfigFromEnv());
   const sse=createSSEBroker({version:API_VERSION});
   const federationHandler=federation?.kernel?createFederationApiHandler(federation):null;

@@ -8,8 +8,8 @@ function createDefaultSpace() {
   return space;
 }
 
-export function createInitialState() {
-  return {
+export function createInitialState({ fixtures = true } = {}) {
+  const state = {
     user: { id:'demo-user', name:'Demo User', role:'operator', capabilities:['*'] },
     activeDomain:'chat',
     primaryMode:'chat',
@@ -83,6 +83,18 @@ export function createInitialState() {
       { id:'ev4', type:'evidence.sealed', text:'Staging verification evidence sealed', time:'10:27' },
     ],
     telemetry:{ online:true, runtime:'healthy', chain:'verified', cost:8.49, activeRuns:3, queued:1, evidence:64, latency:148 },
+    fixtureMode: Boolean(fixtures),
+    source: fixtures ? 'demo-fixture' : 'runtime-empty',
+  };
+  if (fixtures) return state;
+  return {
+    ...state,
+    activeConversationId: null,
+    needsYou: [], approvals: [], missions: [], agents: [], conversations: [],
+    artifacts: [], memory: [], events: [],
+    telemetry: { online: false, runtime: 'unavailable', chain: 'unknown', cost: 0, activeRuns: 0, queued: 0, evidence: 0, latency: null },
+    fixtureMode: false,
+    source: 'runtime-empty',
   };
 }
 

@@ -2,6 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createInitialState, resolveNeed, decideApproval, setTakeover, settleMission, conversationMissionId } from '../src/state.mjs';
 
+test('production initial state is explicit and contains no demo records', () => {
+  const state = createInitialState({ fixtures: false });
+  assert.equal(state.fixtureMode, false);
+  assert.equal(state.source, 'runtime-empty');
+  assert.deepEqual(state.missions, []);
+  assert.deepEqual(state.approvals, []);
+  assert.deepEqual(state.conversations, []);
+  assert.equal(state.telemetry.runtime, 'unavailable');
+});
 test('resolving Needs You removes it from active attention queue', () => {
   const state = createInitialState();
   const id = state.needsYou[0].id;

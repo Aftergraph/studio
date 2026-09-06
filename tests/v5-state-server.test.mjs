@@ -6,10 +6,10 @@ import path from 'node:path';
 import { createInitialState } from '../src/state.mjs';
 import { createAppServer } from '../server.mjs';
 
-async function withServer(fn) {
+async function withServer(fn, options={}) {
   const dir=await mkdtemp(path.join(os.tmpdir(),'aftergraph-v5-'));
   const stateFile=path.join(dir,'state.json');
-  const server=createAppServer({root:new URL('../',import.meta.url),stateFile,runtimeIntervalMs:20});
+  const server=createAppServer({root:new URL('../',import.meta.url),stateFile,runtimeIntervalMs:20,...options});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const base=`http://127.0.0.1:${server.address().port}`;
   try{await fn(base,stateFile)}finally{await new Promise(resolve=>server.close(resolve));await rm(dir,{recursive:true,force:true})}
@@ -35,6 +35,15 @@ test('V5 API identifies itself and returns spatial state',async()=>{
   });
 });
 
+test('production server starts with an explicit empty runtime state when fixtures are disabled',async()=>{
+  await withServer(async base=>{
+    const read=await json(`${base}/api/v1/state`);
+    assert.equal(read.response.status,200);
+    assert.equal(read.body.state.fixtureMode,false);
+    assert.equal(read.body.state.source,'runtime-empty');
+    assert.deepEqual(read.body.state.missions,[]);
+  },{fixtures:false});
+});
 test('spatial mutations persist through server and restart-safe store',async()=>{
   await withServer(async base=>{
     const mutation=await json(`${base}/api/v1/spaces/space_primary`,{

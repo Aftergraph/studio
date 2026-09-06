@@ -69,8 +69,12 @@ export function bootstrapAftergraph(){
   }
 
   function loadState(){
-    try{const raw=localStorage.getItem(STORAGE_KEY);if(raw)return {...createInitialState(),...JSON.parse(raw)}}catch{}
-    return createInitialState();
+    const initial=createInitialState({fixtures:location.protocol!=='http:'});
+    try{
+      const raw=localStorage.getItem(STORAGE_KEY);
+      if(raw){const parsed=JSON.parse(raw);if(!(initial.fixtureMode===false&&parsed.fixtureMode===true))return {...initial,...parsed}}
+    }catch{}
+    return initial;
   }
   function saveState(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}catch{}}
   function detectDevice(){return window.matchMedia('(max-width: 760px)').matches?'mobile':'desktop'}
