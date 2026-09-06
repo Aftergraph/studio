@@ -573,7 +573,7 @@ button:active{transform:translateY(1px) scale(.992)}
 .ag-space-surface:hover{border-color:rgba(148,163,184,.22)}.ag-space-surface.is-focused{border-color:rgba(139,124,255,.44);box-shadow:0 24px 70px rgba(17,14,55,.34),inset 0 0 0 1px rgba(139,124,255,.1)}
 .ag-space-surface>header{height:46px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 12px;border-bottom:1px solid var(--ag-v5-line);background:rgba(6,11,20,.44)}
 .ag-space-surface>header>span:first-child{display:grid;gap:1px}.ag-space-surface>header small{font-size:9px;color:var(--ag-v5-soft);text-transform:uppercase;letter-spacing:.08em}.ag-space-surface>header strong{font-size:11px;font-weight:650;color:#dfe7f2}
-.ag-space-surface-actions{display:flex;gap:3px}.ag-space-surface-actions button{border:0;background:transparent;color:var(--ag-v5-soft);font-size:10px;border-radius:6px;padding:5px 6px}.ag-space-surface-actions button:hover,.ag-space-surface-actions button:focus-visible{color:white;background:rgba(255,255,255,.07)}
+.ag-space-surface-actions{display:flex;gap:3px}.ag-space-surface-actions button{border:0;background:transparent;color:var(--ag-v5-soft);font-size:10px;border-radius:6px;padding:5px 6px;min-width:24px;min-height:24px;display:inline-flex;align-items:center;justify-content:center}.ag-space-surface-actions button:hover,.ag-space-surface-actions button:focus-visible{color:white;background:rgba(255,255,255,.07)}
 .ag-space-surface-body{min-height:0;height:calc(100% - 46px);overflow:auto;padding:12px}
 
 /* Semantic zoom */
