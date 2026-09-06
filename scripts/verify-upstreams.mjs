@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { validateSourceTruthBundle } from '../src/integrations/source-truth.mjs';
 import { UPSTREAM_REVISIONS } from '../src/integrations/upstream-hub.mjs';
 
-const root=path.resolve(fileURLToPath(new URL('../..',import.meta.url)),'upstreams');
+const root=path.join(fileURLToPath(new URL('..',import.meta.url)),'upstreams');
 const read=rel=>JSON.parse(readFileSync(path.join(root,rel),'utf8'));
 const report=validateSourceTruthBundle({
   manifest:read('UPSTREAM-MANIFEST.json'),

@@ -1,0 +1,48 @@
+name: CI & Brand Token Verification
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate JSON schemas
+        run: |
+          node -e "JSON.parse(require('fs').readFileSync('tokens.json', 'utf8'))"
+          node -e "JSON.parse(require('fs').readFileSync('manifest.json', 'utf8'))"
+
+      - name: Verify SVG assets integrity
+        run: |
+          node -e "
+            const fs = require('fs');
+            const files = ['assets/logo.svg', 'assets/wordmark.svg', 'assets/icon.svg', 'assets/banner.svg'];
+            files.forEach(f => {
+              if (!fs.existsSync(f)) throw new Error('Missing: ' + f);
+              const content = fs.readFileSync(f, 'utf8');
+              if (!content.includes('<svg') || !content.includes('</svg>')) throw new Error('Invalid SVG: ' + f);
+            });
+            console.log('SVG assets verified.');
+          "
+
+      - name: Verify Token Export Integrity
+        run: |
+          node -e "
+            const fs = require('fs');
+            const tokens = JSON.parse(fs.readFileSync('tokens.json', 'utf8'));
+            if (!tokens.color?.base?.['institution-black']) throw new Error('Missing institution-black');
+            if (!tokens.color?.accent?.['control-cyan']) throw new Error('Missing control-cyan');
+            console.log('Brand tokens valid.');
+          "

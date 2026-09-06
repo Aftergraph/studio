@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { validateSourceTruthBundle } from '../src/integrations/source-truth.mjs';
 import { UPSTREAM_REVISIONS } from '../src/integrations/upstream-hub.mjs';
 const root=fileURLToPath(new URL('..',import.meta.url));
-const upstreamRoot=path.resolve(root,'../upstreams');
+const upstreamRoot=path.join(root,'upstreams');
 function run(name,cmd,args,cwd=root){const r=spawnSync(cmd,args,{cwd,encoding:'utf8'});if(r.status!==0){console.error(`FAIL ${name}\n${r.stdout}\n${r.stderr}`);process.exitCode=1}else console.log(`PASS ${name}`)}
 function check(name,ok){console.log(`${ok?'PASS':'FAIL'} ${name}`);if(!ok)process.exitCode=1}
 const tests=readdirSync(path.join(root,'tests')).filter(x=>x.endsWith('.test.mjs')).sort().map(x=>`tests/${x}`);

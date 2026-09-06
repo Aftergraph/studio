@@ -8,7 +8,7 @@ on:
 
 jobs:
   verify:
-    name: Monolithic Release Verification (16 Gates)
+    name: Monolithic Release Verification (18 Gates)
     runs-on: ubuntu-latest
 
     steps:

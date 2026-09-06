@@ -1,0 +1,55 @@
+{
+  "name": "@aftergraph/brand",
+  "version": "1.0.0",
+  "description": "Official brand identity, design tokens, visual assets, and UI contracts for Aftergraph / ABDE Intelligence",
+  "type": "module",
+  "main": "./index.mjs",
+  "module": "./index.mjs",
+  "types": "./types.d.ts",
+  "exports": {
+    ".": {
+      "types": "./types.d.ts",
+      "import": "./index.mjs",
+      "default": "./index.mjs"
+    },
+    "./tokens": {
+      "types": "./types.d.ts",
+      "import": "./index.mjs"
+    },
+    "./tokens.json": "./tokens.json",
+    "./manifest.json": "./manifest.json",
+    "./tokens.css": "./tokens.css",
+    "./css": "./tokens.css",
+    "./react": {
+      "types": "./types.d.ts",
+      "import": "./react.mjs"
+    },
+    "./svg/*": "./svg/*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Aftergraph/brand.git"
+  },
+  "keywords": [
+    "aftergraph",
+    "abde-intelligence",
+    "design-system",
+    "brand",
+    "tokens",
+    "governed-intelligence",
+    "visual-language"
+  ],
+  "author": "Aftergraph Architecture Council",
+  "license": "Apache-2.0",
+  "files": [
+    "index.mjs",
+    "react.mjs",
+    "types.d.ts",
+    "tokens.css",
+    "tokens.json",
+    "manifest.json",
+    "USAGE-RULES.md",
+    "DESIGN-SYSTEM.md",
+    "svg"
+  ]
+}

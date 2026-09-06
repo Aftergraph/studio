@@ -1,0 +1,80 @@
+{
+  "manifest": "aftergraph-brand-manifest",
+  "version": "1.0.0",
+  "status": "provisional-not-trademark-cleared",
+  "brand": {
+    "name": "Aftergraph",
+    "altName": "ABDE Intelligence",
+    "tagline": "Infrastructure for governed autonomous intelligence",
+    "identity": "Institutional graph brand",
+    "grammar": "graphs → boundaries → authority → execution → evidence → verified outcomes",
+    "mission": "Govern autonomous execution through verifiable evidence and boundary-enforced graph semantics."
+  },
+  "tokens": "tokens.json",
+  "rules": "USAGE-RULES.md",
+  "designSystem": "DESIGN-SYSTEM.md",
+  "palette": {
+    "institution_black": "#080C14",
+    "graph_midnight": "#0E1630",
+    "evidence_white": "#F5F7FA",
+    "slate": "#8993A4",
+    "control_cyan": "#42C7E8",
+    "evidence_teal": "#24C4AD",
+    "authority_violet": "#7759E8",
+    "decision_amber": "#F0A64A",
+    "system_blue": "#4C8BD8"
+  },
+  "claims": {
+    "provisional": true,
+    "notTrademarkCleared": true,
+    "noIrreversibleRenames": true,
+    "aieIndependentTrack": true,
+    "noSharedClaimInheritance": true,
+    "evidenceBoundaries": [
+      "runtime",
+      "execution",
+      "conformance",
+      "scientific"
+    ]
+  },
+  "visualModes": {
+    "character": "workforce/agent identities (selective)",
+    "product": "real UI/product screenshots and workflows",
+    "system": "architecture, flows, evidence, trust boundaries",
+    "cinematic": "campaign, release, research, storytelling"
+  },
+  "assets": {
+    "wordmark": "svg/aftergraph-wordmark.svg",
+    "wordmarkLight": "svg/aftergraph-wordmark-light.svg",
+    "monogram": "svg/aftergraph-monogram.svg",
+    "monogramMono": "svg/aftergraph-monogram-mono.svg",
+    "monogramInverse": "svg/aftergraph-monogram-inverse.svg",
+    "appIcon": "svg/aftergraph-app-icon.svg",
+    "socialBanner": "svg/aftergraph-social-banner.svg",
+    "lockupHorizontal": "svg/aftergraph-lockup-horizontal.svg",
+    "lockupHorizontalLight": "svg/aftergraph-lockup-horizontal-light.svg",
+    "lockupStacked": "svg/aftergraph-lockup-stacked.svg",
+    "teams": {
+      "platform": "svg/team-platform.svg",
+      "research": "svg/team-research.svg",
+      "security": "svg/team-security.svg",
+      "intelligence": "svg/team-intelligence.svg",
+      "product": "svg/team-product.svg",
+      "infrastructure": "svg/team-infrastructure.svg"
+    }
+  },
+  "surfaces": {
+    "orgProfile": "profile/README.md",
+    "orgAvatar": "svg/aftergraph-app-icon.svg",
+    "orgSocialPreview": "svg/aftergraph-social-banner.svg",
+    "repoHeroes": "svg/aftergraph-social-banner.svg",
+    "repoSocialPreviews": "svg/aftergraph-social-banner.svg"
+  },
+  "exports": {
+    "javascript": "index.mjs",
+    "css": "tokens.css",
+    "react": "react.mjs",
+    "typescript": "types.d.ts"
+  },
+  "repository": "https://github.com/Aftergraph/brand"
+}

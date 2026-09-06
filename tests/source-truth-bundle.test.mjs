@@ -7,7 +7,7 @@ import { validateSourceTruthBundle } from '../src/integrations/source-truth.mjs'
 import { UPSTREAM_REVISIONS } from '../src/integrations/upstream-hub.mjs';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
-const upstreamRoot=path.resolve(here,'../../upstreams');
+const upstreamRoot=path.join(here,'..','upstreams');
 const json=async rel=>JSON.parse(await readFile(path.join(upstreamRoot,rel),'utf8'));
 
 test('materialized source-truth bundle matches every pinned runtime/reference revision and boundary contract',async()=>{

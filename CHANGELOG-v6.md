@@ -63,3 +63,21 @@ Aftergraph V6 unifies intelligence orchestration, deep agentic execution, living
 
 ### Invariant
 Research result can never implicitly become runtime authority. Promotion requires explicit human reviewer and approver at every stage.
+## [V6.5] — Venture OS
+
+### Added
+- `src/venture/cell-registry.mjs` — ProductCell (id, goal, status required); mission creation requires humanApproved
+- `src/venture/budget.mjs` — BudgetEnvelope with hard ceiling; exceeded blocks consumption; expansion requires humanApproved; settle() records allocated vs actual
+- `src/venture/workforce.mjs` — Workforce roster with verifier≠executor enforcement, no self-assign, freezable roster
+- `src/venture/mission-outcome.mjs` — MissionOutcome with verifier≠executor hard throw; verified outcomes require verifier_id; failed outcomes record cost
+- `src/venture/portfolio.mjs` — read-only derived Portfolio (authority: 'none'); aggregates missions and cost across cells
+- `src/venture/avc-integration.mjs` — AVC federation manifest; authority never includes execute
+- `tests/v6-5-venture-os.test.mjs` — 20 test cases covering all V6.5 invariants
+- Gate 17 added to release verifier (V6.5 Venture OS Exit Gate)
+
+### Fixed
+- `packages/brand` converted from dangling gitlink to vendored files at exact-head 52ae51a of Aftergraph/brand
+- `upstreams/` vendored in-repo; verify.mjs, verify-upstreams.mjs and source-truth-bundle.test.mjs now resolve in-repo upstreams/
+
+### Invariant
+Product Cell → mission (human-approved) → workforce execution → verifier seals outcome → budget settled → portfolio updated. Nothing in the chain can be skipped or auto-approved.

@@ -1,0 +1,85 @@
+{
+  "version": "1.0",
+  "generated_at": "2026-09-06",
+  "transport": "connected-github-exact-head-review",
+  "git_clone": {
+    "attempted": true,
+    "succeeded": false,
+    "blocker": "container DNS could not resolve github.com"
+  },
+  "materialized": [
+    {
+      "kind": "exact-contract",
+      "repo": "Aftergraph/after-graph-governance",
+      "head": "40226ebd03ef4c6f081229cce393b231009f0e18",
+      "source_path": "docs/contracts/mission-state/1.0.json",
+      "local_path": "contracts/governance/mission-state-1.0.json",
+      "sha256": "04af348b0019fa23d149229e88c097540a241b2413ca27b5e47dda15ed27e3e9"
+    },
+    {
+      "kind": "exact-contract",
+      "repo": "Aftergraph/after-graph-governance",
+      "head": "40226ebd03ef4c6f081229cce393b231009f0e18",
+      "source_path": "docs/contracts/frozen/policy.token.schema.json",
+      "local_path": "contracts/governance/policy.token.schema.json",
+      "sha256": "6ed2dc23e99a68d5f3613f5ae653f1e9380600bef6249987237412904c06a4c0"
+    },
+    {
+      "kind": "exact-contract",
+      "repo": "Aftergraph/work-intelligence-v2",
+      "head": "f5cd61ef02b858bcc31f2bb25a0bb792a3b46eeb",
+      "source_path": "contracts/work-intelligence-boundary/1.0.json",
+      "local_path": "contracts/work-intelligence/work-intelligence-boundary-1.0.json",
+      "sha256": "29384a52800a05273677a21a0acb7f52ff1ad037bb897645e8e465aed5148c97"
+    },
+    {
+      "kind": "reviewed-interface-notes",
+      "repo": "Aftergraph/trust-gateway",
+      "head": "515f8f744ff9b0a14df7398e38693fd3ac7ab667",
+      "local_path": "source-seams/trust-gateway/HTTP-SURFACES.md",
+      "sha256": "d783dac1d0e51acd8bbf25ceaefc94ec378e553e715eae405fb2f8613d90eb7b"
+    },
+    {
+      "kind": "reviewed-interface-notes",
+      "repo": "Aftergraph/works-execution",
+      "head": "3ea1a80494c38f3e422339db6efbf5a7935a48be",
+      "local_path": "source-seams/works-execution/HTTP-SURFACES.md",
+      "sha256": "459489dca3ba7ec19b9aabc563a3a9ed1c33568acb3e86d2385900998e0aeccd"
+    },
+    {
+      "kind": "reviewed-interface-notes",
+      "repo": "Aftergraph/aie",
+      "head": "3432834afd80e60009f1252a1801f21feb551b9b",
+      "local_path": "source-seams/aie/A2A-HTTP-JSON.md",
+      "sha256": "866798f676f4b13520ea19c437ee45cfe1768f0708055fb50d68072da88c3d6c"
+    },
+    {
+      "kind": "reviewed-interface-notes",
+      "repo": "Aftergraph/work-intelligence-v2",
+      "head": "f5cd61ef02b858bcc31f2bb25a0bb792a3b46eeb",
+      "local_path": "source-seams/work-intelligence-v2/HTTP-SURFACES.md",
+      "sha256": "e154c48badfdf0f08374e290d4d23de82504a15734d803afed03def0520b3c14"
+    },
+    {
+      "kind": "research-reference-notes",
+      "repo": "Aftergraph/intelligence-systems-research",
+      "head": "d67354385ea94f45e2dad7e8362621a9dee31b2f",
+      "local_path": "source-seams/intelligence-systems-research/HUMAN-INTELLIGENCE-EXPERIENCE.md",
+      "sha256": "9ef08367543af60c55b6d68be0b5222794efab947d28d45e692d0de0a2273984"
+    }
+  ],
+  "tracked_but_not_materialized": [
+    {
+      "repo": "Aftergraph/autonomous-venture-company",
+      "reason": "GitHub connector cannot access repository and container git transport is DNS-blocked; no current head independently verified"
+    },
+    {
+      "repo": "Aftergraph/skills-vault",
+      "reason": "GitHub connector cannot access repository and container git transport is DNS-blocked; no current head independently verified"
+    },
+    {
+      "repo": "Aftergraph/work-intelligence-web",
+      "reason": "GitHub connector cannot access repository and container git transport is DNS-blocked; sibling product-web is not used as runtime authority"
+    }
+  ]
+}

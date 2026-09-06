@@ -1,0 +1,43 @@
+{
+  "generated_at": "2026-09-06",
+  "transport": "connected-github-exact-head-source-snapshot",
+  "clone_status": "git clone attempted but container DNS could not resolve github.com",
+  "repos": {
+    "trust-gateway": {
+      "repo": "Aftergraph/trust-gateway",
+      "branch": "main",
+      "head": "515f8f744ff9b0a14df7398e38693fd3ac7ab667",
+      "role": "runtime-enforcement"
+    },
+    "works-execution": {
+      "repo": "Aftergraph/works-execution",
+      "branch": "main",
+      "head": "3ea1a80494c38f3e422339db6efbf5a7935a48be",
+      "role": "durable-execution"
+    },
+    "aie": {
+      "repo": "Aftergraph/aie",
+      "branch": "main",
+      "head": "3432834afd80e60009f1252a1801f21feb551b9b",
+      "role": "normative-authority"
+    },
+    "work-intelligence-v2": {
+      "repo": "Aftergraph/work-intelligence-v2",
+      "branch": "main",
+      "head": "f5cd61ef02b858bcc31f2bb25a0bb792a3b46eeb",
+      "role": "detection/observation/proposal-only"
+    },
+    "after-graph-governance": {
+      "repo": "Aftergraph/after-graph-governance",
+      "branch": "main",
+      "head": "40226ebd03ef4c6f081229cce393b231009f0e18",
+      "role": "canonical-contracts"
+    },
+    "intelligence-systems-research": {
+      "repo": "Aftergraph/intelligence-systems-research",
+      "branch": "main",
+      "head": "d67354385ea94f45e2dad7e8362621a9dee31b2f",
+      "role": "research"
+    }
+  }
+}
