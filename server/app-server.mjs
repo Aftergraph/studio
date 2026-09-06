@@ -12,6 +12,7 @@ import { reduceSpatialState } from '../packages/spatial/index.mjs';
 import { buildReplayFrames } from '../src/replay.mjs';
 import { buildTemporalFrames, reconstructAt, counterfactualAt, futureTrajectory } from '../src/temporal/temporal-intelligence.mjs';
 import { createActionGuard, assertActorCapability, requireResetConfirmation, RESET_CONFIRMATION } from '../src/action-guard.mjs';
+import { createKnowledgeEntry, promoteKnowledge, isAuthoritative } from '../src/brain/knowledge.mjs';
 import { createServerLog } from '../src/distributed/server-log.mjs';
 import { createUpstreamHub } from '../src/integrations/upstream-hub.mjs';
 import { createFederationApiHandler } from './federation-routes.mjs';
@@ -415,6 +416,47 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
           if (!artifact) { sendJson(res, 404, { error:'artifact_not_found' }); return; }
           const mission = snapshot.missions.find(m => m.id === artifact.missionId) || null;
           sendJson(res, 200, { artifact, mission, evidenceCount:mission?.evidenceCount || 0 });
+          return;
+        }
+
+        if (url.pathname === '/api/v1/memory/authoritative' && req.method === 'GET') {
+          // ponytail: legacy seed entries carry promoted:true without lifecycle
+          // status; grandfather them instead of rewriting seed history.
+          const entries=store.snapshot().memory.filter(m=>isAuthoritative(m)||m.promoted===true);
+          sendJson(res,200,{version:API_VERSION,entries});
+          return;
+        }
+
+        if (url.pathname === '/api/v1/memory' && req.method === 'POST') {
+          const body=await readJson(req);
+          const action=beginAction(req,body,'memory.write',url.pathname);
+          try {
+            const entry=createKnowledgeEntry({
+              scope:body.scope,label:body.label,value:body.value,source:body.source,
+              confidence:body.confidence??0,retentionMs:body.retentionMs??null,
+            });
+            const next=await store.mutate(draft=>{draft.memory.unshift(entry);return draft;});
+            completeAction(action.key,{status:'accepted'});
+            broadcast({state:next,runtimes:runtimeHub.snapshot()});
+            sendJson(res,201,{version:API_VERSION,entry});
+          } catch(error){ actionGuard.fail(action.key,error?.message||error);sendJson(res,422,{error:error?.code||'invalid_memory_entry'}); }
+          return;
+        }
+
+        match = url.pathname.match(/^\/api\/v1\/memory\/([^/]+)\/promote$/);
+        if (match && req.method === 'POST') {
+          const body=await readJson(req);
+          const id=decodeURIComponent(match[1]);
+          const found=store.snapshot().memory.find(m=>m.id===id);
+          if(!found){sendJson(res,404,{error:'memory_not_found'});return;}
+          const action=beginAction(req,body,'memory.promote',url.pathname);
+          try {
+            const entry=promoteKnowledge(found,{by:body.actor,evidence:body.evidence,override:body.override});
+            const next=await store.mutate(draft=>{draft.memory=draft.memory.map(m=>m.id===id?entry:m);return draft;});
+            completeAction(action.key,{status:'accepted'});
+            broadcast({state:next,runtimes:runtimeHub.snapshot()});
+            sendJson(res,200,{version:API_VERSION,entry});
+          } catch(error){ actionGuard.fail(action.key,error?.message||error);sendJson(res,422,{error:error?.code||'promotion_rejected'}); }
           return;
         }
 

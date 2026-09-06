@@ -35,6 +35,7 @@ const GATES = [
   { name: 'V8.1 Distributed Server Sync Exit Gate', cmd: 'node', args: ['--test', 'tests/v81-distributed-sync.test.mjs'] },
   { name: 'V8.1 Distributed Aftergraph Exit Gate', cmd: 'node', args: ['--test', 'tests/v81-distributed-offline-client.test.mjs'] },
   { name: 'V8.2 Brain Knowledge Lifecycle Exit Gate', cmd: 'node', args: ['--test', 'tests/v82-brain-knowledge.test.mjs'] },
+  { name: 'V8.2 Brain Server Promotion Exit Gate', cmd: 'node', args: ['--test', 'tests/v82-brain-server.test.mjs'] },
   { name: 'Axe-Core 4.10.3 Accessibility Gate (WCAG 2.2 AA)', cmd: 'python', args: ['scripts/a11y_smoke.py'] }
 ];
 
