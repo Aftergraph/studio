@@ -53,6 +53,23 @@ Aftergraph V6 unifies intelligence orchestration, deep agentic execution, living
 - Added GitHub Actions CI/CD workflows for both repositories.
 - Registered Studio and Brand in Aftergraph/.github profile ecosystem table.
 - Full 16-gate monolithic verification verified 100% green.
+## [V6.1] — Live Federation
+
+### Added
+- Live federated event flow: envelope, normalizer, stream adapter, health monitor and authoritative resync protocol (`src/federation/live/`).
+- Engines can go offline/online without false state; reconnect/resync with partial federation support.
+
+## [V6.2] — Universal Search & Context
+
+### Added
+- Federated search over work, research, agents, evidence and memory (`src/search/federated-index.mjs`, `src/search/context-resolver.mjs`).
+- Search results carry provenance with explicit incomplete-result semantics.
+
+## [V6.3] — Capability Runtime
+
+### Added
+- Skills, agents, tools and providers as typed capabilities with policy-gated execution (`src/federation/capability-registry.mjs`, `src/runtime/capability-runtime.mjs`).
+- Discovery never implies grant; capability execution is fully governed.
 ## [V6.4] — Research OS
 
 ### Added

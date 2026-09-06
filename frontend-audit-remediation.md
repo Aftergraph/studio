@@ -53,5 +53,5 @@ Changes:
 Acceptance evidence:
 
 - Focused destructive/fullstack/UI tests: 17/17 PASS.
-- Full Node suite: 488/488 PASS.
+- Full Node suite at slice time: 488/488 PASS (superseded: suite has since grown with V8.1 distributed slices).
 - Remaining release, browser, accessibility and exact-head CI checks are run before promotion.
