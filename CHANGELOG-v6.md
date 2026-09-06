@@ -152,3 +152,20 @@ Product Cell → mission (human-approved) → workforce execution → verifier s
 - Temporal views are deterministic and immutable.
 - Counterfactuals never mutate historical state or execute actions.
 - Future trajectories are forecasts only: `executed: false`, `authority: 'none'`.
+
+## [V7.4] — Outcome Economy
+
+### Added
+- `src/economy/outcome-economy.mjs` — integer-cent attributable cost ledger,
+  idempotent entries, evidence-bound settlement, and reconciliation.
+- `GET /api/v1/temporal` remains read-only; economy never moves money or issues
+  invoices.
+- Outcome receipts can show actual vs allocated cost without implying payment.
+- `tests/v7-4-outcome-economy.test.mjs` — 10 tests for cents precision,
+  budget overruns, evidence, idempotency and reconciliation.
+- `scripts/v6_release_verify.mjs` — Gate 23: V7.4 Outcome Economy Exit Gate.
+
+### Invariants
+- All amounts are finite, non-negative integer cents within safe integer range.
+- Budget overrun blocks settlement until explicit human approval.
+- Cost, evidence and outcome remain attributable; authority stays `none`.
