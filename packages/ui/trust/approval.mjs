@@ -1,0 +1,5 @@
+import { AGIcon, esc, attr } from '../shared.mjs';
+
+export function AGApproval({id,title,risk,state='pending',why,impact,rollback,authority,evidence=[]}) {
+  return `<section id="${attr(id)}" class="ag-approval" data-ag-component="approval" data-risk="${attr(risk)}" data-state="${attr(state)}" role="dialog" aria-modal="true" aria-labelledby="${attr(id)}-title"><div class="ag-approval-mark">${AGIcon('shield',{size:21})}</div><div class="ag-approval-head"><small>Approval required</small><h2 id="${attr(id)}-title">${esc(title)}</h2><div class="ag-approval-meta"><span>${esc(risk)}</span><span>${esc(authority)}</span><span>${evidence.length} evidence</span></div></div><dl><div><dt>Why</dt><dd>${esc(why)}</dd></div><div><dt>Impact</dt><dd>${esc(impact)}</dd></div><div><dt>Rollback</dt><dd>${esc(rollback)}</dd></div></dl><footer><button type="button" class="ag-button quiet" data-approval-action="reject">Reject</button><button type="button" class="ag-button" data-approval-action="inspect">${AGIcon('evidence',{size:15})} Evidence</button><button type="button" class="ag-button primary" data-approval-action="approve">Approve</button></footer></section>`;
+}

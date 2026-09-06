@@ -1,0 +1,19 @@
+/* V5.2 responsive overrides live here. Base rules remain order-preserved in views.css until intentional redesign. */
+
+/* V5.2 purpose-built mobile shell */
+@media(max-width:760px){
+  .ag-sidebar{display:none}
+  .ag-mode-switch{display:flex;position:fixed;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom, 0px));z-index:70;height:54px;padding:5px;border:1px solid rgba(182,207,239,.12);border-radius:17px;background:rgba(7,17,31,.94);box-shadow:0 18px 46px rgba(0,0,0,.38);backdrop-filter:blur(18px)}
+  .ag-mode-switch button{flex:1;min-width:0;height:44px;border-radius:12px;font-size:12px}
+  .ag-calm-conversation>.ag-conversation-head,.ag-calm-conversation>.ag-takeover-ribbon,.ag-calm-conversation>.ag-reading-stream,.ag-calm-conversation>.ag-live-strip,.ag-calm-conversation>.ag-calm-composer-wrap{width:calc(100% - 26px)}
+  .ag-calm-conversation>.ag-conversation-head{padding:18px 0 9px}
+  .ag-calm-conversation>.ag-conversation-head h1{font-size:21px}
+  .ag-calm-conversation>.ag-conversation-head p{font-size:12px;line-height:1.45}
+  .ag-calm-composer-wrap{padding-bottom:calc(74px + env(safe-area-inset-bottom, 0px))}
+  .ag-calm-composer-wrap .ag-action-dock{display:none}
+  .ag-calm-work{display:block;padding-bottom:calc(68px + env(safe-area-inset-bottom, 0px))}
+  .ag-calm-work .ag-mission-rail{display:none}
+  .ag-calm-work .ag-work-canvas{padding:20px 14px 92px}
+  .ag-direct-space{padding-bottom:calc(64px + env(safe-area-inset-bottom, 0px))}
+  .ag-direct-space .ag-space-edge-controls{padding:8px 10px;overflow:auto}
+}

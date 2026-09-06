@@ -1,0 +1,22 @@
+import { useState } from 'react';
+import { ScrollView, Pressable, Text, TextInput, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { Image } from 'expo-image';
+import { theme } from '../src/theme';
+
+export default function ChatScreen() {
+  const [draft, setDraft] = useState('');
+  const [artifactOpen, setArtifactOpen] = useState(false);
+  return (
+    <View style={{ flex: 1, backgroundColor: theme.canvas }}>
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ padding: 18, gap: 22, paddingBottom: 112 }}>
+        <View style={{ gap: 5 }}><Text selectable style={{ fontSize: 24, fontWeight: '740', color: theme.text, letterSpacing: -.7 }}>Build Q4 report</Text><Text selectable style={{ color: theme.text3, fontSize: 12 }}>Create a Q4 business report with key metrics, trends and recommendations.</Text></View>
+        <View style={{ alignItems: 'flex-end' }}><View style={{ maxWidth: '86%', backgroundColor: theme.surface, padding: 12, borderRadius: 14, borderCurve: 'continuous' }}><Text selectable style={{ color: theme.text }}>Create a Q4 business report with key metrics, trends and recommendations.</Text></View></View>
+        <View style={{ gap: 12 }}><Text selectable style={{ fontWeight: '700', color: theme.text }}>Friday</Text><Text selectable style={{ color: theme.text2, lineHeight: 21 }}>I turned that into structured work and started the analysis. I’ll only interrupt you if a decision or exception needs attention.</Text>{['Analyze data sources','Process Q4 metrics','Generate visualizations','Create recommendations','Compile final report'].map((step, i) => <View key={step} style={{ minHeight: 38, borderTopWidth: 1, borderTopColor: theme.border, flexDirection: 'row', alignItems: 'center', gap: 9 }}><Image source={`sf:${i===0?'checkmark.circle.fill':i===1?'circle.dotted':'circle'}`} style={{ width: 16, height: 16, tintColor: i===0?theme.success:i===1?theme.accent:theme.text3 }} /><Text selectable style={{ flex:1, color: theme.text2, fontSize: 13 }}>{step}</Text><Text selectable style={{ color: theme.text3, fontSize: 11 }}>{i===0?'Done':i===1?'Running':'Pending'}</Text></View>)}</View>
+        <Pressable onPress={() => { Haptics.selectionAsync(); setArtifactOpen(true); }} style={{ minHeight: 54, borderTopWidth: 1, borderBottomWidth: 1, borderColor: theme.border, flexDirection:'row', alignItems:'center', gap:10 }}><Image source="sf:doc.text" style={{width:18,height:18,tintColor:theme.accent}}/><View style={{flex:1}}><Text selectable style={{fontWeight:'650',color:theme.text}}>Q4 Business Analysis</Text><Text selectable style={{fontSize:11,color:theme.text3}}>Working artifact · 2 min ago</Text></View><Image source="sf:chevron.right" style={{width:12,height:12,tintColor:theme.text3}}/></Pressable>
+        {artifactOpen ? <View style={{ borderWidth: 1, borderColor: theme.border, borderRadius: 16, borderCurve: 'continuous', padding: 18, gap: 10, backgroundColor: theme.canvas, boxShadow: '0 12px 40px rgba(20,26,38,.08)' }}><View style={{flexDirection:'row',alignItems:'center'}}><Text selectable style={{flex:1,fontWeight:'720',color:theme.text,fontSize:20}}>Q4 Business Analysis</Text><Pressable onPress={()=>setArtifactOpen(false)}><Image source="sf:xmark" style={{width:16,height:16,tintColor:theme.text3}}/></Pressable></View><Text selectable style={{color:theme.text2,lineHeight:20}}>Revenue increased 18% and customer acquisition increased 24%, while retention held at 94%.</Text></View> : null}
+      </ScrollView>
+      <View style={{ position:'absolute', left:12, right:12, bottom:10, flexDirection:'row', gap:8, alignItems:'center', backgroundColor:theme.canvas, borderWidth:1, borderColor:theme.border, borderRadius:16, borderCurve:'continuous', padding:8, boxShadow:'0 8px 30px rgba(20,26,38,.08)' }}><Pressable onPress={()=>Haptics.selectionAsync()}><Image source="sf:paperclip" style={{width:20,height:20,tintColor:theme.text3}}/></Pressable><TextInput value={draft} onChangeText={setDraft} placeholder="Ask, create, analyze, or delegate…" placeholderTextColor={theme.text3} style={{flex:1,minHeight:36,color:theme.text}}/><Pressable onPress={()=>{Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);setDraft('')}} style={{width:36,height:36,borderRadius:11,borderCurve:'continuous',backgroundColor:theme.text,alignItems:'center',justifyContent:'center'}}><Image source="sf:arrow.up" style={{width:17,height:17,tintColor:theme.canvas}}/></Pressable></View>
+    </View>
+  );
+}

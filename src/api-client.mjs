@@ -1,0 +1,93 @@
+function normalizeBase(baseUrl='') {
+  if (!baseUrl) return '';
+  return String(baseUrl).replace(/\/$/,'');
+}
+
+
+async function readBodyWithMeta(response) {
+  const type=response.headers.get('content-type')||'';
+  const text=await response.text();
+  const bytes=new TextEncoder().encode(text).byteLength;
+  let body={};
+  if(text){
+    if(type.includes('application/json')) body=JSON.parse(text);
+    else body={message:text};
+  }
+  return {body,bytes};
+}
+
+async function readBody(response) {
+  const type=response.headers.get('content-type')||'';
+  if (type.includes('application/json')) return response.json();
+  const text=await response.text();
+  return text?{message:text}:{};
+}
+
+export function createApiClient({ baseUrl='', fetchImpl=globalThis.fetch, EventSourceImpl=globalThis.EventSource }={}) {
+  const base=normalizeBase(baseUrl);
+  if (typeof fetchImpl !== 'function') throw new Error('fetch implementation required');
+
+  const request=async(path,options={})=>{
+    const headers={...(options.body?{'content-type':'application/json'}:{}),...(options.headers||{})};
+    let response;
+    try { response=await fetchImpl(`${base}${path}`,{...options,headers}); }
+    catch (cause) {
+      const error=new Error('backend_unavailable');error.code='backend_unavailable';error.cause=cause;throw error;
+    }
+    const body=await readBody(response);
+    if(!response.ok){const error=new Error(body?.error||`http_${response.status}`);error.code=body?.error||`http_${response.status}`;error.status=response.status;throw error}
+    return body;
+  };
+
+  const requestWithMeta=async(path,options={})=>{
+    const headers={...(options.body?{'content-type':'application/json'}:{}),...(options.headers||{})};
+    let response;
+    try { response=await fetchImpl(`${base}${path}`,{...options,headers}); }
+    catch (cause) { const error=new Error('backend_unavailable');error.code='backend_unavailable';error.cause=cause;throw error; }
+    const {body,bytes}=await readBodyWithMeta(response);
+    if(!response.ok){const error=new Error(body?.error||`http_${response.status}`);error.code=body?.error||`http_${response.status}`;error.status=response.status;throw error}
+    return {payload:body,bytes};
+  };
+
+  return Object.freeze({
+    async detect(){try{const body=await request('/healthz');return body?.status==='ok'}catch{return false}},
+    state(){return request('/api/v1/state')},
+    stateWithMeta(){return requestWithMeta('/api/v1/state')},
+    needs(){return request('/api/v1/needs')},
+    missions(){return request('/api/v1/missions')},
+    agents(){return request('/api/v1/agents')},
+    artifacts(){return request('/api/v1/artifacts')},
+    connections(){return request('/api/v1/connections')},
+    spaces(){return request('/api/v1/spaces')},
+    system(){return request('/api/v1/system')},
+    upstreams(){return request('/api/v1/upstreams')},
+    syncUpstreams(){return request('/api/v1/upstreams/sync',{method:'POST'})},
+    decideUpstreamApproval(id,decision){return request(`/api/v1/upstreams/trust-gateway/approvals/${encodeURIComponent(id)}/decision`,{method:'POST',body:JSON.stringify({decision})})},
+    controlUpstreamWork(id,action,payload={}){return request(`/api/v1/upstreams/works/${encodeURIComponent(id)}/control`,{method:'POST',body:JSON.stringify({action,payload})})},
+    reviewWorkIntelligence(id,{actor,decision}={}){return request(`/api/v1/upstreams/work-intelligence/${encodeURIComponent(id)}/review`,{method:'POST',body:JSON.stringify({actor,decision})})},
+    promoteWorkIntelligence(id,{actor,confirmed=false}={}){return request(`/api/v1/upstreams/work-intelligence/${encodeURIComponent(id)}/promote`,{method:'POST',body:JSON.stringify({actor,confirmed})})},
+    cancelAieTask(id){return request(`/api/v1/upstreams/aie/tasks/${encodeURIComponent(id)}/cancel`,{method:'POST',body:'{}'})},
+    sendAieMessage(body){return request('/api/v1/upstreams/aie/messages',{method:'POST',body:JSON.stringify(body)})},
+    createConversation({id,title='New conversation'}={}){return request('/api/v1/conversations',{method:'POST',body:JSON.stringify({id,title})})},
+    resolveNeed(id){return request(`/api/v1/needs/${encodeURIComponent(id)}`,{method:'DELETE'})},
+    context(conversationId){return request(`/api/v1/context?conversationId=${encodeURIComponent(conversationId)}`)},
+    artifact(id){return request(`/api/v1/artifacts/${encodeURIComponent(id)}`)},
+    sendMessage(id,{text,mode='Ask',actor='demo-user',reply=null,attachments=[]}={}){return request(`/api/v1/conversations/${encodeURIComponent(id)}/messages`,{method:'POST',body:JSON.stringify({text,mode,actor,reply,attachments})})},
+    decideApproval(id,decision,actor='demo-user'){return request(`/api/v1/approvals/${encodeURIComponent(id)}/decision`,{method:'POST',body:JSON.stringify({decision,actor})})},
+    setControl(id,mode){return request(`/api/v1/missions/${encodeURIComponent(id)}/control`,{method:'POST',body:JSON.stringify({mode})})},
+    runtime(id,action){return request(`/api/v1/missions/${encodeURIComponent(id)}/runtime`,{method:'POST',body:JSON.stringify({action})})},
+    deleteMemory(id){return request(`/api/v1/memory/${encodeURIComponent(id)}`,{method:'DELETE'})},
+    updateSpace(id,action){return request(`/api/v1/spaces/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify({action})})},
+    replay({cursor,playing,speed}={}){return request('/api/v1/replay',{method:'PATCH',body:JSON.stringify({cursor,playing,speed})})},
+    reset(){return request('/api/v1/reset',{method:'POST'})},
+    subscribe(onMessage,onError=()=>{},{onOpen=()=>{}}={}){
+      if(typeof EventSourceImpl!=='function') return ()=>{};
+      const source=new EventSourceImpl(`${base}/api/v1/events`);
+      const handler=event=>{try{onMessage(JSON.parse(event.data))}catch(error){onError(error)}};
+      source.addEventListener?.('workspace',handler);
+      source.onopen=()=>onOpen();
+      source.onerror=onError;
+      return ()=>{source.removeEventListener?.('workspace',handler);source.close?.()};
+    },
+  });
+}

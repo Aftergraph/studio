@@ -1,0 +1,12 @@
+import { AGIcon, esc, attr } from '../shared.mjs';
+
+export function AGPulseRail({agents=[],attentionCount=0,mission=null,expanded=false}) {
+  const running=agents.filter(a=>a.state==='running');
+  const progress=Math.max(0,Math.min(100,Number(mission?.progress)||0));
+  return `<aside class="ag-pulse-rail ${expanded?'is-open':''}" data-ag-component="pulse-rail" data-state="${attr(mission?.state||'idle')}" aria-label="Live workspace pulse"><button type="button" class="ag-pulse-toggle" data-action="toggle-pulse" aria-expanded="${expanded?'true':'false'}" aria-label="${expanded?'Collapse':'Expand'} live workspace pulse"><span class="ag-pulse-orb" data-live="${running.length?'true':'false'}"><i></i></span><span class="ag-pulse-count">${running.length||agents.length}</span>${AGIcon(expanded?'close':'arrow',{size:12})}</button><div class="ag-pulse-body"><header><small>Live workspace</small><strong>${esc(mission?.title||'No active mission')}</strong><span>${progress}%</span></header><div class="ag-pulse-progress" role="progressbar" aria-label="Mission progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}"><i style="width:${progress}%"></i></div><section><span>Agents</span>${agents.slice(0,4).map(a=>`<button type="button" data-action="context-preview"><i data-state="${attr(a.state||'idle')}">${esc(String(a.name||'A').slice(0,1))}</i><span><strong>${esc(a.name)}</strong><small>${esc(a.task||a.state||'idle')}</small></span><em>${esc(a.state||'idle')}</em></button>`).join('')}</section><button type="button" class="ag-pulse-attention" data-action="show-control">${AGIcon('approval',{size:14})}<span><strong>${Number(attentionCount)||0} need${Number(attentionCount)===1?'':'s'} you</strong><small>Approvals, credentials and exceptions</small></span>${AGIcon('arrow',{size:12})}</button></div></aside>`;
+}
+
+export function AGTelemetryStrip({telemetry={},backend='local'}) {
+  const status=telemetry.online===false?'offline':String(telemetry.runtime||'unknown');
+  return `<div class="ag-telemetry-strip" data-ag-component="telemetry-strip" data-state="${attr(status)}" data-backend="${attr(backend)}" role="status" aria-label="Workspace runtime health"><span class="ag-telemetry-live"><i></i>${backend==='connected'?'Live backend':'Local runtime'}</span><span>${Number(telemetry.activeRuns)||0} active</span><span>${Number(telemetry.queued)||0} queued</span><span>${Number(telemetry.evidence)||0} evidence</span><span>${Number(telemetry.latency)||0}ms</span><span>${esc(telemetry.chain||'unverified')}</span></div>`;
+}

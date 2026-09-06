@@ -1,0 +1,8 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createCoreIntegrationManifests, createManifestBackedCoreAdapters } from '../src/federation/core-integrations.mjs';
+
+test('core integration manifests preserve specialist authority boundaries',()=>{const m=createCoreIntegrationManifests();assert.equal(m.trustGateway.authority[0].owner,'trust-gateway');assert.equal(m.works.authority[0].owner,'works');assert.equal(m.workIntelligence.authority.some(a=>a.operations?.includes('execute')),false);assert.equal(m.aie.roles.includes('institutional-authority'),true);assert.equal(m.governance.roles.includes('canonical-contracts'),true)});
+test('core manifest repository revisions are explicit and non-empty',()=>{for(const m of Object.values(createCoreIntegrationManifests())){assert.match(m.repository,/^Aftergraph\//);assert.ok(m.repositoryRevision)}});
+test('manifest-backed adapters keep manifests separate from runtime clients',()=>{const bundle=createManifestBackedCoreAdapters({config:{},fetchImpl:async()=>{throw new Error('unused')}});assert.equal(bundle.integrations.works.manifest.id,'works');assert.equal(bundle.integrations.works.adapter,null);assert.equal(bundle.integrations.governance.adapter.kind,'after-graph-governance')});
+test('configured adapter never gains authority from manifest projection',()=>{const bundle=createManifestBackedCoreAdapters({config:{workIntelligence:{baseUrl:'http://wi.invalid'}},fetchImpl:async()=>({ok:true,status:200,text:async()=>'{"items":[]}',headers:new Headers({'content-type':'application/json'})})});const wi=bundle.integrations.workIntelligence;assert.ok(wi.adapter);assert.equal(wi.manifest.authority.some(a=>a.operations?.includes('execute')),false)});

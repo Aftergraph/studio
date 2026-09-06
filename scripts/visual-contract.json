@@ -1,0 +1,10 @@
+{
+  "schema":"aftergraph.visual-parity/1.0",
+  "thresholds":{"ssim_min":0.995,"changed_pixel_ratio_max":0.005,"channel_ignore_threshold":12},
+  "viewports":[
+    {"id":"desktop-wide","width":1440,"height":1000},
+    {"id":"desktop-laptop","width":1280,"height":800},
+    {"id":"mobile","width":390,"height":844}
+  ],
+  "views":{"desktop":["chat","work","space","system","control"],"mobile":["chat","work","space"]}
+}

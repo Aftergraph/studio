@@ -1,0 +1,55 @@
+import { spawnSync } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = fileURLToPath(new URL('..', import.meta.url));
+
+const GATES = [
+  { name: 'Node Tests (Unit, Domain, Invariants)', cmd: 'node', args: ['--test', 'tests/*.test.mjs'] },
+  { name: 'Workspace Verification (Syntax, Architecture, Contracts)', cmd: 'node', args: ['scripts/verify.mjs'] },
+  { name: 'Platform Source Contracts (Expo, SwiftUI)', cmd: 'node', args: ['scripts/platform_verify.mjs'] },
+  { name: 'Browser Smoke (V4 & V5 Desktop & Mobile)', cmd: 'python', args: ['scripts/browser_smoke.py'] },
+  { name: 'Browser Smoke V5', cmd: 'python', args: ['scripts/browser_smoke_v5.py'] },
+  { name: 'V6 Browser QA (Research, Capabilities, Mobile)', cmd: 'python', args: ['scripts/v6_browser_qa.py'] },
+  { name: 'Fullstack Bridge Smoke (APIs, Server Persistence)', cmd: 'python', args: ['scripts/fullstack_bridge_smoke_v5.py'] },
+  { name: 'Upstream Source Truth (Exact-Head, Boundaries)', cmd: 'node', args: ['scripts/verify-upstreams.mjs'] },
+  { name: 'Polyrepo Bridge Smoke (Upstream Adapters, Hub)', cmd: 'python', args: ['scripts/polyrepo_bridge_smoke_v5.py'] },
+  { name: 'Performance Smoke (DOM counts, interaction p95)', cmd: 'python', args: ['scripts/performance_smoke.py'] },
+  { name: 'Cross-System E2E Journeys A–E', cmd: 'python', args: ['scripts/v6_e2e.py'] },
+  { name: 'Secret & Credential Scan', cmd: 'node', args: ['scripts/v6-secret-scan.mjs'] },
+  { name: 'V6.1 Live Federation & Engine Fault-Tolerance Exit Gate', cmd: 'node', args: ['--test', 'tests/v6-1-live-federation.test.mjs'] },
+  { name: 'V6.2 Universal Search & Context Exit Gate', cmd: 'node', args: ['--test', 'tests/v6-2-universal-search-context.test.mjs'] },
+  { name: 'V6.3 Capability Runtime Exit Gate', cmd: 'node', args: ['--test', 'tests/v6-3-capability-runtime.test.mjs'] },
+  { name: 'Axe-Core 4.10.3 Accessibility Gate (WCAG 2.2 AA)', cmd: 'python', args: ['scripts/a11y_smoke.py'] }
+];
+
+console.log('====================================================');
+console.log('AFTERGRAPH V6 MONOLITHIC RELEASE VERIFICATION RUNNER');
+console.log('====================================================\n');
+
+let passed = 0;
+let failed = 0;
+
+for (const gate of GATES) {
+  process.stdout.write(`RUNNING: ${gate.name}... `);
+  const result = spawnSync(gate.cmd, gate.args, { cwd: root, encoding: 'utf8' });
+  if (result.status === 0) {
+    console.log('PASS');
+    passed++;
+  } else {
+    console.log('FAIL');
+    console.error(`--- STDOUT ---\n${result.stdout}`);
+    console.error(`--- STDERR ---\n${result.stderr}`);
+    failed++;
+  }
+}
+
+console.log('\n====================================================');
+console.log(`RELEASE VERIFICATION SUMMARY: ${passed}/${GATES.length} GATES PASSED`);
+if (failed > 0) {
+  console.log(`STATUS: FAILED (${failed} gates failed)`);
+  process.exit(1);
+} else {
+  console.log('STATUS: 100% PASS - ALL V6 RELEASE CRITERIA SATISFIED');
+}
+console.log('====================================================');

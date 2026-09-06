@@ -1,0 +1,47 @@
+{
+  "schema": "aftergraph.release-invariants/v1",
+  "version": "6.0.0",
+  "v6_invariants": [
+    "WorkItemNeverBecomesWorksWorkImplicitly",
+    "ResearchEvidenceNeverBecomesRuntimeAuthority",
+    "ProjectionNeverGrantsAuthority",
+    "FailedAuthorityWriteNeverShowsSuccess",
+    "BackgroundSyncNeverStealsHumanNavigation",
+    "BackgroundSyncPreservesComposerFocusCaretAndDraft",
+    "SourceRevisionDriftDisablesUnsafeWrites",
+    "StaleEvidenceNeverAppearsNewlyVerified",
+    "CapabilityDiscoveryNeverEqualsCapabilityGrant",
+    "CrossTenantRelationFailsClosed",
+    "MissingIntegrationLeavesUnaffectedDomainsOperational",
+    "SearchReportsIncompleteCoverageDuringOutage"
+  ],
+  "v5_2_invariants": [
+    "progress-only runtime event must not full-shell rerender",
+    "focus/caret/selection survive patching",
+    "human-owned navigation survives background reconciliation",
+    "consequential writes are non-optimistic",
+    "SSE reconnect performs authoritative resync",
+    "resync timeout ends in explicit degraded/stale UX",
+    "390px layout has no horizontal overflow",
+    "reduced-motion preserves final semantic state"
+  ],
+  "e2e_journeys": [
+    "research-to-governed-work",
+    "wi-to-execution",
+    "avc-agent-execution",
+    "failure-and-recovery",
+    "partial-federation"
+  ],
+  "performance_budgets": {
+    "local_interaction_p95_ms": 100,
+    "federated_search_p95_ms": 150,
+    "desktop_active_view_dom_max": 700,
+    "mobile_active_view_dom_max": 500,
+    "progress_shell_renders": 0
+  },
+  "accessibility_gate": {
+    "target": "WCAG 2.2 AA",
+    "axe_critical_violations_max": 0,
+    "axe_serious_violations_max": 0
+  }
+}

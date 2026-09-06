@@ -1,0 +1,1 @@
+{"schema":"aftergraph.object-types/v1","types":["person","agent","mission","work","work_item","task","approval","action","capability","skill","research_program","study","experiment","claim","evidence","artifact","decision","incident","product_cell","memory","outcome","repository","service"]}

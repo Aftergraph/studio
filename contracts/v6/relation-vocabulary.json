@@ -1,0 +1,1 @@
+{"schema":"aftergraph.relations/v1","relations":["observed_from","suggests","promoted_to","fulfills","executes","assigned_to","requires","authorized_by","approved_by","produces","supported_by","derived_from","verifies","contradicts","supersedes","belongs_to","uses_capability","uses_skill","related_to"]}

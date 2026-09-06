@@ -1,0 +1,11 @@
+{
+  "name": "Aftergraph Agentic Operating Environment",
+  "short_name": "Aftergraph",
+  "description": "Aftergraph V5 Agentic Operating Environment for spatial, governed human-agent work.",
+  "start_url": "/chat",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#07111f",
+  "theme_color": "#07111f",
+  "icons": []
+}

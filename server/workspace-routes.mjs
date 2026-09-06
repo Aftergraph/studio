@@ -1,0 +1,1 @@
+export const WORKSPACE_ROUTE_PATTERNS=Object.freeze({conversationMessage:/^\/api\/v1\/conversations\/([^/]+)\/messages$/,artifact:/^\/api\/v1\/artifacts\/([^/]+)$/,memory:/^\/api\/v1\/memory\/([^/]+)$/});

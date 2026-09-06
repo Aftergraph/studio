@@ -1,0 +1,3 @@
+function freeze(v){if(!v||typeof v!=='object'||Object.isFrozen(v))return v;for(const child of Object.values(v))freeze(child);return Object.freeze(v)}
+export function canonicalSkillOwner(skill){return skill?.name?.startsWith('avc-')?'avc':'skills-vault'}
+export function projectSkillCapability(skill){if(!skill?.name)throw new TypeError('skill.name required');const owner=canonicalSkillOwner(skill);return freeze({id:`skill:${skill.name}`,type:'skill',name:skill.name,description:skill.description??'',source:owner,discoverable:skill.discoverable!==false,requiresAuthority:structuredClone(skill.requiresAuthority??[]),authority:[],granted:false,provenance:{repository:owner==='avc'?'Aftergraph/autonomous-venture-company':'Aftergraph/skills-vault'}})}

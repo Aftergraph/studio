@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { validateIntegrationManifest, integrationStateForValidation } from '../src/federation/integration-manifest.mjs';
+const base={schema:'aftergraph.integration/v1',id:'works',repository:'Aftergraph/works-execution',integrationVersion:'1.0.0',repositoryRevision:'abc123',serviceVersion:'0.3.5',roles:['execution'],objects:[],relations:[],capabilities:[],surfaces:[],events:[],reads:[],writes:[],authority:[],evidence:[],health:{kind:'http',path:'/healthz'},degradedBehavior:{reads:'stale',writes:'block'},compatibility:{mode:'exact-or-declared',supported:['1.x']}};
+test('manifest rejects missing authority declaration',()=>{const m=structuredClone(base);delete m.authority;assert.throws(()=>validateIntegrationManifest(m),/authority/)});
+test('manifest distinguishes repository revision from service version',()=>{const m=validateIntegrationManifest(base);assert.equal(m.repositoryRevision,'abc123');assert.equal(m.serviceVersion,'0.3.5')});
+test('manifest rejects incomplete degraded write policy',()=>{const m=structuredClone(base);delete m.degradedBehavior.writes;assert.throws(()=>validateIntegrationManifest(m),/degradedBehavior\.writes/)});
+test('manifest fails closed on unsupported schema',()=>assert.throws(()=>validateIntegrationManifest({...base,schema:'aftergraph.integration/v9'}),/unsupported schema/));
+test('validation errors resolve to incompatible integration state',()=>{assert.equal(integrationStateForValidation(['missing authority']),'incompatible');assert.equal(integrationStateForValidation([]),'stale')});
+test('normalized manifest is deeply immutable at contract boundary',()=>{const m=validateIntegrationManifest(base);assert.equal(Object.isFrozen(m),true);assert.equal(Object.isFrozen(m.degradedBehavior),true);assert.throws(()=>{m.degradedBehavior.writes='allow'},TypeError)});

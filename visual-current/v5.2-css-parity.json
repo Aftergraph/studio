@@ -1,0 +1,157 @@
+{
+  "schema": "aftergraph.visual-parity-result/1.0",
+  "pass": true,
+  "thresholds": {
+    "ssim_min": 0.995,
+    "changed_pixel_ratio_max": 0.005,
+    "channel_ignore_threshold": 12
+  },
+  "count": 13,
+  "results": [
+    {
+      "baseline": "visual-baselines/v5.1-structural/desktop-laptop--chat.png",
+      "current": "visual-current/v5.2-css-structural/desktop-laptop--chat.png",
+      "dimensions_match": true,
+      "width": 1280,
+      "height": 800,
+      "ssim": 1.0,
+      "changed_pixel_ratio": 0.0,
+      "pass": true,
+      "name": "desktop-laptop--chat.png"
+    },
+    {
+      "baseline": "visual-baselines/v5.1-structural/desktop-laptop--control.png",
+      "current": "visual-current/v5.2-css-structural/desktop-laptop--control.png",
+      "dimensions_match": true,
+      "width": 1280,
+      "height": 800,
+      "ssim": 1.0,
+      "changed_pixel_ratio": 0.0,
+      "pass": true,
+      "name": "desktop-laptop--control.png"
+    },
+    {
+      "baseline": "visual-baselines/v5.1-structural/desktop-laptop--space.png",
+      "current": "visual-current/v5.2-css-structural/desktop-laptop--space.png",
+      "dimensions_match": true,
+      "width": 1280,
+      "height": 800,
+      "ssim": 1.0,
+      "changed_pixel_ratio": 0.0,
+      "pass": true,
+      "name": "desktop-laptop--space.png"
+    },
+    {
+      "baseline": "visual-baselines/v5.1-structural/desktop-laptop--system.png",
+      "current": "visual-current/v5.2-css-structural/desktop-laptop--system.png",
+      "dimensions_match": true,
+      "width": 1280,
+      "height": 800,
+      "ssim": 1.0,
+      "changed_pixel_ratio": 0.0,
+      "pass": true,
+      "name": "desktop-laptop--system.png"
+    },
+    {
+      "baseline": "visual-baselines/v5.1-structural/desktop-laptop--work.png",
+      "current": "visual-current/v5.2-css-structural/desktop-laptop--work.png",
+      "dimensions_match": true,
+      "width": 1280,
+      "height": 800,
+      "ssim": 1.0,
+      "changed_pixel_ratio": 0.0,
+      "pass": true,
+      "name": "desktop-laptop--work.png"
+    },
+    {
+      "baseline": "visual-baselines/v5.1-structural/desktop-wide--chat.png",
+      "current": "visual-current/v5.2-css-structural/desktop-wide--chat.png",
+      "dimensions_match": true,
+      "width": 1440,
+      "height": 1000,
+      "ssim": 1.0,
+      "changed_pixel_ratio": 0.0,
+      "pass": true,
+      "name": "desktop-wide--chat.png"
+    },
+    {
+      "baseline": "visual-baselines/v5.1-structural/desktop-wide--control.png",
+      "current": "visual-current/v5.2-css-structural/desktop-wide--control.png",
+      "dimensions_match": true,
+      "width": 1440,
+      "height": 1000,
+      "ssim": 1.0,
+      "changed_pixel_ratio": 0.0,
+      "pass": true,
+      "name": "desktop-wide--control.png"
+    },
+    {
+      "baseline": "visual-baselines/v5.1-structural/desktop-wide--space.png",
+      "current": "visual-current/v5.2-css-structural/desktop-wide--space.png",
+      "dimensions_match": true,
+      "width": 1440,
+      "height": 1000,
+      "ssim": 1.0,
+      "changed_pixel_ratio": 0.0,
+      "pass": true,
+      "name": "desktop-wide--space.png"
+    },
+    {
+      "baseline": "visual-baselines/v5.1-structural/desktop-wide--system.png",
+      "current": "visual-current/v5.2-css-structural/desktop-wide--system.png",
+      "dimensions_match": true,
+      "width": 1440,
+      "height": 1000,
+      "ssim": 1.0,
+      "changed_pixel_ratio": 0.0,
+      "pass": true,
+      "name": "desktop-wide--system.png"
+    },
+    {
+      "baseline": "visual-baselines/v5.1-structural/desktop-wide--work.png",
+      "current": "visual-current/v5.2-css-structural/desktop-wide--work.png",
+      "dimensions_match": true,
+      "width": 1440,
+      "height": 1000,
+      "ssim": 1.0,
+      "changed_pixel_ratio": 0.0,
+      "pass": true,
+      "name": "desktop-wide--work.png"
+    },
+    {
+      "baseline": "visual-baselines/v5.1-structural/mobile--chat.png",
+      "current": "visual-current/v5.2-css-structural/mobile--chat.png",
+      "dimensions_match": true,
+      "width": 390,
+      "height": 844,
+      "ssim": 1.0,
+      "changed_pixel_ratio": 0.0,
+      "pass": true,
+      "name": "mobile--chat.png"
+    },
+    {
+      "baseline": "visual-baselines/v5.1-structural/mobile--space.png",
+      "current": "visual-current/v5.2-css-structural/mobile--space.png",
+      "dimensions_match": true,
+      "width": 390,
+      "height": 844,
+      "ssim": 1.0,
+      "changed_pixel_ratio": 0.0,
+      "pass": true,
+      "name": "mobile--space.png"
+    },
+    {
+      "baseline": "visual-baselines/v5.1-structural/mobile--work.png",
+      "current": "visual-current/v5.2-css-structural/mobile--work.png",
+      "dimensions_match": true,
+      "width": 390,
+      "height": 844,
+      "ssim": 1.0,
+      "changed_pixel_ratio": 0.0,
+      "pass": true,
+      "name": "mobile--work.png"
+    }
+  ],
+  "ssim": 1.0,
+  "changed_pixel_ratio": 0.0
+}

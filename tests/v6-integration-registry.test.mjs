@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createIntegrationRegistry } from '../src/federation/integration-registry.mjs';
+import { validateIntegrationManifest } from '../src/federation/integration-manifest.mjs';
+function validManifest(id='works'){return validateIntegrationManifest({schema:'aftergraph.integration/v1',id,repository:`Aftergraph/${id}`,integrationVersion:'1.0.0',repositoryRevision:'abc123',roles:['execution'],objects:[],relations:[],capabilities:[],surfaces:[],events:[],reads:[],writes:[],authority:[],evidence:[],health:{kind:'http',path:'/healthz'},degradedBehavior:{reads:'stale',writes:'block'},compatibility:{mode:'exact-or-declared',supported:['1.x']}})}
+test('only current integration may expose fresh canonical projection',()=>{const r=createIntegrationRegistry();r.register(validManifest('works'));r.setState('works','stale');assert.equal(r.canRead('works'),true);assert.equal(r.get('works').freshness,'stale');assert.equal(r.canWrite('works'),false)});
+test('drifted integration blocks unsafe writes',()=>{const r=createIntegrationRegistry();r.register(validManifest('tg'));r.setState('tg','drifted',{expected:'a',actual:'b'});assert.equal(r.canWrite('tg'),false);assert.equal(r.canRead('tg'),true)});
+test('incompatible and unavailable integrations block reads and writes',()=>{for(const state of ['incompatible','unavailable']){const r=createIntegrationRegistry();r.register(validManifest('x'));r.setState('x',state);assert.equal(r.canRead('x'),false);assert.equal(r.canWrite('x'),false)}});
+test('register rejects duplicate integration ids',()=>{const r=createIntegrationRegistry();const m=validManifest('works');r.register(m);assert.throws(()=>r.register(m),/already registered/)});
+test('list returns immutable snapshots rather than mutable registry state',()=>{const r=createIntegrationRegistry();r.register(validManifest('works'));const e=r.list()[0];assert.equal(Object.isFrozen(e),true);assert.throws(()=>{e.state='current'},TypeError);assert.equal(r.get('works').state,'stale')});

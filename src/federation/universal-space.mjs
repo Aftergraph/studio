@@ -1,0 +1,9 @@
+import { createSpatialState, reduceSpatialState } from '../../packages/spatial/index.mjs';
+export function createUniversalSpace({objectGraph,surfaceRegistry,space=createSpatialState()}={}){if(!objectGraph||!surfaceRegistry)throw new TypeError('objectGraph and surfaceRegistry required');let state=space;const bindings=new Map();return Object.freeze({
+ open({graphId,surfaceId,regionId='primary'}={}){const object=objectGraph.get(graphId);if(!object)throw new Error(`unknown object ${graphId}`);const template=surfaceRegistry.get(surfaceId);if(!template)throw new Error(`unknown surface ${surfaceId}`);if(!(template.objectTypes??[]).includes(object.type))throw new Error(`surface ${surfaceId} does not support object type ${object.type}`);const id=`surface:${graphId}`;bindings.set(id,{graphId,surfaceId});state=reduceSpatialState(state,{type:'surface.dock',regionId,surface:{id,kind:template.renderer,title:object.payload?.title??object.canonicalId,graphId,surfaceId}});return Object.freeze({surface:template,object,space:state})},
+ move(surfaceInstanceId,regionId){if(!bindings.has(surfaceInstanceId))throw new Error(`unknown surface instance ${surfaceInstanceId}`);state=reduceSpatialState(state,{type:'surface.move',surfaceId:surfaceInstanceId,regionId});return state},
+ close(surfaceInstanceId){state=reduceSpatialState(state,{type:'surface.close',surfaceId:surfaceInstanceId});bindings.delete(surfaceInstanceId);return state},
+ focus(surfaceInstanceId){state=reduceSpatialState(state,{type:'surface.focus',surfaceId:surfaceInstanceId});return state},
+ snapshot(){return structuredClone(state)},
+ resolve(surfaceInstanceId){const b=bindings.get(surfaceInstanceId);if(!b)return null;return Object.freeze({binding:Object.freeze({...b}),object:objectGraph.get(b.graphId),surface:surfaceRegistry.get(b.surfaceId)})},
+});}

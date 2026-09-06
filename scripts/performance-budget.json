@@ -1,0 +1,13 @@
+{
+  "schema": "aftergraph-performance-budget/1.0",
+  "interaction_p95_ms_max": 100,
+  "dom_growth_ratio_max": 1.2,
+  "progress_tick_shell_render_delta_max": 0,
+  "composer_node_identity_must_remain_stable": true,
+  "frame_sampling": "report-when-supported",
+  "dom_reference": {
+    "chat": 366,
+    "work": 299,
+    "space": 435
+  }
+}
