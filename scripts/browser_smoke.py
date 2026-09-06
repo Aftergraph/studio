@@ -118,8 +118,9 @@ with sync_playwright() as p:
     page.get_by_role('button',name='Close artifact').click();page.wait_for_timeout(70)
     check(page.locator('.ag-artifact-surface.split').count()==0,'artifact collapses back into conversation')
 
-    page.keyboard.press('Control+K');page.wait_for_timeout(100)
+    page.keyboard.press('Control+K');page.wait_for_timeout(250)
     check(page.locator('.ag-command-palette').is_visible(),'Ctrl+K opens immersive command palette')
+    page.wait_for_timeout(150)
     check(page.evaluate("document.activeElement && document.activeElement.id==='palette-input'"),'command palette receives focus')
     page.locator('#palette-input').fill('live mission');page.wait_for_timeout(100)
     check(page.locator('.ag-command-result').count()>=1,'command palette searches actions and objects')
