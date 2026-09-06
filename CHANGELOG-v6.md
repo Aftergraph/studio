@@ -81,3 +81,20 @@ Research result can never implicitly become runtime authority. Promotion require
 
 ### Invariant
 Product Cell → mission (human-approved) → workforce execution → verifier seals outcome → budget settled → portfolio updated. Nothing in the chain can be skipped or auto-approved.
+
+## [V7.0] — Intent Operating System (Intent Journey)
+
+### Added
+- `src/intent/journey.mjs` — immutable stage machine
+  `resolved → contextualized → approved → executing → evidenced → completed`;
+  grants nothing, records only; authority 'none' at every stage.
+- `server/intent-routes.mjs` — `POST /api/v1/federation/intent/resolve|advance`
+  wired into federation routes (thin layer over the journey machine).
+- `tests/v7-0-intent-journey.test.mjs` — 17 tests incl. full exit-chain test
+  across resolver, registry, capability runtime, evidence graph.
+- `scripts/v6_release_verify.mjs` — Gate 19: V7.0 Intent Journey Exit Gate.
+
+### Invariants
+- Resolver never executes; `executing` requires every capability granted
+  in the live registry; `completed` requires sealed evidenceRef;
+  stages advance immediate-next only.

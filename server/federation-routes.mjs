@@ -2,6 +2,7 @@ import { sendJson, readJson } from './http-utils.mjs';
 import { createSearchRouteHandler } from './search-routes.mjs';
 import { createNowRouteHandler } from './now-routes.mjs';
 import { createResearchRouteHandler } from './research-routes.mjs';
+import { createIntentRouteHandler } from './intent-routes.mjs';
 
 const PREFIX = '/api/v1/federation';
 
@@ -16,12 +17,14 @@ export function createFederationApiHandler({
   const searchHandler = createSearchRouteHandler({ search, contextResolver: contextResolver || kernel._registries?.contextResolver });
   const nowHandler = createNowRouteHandler({ now });
   const researchHandler = createResearchRouteHandler({ kernel });
+  const intentHandler = createIntentRouteHandler({ kernel });
 
   return function handle(req, res, url) {
     if (!url.pathname.startsWith(PREFIX)) return false;
     if (searchHandler(req, res, url)) return true;
     if (nowHandler(req, res, url)) return true;
     if (researchHandler(req, res, url)) return true;
+    if (intentHandler(req, res, url)) return true;
 
     if (url.pathname === `${PREFIX}/live/health` && req.method === 'GET') {
       const health = (kernel.integrations ? kernel.integrations() : []).map(i => kernel.liveHealth?.(i.manifest?.id) ?? { integrationId: i.manifest?.id, state: i.state });

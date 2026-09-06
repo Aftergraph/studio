@@ -11,3 +11,29 @@ test('federation object endpoint preserves graph identity and owner',async()=>wi
 test('federated search API reports coverage',async()=>withServer(async base=>{const r=await fetch(`${base}/api/v1/federation/search?q=deploy&tenantId=t1`);const j=await r.json();assert.equal(j.search.complete,true);assert.equal(j.search.results[0].graphId,'works:work:w1')}));
 test('browser client uses same-origin federation routes',async()=>withServer(async base=>{const c=createFederationBrowserClient({baseUrl:base});assert.equal((await c.integrations()).integrations[0].manifest.id,'works');assert.equal((await c.object('works:work:w1')).object.canonicalOwner,'works');assert.equal((await c.search('deploy',{tenantId:'t1'})).search.results.length,1)}));
 test('unknown federation object returns 404',async()=>withServer(async base=>{const r=await fetch(`${base}/api/v1/federation/objects/${encodeURIComponent('works:work:nope')}`);assert.equal(r.status,404)}));
+
+test('intent resolve opens a journey without granting', async () => withServer(async (base) => {
+  const { createFederationKernel } = await import('../src/federation/federation-kernel.mjs');
+  const { createFederationApiHandler: mkHandler } = await import('../server/federation-routes.mjs');
+  const k = createFederationKernel();
+  const h = mkHandler({ kernel: k });
+  const srv = http.createServer((req, res) => {
+    const url = new URL(req.url, 'http://127.0.0.1');
+    if (!h(req, res, url)) { res.writeHead(404); res.end('{}'); }
+  });
+  srv.listen(0, '127.0.0.1');
+  await once(srv, 'listening');
+  try {
+    const b = `http://127.0.0.1:${srv.address().port}`;
+    const r = await fetch(`${b}/api/v1/federation/intent/resolve`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text: 'research this', mode: 'Ask', subjectId: 'human:1', actor: 'human:1' }),
+    });
+    assert.equal(r.status, 200);
+    const j = await r.json();
+    assert.equal(j.ok, true);
+    assert.equal(j.journey.stage, 'resolved');
+    assert.equal(j.journey.authority, 'none');
+    assert.equal(j.journey.executed, false);
+  } finally { srv.close(); await once(srv, 'close'); }
+}));
