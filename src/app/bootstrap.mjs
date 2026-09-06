@@ -540,6 +540,17 @@ export function bootstrapAftergraph(){
   function renderControlDomain(){
     const pending=state.approvals.filter(a=>a.state==='pending');
     const tgApprovals=state.upstreams?.trustGateway?.approvals||[];
+    const killPending=[...pendingActions].find(k=>k.startsWith('kill:'))?.slice(5)||null;
+    const killSwitches=state.missions.filter(m=>m.state==='running').map(m=>({scope:`mission:${m.id}`,missionTitle:m.title,engaged:ui.killStates?.[`mission:${m.id}`]===true}));
+    if(backendConnected&&!ui.killRefreshInFlight){
+      ui.killRefreshInFlight=true;
+      void Promise.allSettled(state.missions.filter(m=>m.state==='running').map(m=>apiClient.readKill(`mission:${m.id}`).then(r=>({scope:`mission:${m.id}`,engaged:!!r?.switch?.engaged})))).then(results=>{
+        ui.killRefreshInFlight=false;
+        let changed=false;
+        for(const r of results){if(r.status!=='fulfilled')continue;if(ui.killStates?.[r.value.scope]!==r.value.engaged){ui.killStates={...(ui.killStates||{}),[r.value.scope]:r.value.engaged};changed=true;}}
+        if(changed)render();
+      });
+    }
     return renderControlSurface({
       localApprovals:pending,
       remoteApprovals:tgApprovals,
@@ -548,6 +559,8 @@ export function bootstrapAftergraph(){
       service:state.upstreams?.services?.trustGateway||{},
       decisionError:ui.controlError||'',
       institutionalProjection:state.institutional||null,
+      killSwitches,
+      killPending,
     });
   }
 
@@ -673,6 +686,8 @@ export function bootstrapAftergraph(){
       case 'show-evidence':ui.inspectorOpen=true;break;
       case 'revoke-memory':if(el.dataset.id){const key=`memory:${el.dataset.id}`;if(!beginUiAction(key))break;if(backendConnected){void apiClient.deleteMemory(el.dataset.id,state.user.id).then(payload=>{applyBackendPayload(payload);toast('Memory revoked');endUiAction(key)}).catch(error=>{toast('Memory revoke failed');endUiAction(key);console.warn('Memory revoke failed',error?.code||error)})}else{state.memory=state.memory.filter(m=>m.id!==el.dataset.id);saveState();toast('Memory revoked');endUiAction(key)}}break;
       case 'promote-memory':if(el.dataset.id){const key=`memory:${el.dataset.id}`;if(!beginUiAction(key))break;const evidence=state.artifacts.find(a=>a.verified)?.id;if(!backendConnected||!evidence){toast('Promotion needs server connection and verified evidence');endUiAction(key);break;}void apiClient.promoteMemory(el.dataset.id,{actor:state.user.id,evidence}).then(payload=>{applyBackendPayload(payload);toast('Memory promoted');endUiAction(key)}).catch(error=>{toast('Memory promotion failed');endUiAction(key);console.warn('Memory promotion failed',error?.code||error)})}break;
+      case 'engage-kill':if(el.dataset.scope){const key=`kill:${el.dataset.scope}`;if(!beginUiAction(key))break;if(!backendConnected){toast('Kill switch needs server connection');endUiAction(key);break;}void apiClient.engageKill(el.dataset.scope,{actor:state.user.id,reason:'manual engage from Control'}).then(payload=>{ui.killStates={...(ui.killStates||{}),[el.dataset.scope]:!!payload?.switch?.engaged};toast('Autonomy halted');endUiAction(key)}).catch(error=>{toast('Kill engage failed');endUiAction(key);console.warn('Kill engage failed',error?.code||error)})}break;
+      case 'release-kill':if(el.dataset.scope){const key=`kill:${el.dataset.scope}`;if(!beginUiAction(key))break;if(!backendConnected){toast('Kill switch needs server connection');endUiAction(key);break;}void apiClient.releaseKill(el.dataset.scope,{actor:state.user.id}).then(payload=>{ui.killStates={...(ui.killStates||{}),[el.dataset.scope]:!!payload?.switch?.engaged};toast('Autonomy resumed');endUiAction(key)}).catch(error=>{toast('Kill release failed');endUiAction(key);console.warn('Kill release failed',error?.code||error)})}break;
       case 'copy-link':{const type=el.dataset.type,id=el.dataset.id;const link=location.origin+buildDeepLink(domainForObject(type),type,id);navigator.clipboard?.writeText(link).catch(()=>{});toast('Deep link copied');break}
       case 'sync-upstreams':if(backendConnected){void apiClient.syncUpstreams().then(payload=>{applyUpstreamPayload(payload);toast('Source truth synchronized')}).catch(error=>{console.warn('Upstream sync failed',error?.code||error);toast('Upstream sync failed')})}break;
       case 'reset-demo':stopRuntimeTimer();try{localStorage.removeItem(STORAGE_KEY)}catch{};state=createInitialState();liveRuntime=null;backendRuntimes={};toast('Demo reset');if(backendConnected)void syncBackend(apiClient.reset());break;

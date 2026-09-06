@@ -270,3 +270,25 @@ Product Cell → mission (human-approved) → workforce execution → verifier s
 ### Boundary
 - Ephemeral knowledge cannot become authoritative without human promotion
   plus evidence; expired entries lose authority automatically.
+
+## [V8.3] — Autonomous Operations
+
+### Added
+- Autonomy bounds (`src/autonomy/bounds.mjs`): human-only kill switch with
+  history, allowance over the V7.4 cost ledger (budget, policy, evidence).
+- Server kill switch, cost ledger and allowance gate
+  (`POST/GET /api/v1/autonomy/kill`, `/release`, `/cost`, `/allowance`).
+- Runtime halt wiring: the mission auto-stepper pauses with kill attention
+  instead of advancing while a kill switch is engaged.
+- Kill-switch UI on Control: per-mission engage/release with impact text,
+  pending states and fail-closed offline messaging.
+
+### Gates
+- V8.3 Autonomy Bounds Exit Gate.
+- V8.3 Autonomy Server Exit Gate.
+- V8.3 Autonomy Halt and Kill UI Exit Gate.
+
+### Boundary
+- Autonomy stays bounded by kill switches, budgets, policy and evidence;
+  overruns and kills require human action, and the halt is enforced in the
+  auto-stepper itself rather than only at the API edge.

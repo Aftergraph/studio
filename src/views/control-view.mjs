@@ -1,4 +1,4 @@
-import { AGNeedYou, AGEventRow, AGSourceTruthBadge } from '../../packages/ui/index.mjs';
+import { AGNeedYou, AGEventRow, AGSourceTruthBadge, AGKillSwitch } from '../../packages/ui/index.mjs';
 import { escapeHtml } from '../ui-helpers.mjs';
 
 function localRow(approval={}){
@@ -14,8 +14,9 @@ function remoteRow(approval={}){
   return `<article class="ag-upstream-approval ag-decision-card" data-state="${escapeHtml(state)}"><div><small>Trust Gateway</small><strong>${escapeHtml(approval.title||approval.tool||approval.id||'Decision')}</strong><span>${escapeHtml(state)}</span></div><div class="ag-decision-actions"><button type="button" class="ag-button quiet" data-upstream-approval="${escapeHtml(approval.id||'')}" data-upstream-decision="deny">Deny</button><button type="button" class="ag-button primary" data-upstream-approval="${escapeHtml(approval.id||'')}" data-upstream-decision="approve">Approve</button></div></article>`;
 }
 
-export function renderControlSurface({localApprovals=[],remoteApprovals=[],exceptions=[],events=[],service={},decisionError='',institutionalProjection=null}={}){
+export function renderControlSurface({localApprovals=[],remoteApprovals=[],exceptions=[],events=[],service={},decisionError='',institutionalProjection=null,killSwitches=[],killPending=null}={}){
   const pendingLocal=localApprovals.filter(a=>(a.state||'pending')==='pending');
+  const killRows=killSwitches.map(k=>AGKillSwitch({scope:k.scope,missionTitle:k.missionTitle||k.scope,engaged:!!k.engaged,pendingAction:killPending===k.scope?k.engaged?'release-kill':'engage-kill':null})).join('');
   return `<main id="main-content" class="ag-domain-page ag-calm-control" data-domain-surface="control">
     <header class="ag-domain-header ag-product-header"><div><small>CONTROL</small><h1>Control</h1><p>Intervene only where authority, risk or missing input requires a human decision.</p></div><span>${pendingLocal.length+remoteApprovals.length} pending</span></header>
     ${decisionError?`<div class="ag-control-error" role="alert">${escapeHtml(decisionError)}</div>`:''}
@@ -24,6 +25,7 @@ export function renderControlSurface({localApprovals=[],remoteApprovals=[],excep
         <section class="ag-domain-section"><div class="ag-section-heading"><span>Needs your decision</span><small>Human authority</small></div><div class="ag-attention-list">${pendingLocal.map(localRow).join('')||'<p class="ag-domain-empty">No local decisions are waiting.</p>'}</div></section>
         ${remoteApprovals.length?`<section class="ag-domain-section"><div class="ag-section-heading"><span>Enforcement decisions</span><small>Trust Gateway</small></div><div class="ag-upstream-approval-list">${remoteApprovals.map(remoteRow).join('')}</div></section>`:''}
         <section class="ag-domain-section"><div class="ag-section-heading"><span>Exceptions</span><small>${exceptions.length}</small></div><div class="ag-attention-list">${exceptions.map(n=>AGNeedYou({...n,action:'context-preview'})).join('')||'<p class="ag-domain-empty">No unresolved exceptions.</p>'}</div></section>
+        ${killSwitches.length?`<section class="ag-domain-section"><div class="ag-section-heading"><span>Autonomy kill switches</span><small>${killSwitches.filter(k=>k.engaged).length} engaged</small></div><div class="ag-kill-list">${killRows}</div></section>`:''}
       </div>
       <aside class="ag-control-provenance"><section class="ag-domain-section"><div class="ag-section-heading"><span>Authority source</span>${AGSourceTruthBadge({owner:'Trust Gateway',contract:'approval.decide',sha:service.headSha||''})}</div><p class="ag-control-note">Consequential decisions are committed only after their authority owner confirms them.</p></section>${AGInstitutionSummary({projection:institutionalProjection})}<section class="ag-domain-section"><div class="ag-section-heading"><span>Recent audit</span><small>${events.length}</small></div>${events.slice(0,8).map(event=>AGEventRow({event})).join('')||'<p class="ag-domain-empty">No recent control events.</p>'}</section></aside>
     </div>

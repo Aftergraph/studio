@@ -81,6 +81,7 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
     store,
     intervalMs:runtimeIntervalMs,
     onChange:payload => broadcast(payload),
+    isHalted:missionId=>killSwitches.get(`mission:${missionId}`)?.engaged===true,
   });
 
   const server = http.createServer(async (req, res) => {

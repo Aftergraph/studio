@@ -83,6 +83,9 @@ export function createApiClient({ baseUrl='', fetchImpl=globalThis.fetch, EventS
     updateSpace(id,action){return request(`/api/v1/spaces/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify({action})})},
     replay({cursor,playing,speed}={}){return request('/api/v1/replay',{method:'PATCH',body:JSON.stringify({cursor,playing,speed})})},
     reset(actor='demo-user',confirmationToken='RESET_WORKSPACE',idempotencyKey=`reset-${Date.now()}`){return request('/api/v1/reset',{method:'POST',headers:{'idempotency-key':idempotencyKey},body:JSON.stringify({actor,confirmationToken,idempotencyKey})})},
+    readKill(scope){return request(`/api/v1/autonomy/kill?scope=${encodeURIComponent(scope)}`)},
+    engageKill(scope,{actor='demo-user',reason,idempotencyKey=`kill-${scope}-${Date.now()}`}={}){return request('/api/v1/autonomy/kill',{method:'POST',headers:{'idempotency-key':idempotencyKey},body:JSON.stringify({actor,scope,reason,idempotencyKey})})},
+    releaseKill(scope,{actor='demo-user',idempotencyKey=`kill-release-${scope}-${Date.now()}`}={}){return request('/api/v1/autonomy/kill/release',{method:'POST',headers:{'idempotency-key':idempotencyKey},body:JSON.stringify({actor,scope,idempotencyKey})})},
     submitSync({nodeId,events,actor='demo-user',idempotencyKey=`sync-${nodeId}-${Date.now()}`}={}){return request('/api/v1/sync/events',{method:'POST',headers:{'idempotency-key':idempotencyKey},body:JSON.stringify({actor,nodeId,events,idempotencyKey})})},
     readSync(){return request('/api/v1/sync/events')},
     subscribe(onMessage,onError=()=>{},{onOpen=()=>{}}={}){

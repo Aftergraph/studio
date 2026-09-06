@@ -3,11 +3,12 @@ import { createLiveRuntime, pauseMission, resumeMission, stepMission } from './l
 const clone = value => structuredClone(value);
 
 export class MissionRuntimeHub {
-  constructor({ store, intervalMs = 1250, onChange = () => {} } = {}) {
+  constructor({ store, intervalMs = 1250, onChange = () => {}, isHalted = () => false } = {}) {
     if (!store) throw new Error('store required');
     this.store = store;
     this.intervalMs = Math.max(10, Number(intervalMs) || 1250);
     this.onChange = onChange;
+    this.isHalted = isHalted;
     this.runtimes = new Map();
     this.timers = new Map();
   }
@@ -41,6 +42,14 @@ export class MissionRuntimeHub {
   async step(missionId) {
     let runtime = this.runtimes.get(missionId) || createLiveRuntime(this.store.snapshot(), missionId);
     runtime = clone(runtime);
+    if (this.isHalted(missionId)) {
+      runtime.status = 'paused';
+      runtime.attention = { type:'kill', missionId };
+      this.runtimes.set(missionId, runtime);
+      this.stopTimer(missionId);
+      await this.emit();
+      return clone(runtime);
+    }
     runtime.state = this.store.snapshot();
     runtime = stepMission(runtime);
     this.runtimes.set(missionId, runtime);

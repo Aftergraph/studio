@@ -22,3 +22,16 @@ export function AGMemoryItem({id,label,scope='session',source='runtime',promoted
   const promote=(!trusted)?(pendingAction?`<button type="button" class="ag-memory-promote" disabled data-state="loading">Promoting…</button>`:`<button type="button" class="ag-memory-promote" data-action="promote-memory" data-id="${attr(id)}" aria-describedby="${attr(descId)}">Promote</button>`):'';
   return `<div class="ag-memory-item" data-ag-component="memory-item" data-id="${attr(id)}"><span>${AGIcon('brain',{size:14})}</span><span><strong>${esc(label)}</strong><small>${esc(scope)} · ${esc(source)} · ${tag}${conf}</small><small id="${attr(descId)}">${desc}</small></span>${promote}<button type="button" class="ag-memory-revoke" data-action="revoke-memory" data-id="${attr(id)}" aria-label="Revoke ${attr(label)}"${dis}><span aria-hidden="true">×</span></button></div>`;
 }
+
+export function AGKillSwitch({scope,missionTitle='',engaged=false,pendingAction=null}) {
+  if(!scope||typeof scope!=='string') return '';
+  const descId=`ks-${String(scope).replaceAll(':','-')}-desc`;
+  const desc=engaged
+    ?`Kill switch engaged for ${scope}. Autonomous execution is halted. Releasing resumes it.`
+    :`Kill switch for ${scope}. Engaging halts autonomous execution immediately; budgets, policy and evidence gates stay enforced.`;
+  if(pendingAction) return `<div class="ag-kill-switch" data-ag-component="kill-switch" data-scope="${attr(scope)}"><span>${AGIcon('shield',{size:14})}</span><span><strong>${esc(missionTitle||scope)}</strong><small>${engaged?'engaged':'disengaged'}</small></span><button type="button" class="ag-button" disabled data-state="loading">Working…</button></div>`;
+  const action=engaged
+    ?`<button type="button" class="ag-button" data-action="release-kill" data-scope="${attr(scope)}" aria-describedby="${attr(descId)}">Release</button>`
+    :`<button type="button" class="ag-button" data-action="engage-kill" data-scope="${attr(scope)}" aria-describedby="${attr(descId)}">Engage kill switch</button>`;
+  return `<div class="ag-kill-switch" data-ag-component="kill-switch" data-scope="${attr(scope)}"><span>${AGIcon('shield',{size:14})}</span><span><strong>${esc(missionTitle||scope)}</strong><small id="${attr(descId)}">${desc}</small></span>${action}</div>`;
+}
