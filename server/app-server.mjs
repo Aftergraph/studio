@@ -12,6 +12,7 @@ import { reduceSpatialState } from '../packages/spatial/index.mjs';
 import { buildReplayFrames } from '../src/replay.mjs';
 import { buildTemporalFrames, reconstructAt, counterfactualAt, futureTrajectory } from '../src/temporal/temporal-intelligence.mjs';
 import { createActionGuard, assertActorCapability, requireResetConfirmation, RESET_CONFIRMATION } from '../src/action-guard.mjs';
+import { createServerLog } from '../src/distributed/server-log.mjs';
 import { createUpstreamHub } from '../src/integrations/upstream-hub.mjs';
 import { createFederationApiHandler } from './federation-routes.mjs';
 
@@ -69,6 +70,7 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
   };
   const completeAction=(key,result)=>actionGuard.complete(key,result);
   const failAction=(key,error)=>{actionGuard.fail(key,error?.message||error);throw error;};
+  const syncLog=createServerLog();
   const runtimeHub = new MissionRuntimeHub({
     store,
     intervalMs:runtimeIntervalMs,
@@ -211,6 +213,26 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
             broadcast({ state:next, runtimes:{} });
             sendJson(res, 200, { state:next, runtimes:{} });
           } catch (error) { failAction(action.key,error); }
+          return;
+        }
+
+        if (url.pathname === '/api/v1/sync/events' && req.method === 'POST') {
+          const body=await readJson(req);
+          if(!body?.actor){sendJson(res,422,{error:'actor_required'});return;}
+          if(!body?.nodeId||typeof body.nodeId!=='string'){sendJson(res,422,{error:'node_id_required'});return;}
+          if(!Array.isArray(body?.events)){sendJson(res,422,{error:'events_required'});return;}
+          const key=req.headers['idempotency-key']||body.idempotencyKey;
+          if(!key){sendJson(res,422,{error:'idempotency_key_required'});return;}
+          try {
+            const read=syncLog.submit(body.events);
+            sendJson(res,200,{version:API_VERSION,events:read.events,clock:read.clock});
+          } catch { sendJson(res,422,{error:'invalid_sync_event'}); }
+          return;
+        }
+
+        if (url.pathname === '/api/v1/sync/events' && req.method === 'GET') {
+          const read=syncLog.read();
+          sendJson(res,200,{version:API_VERSION,events:read.events,clock:read.clock});
           return;
         }
 
