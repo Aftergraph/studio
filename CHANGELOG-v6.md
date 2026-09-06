@@ -53,3 +53,13 @@ Aftergraph V6 unifies intelligence orchestration, deep agentic execution, living
 - Added GitHub Actions CI/CD workflows for both repositories.
 - Registered Studio and Brand in Aftergraph/.github profile ecosystem table.
 - Full 16-gate monolithic verification verified 100% green.
+## [V6.4] — Research OS
+
+### Added
+- `src/research/surface-registry.mjs` — 5 typed research surfaces (Study, Experiment, Claim, Evidence, Paper), all isr-owned, zero runtime authority
+- `src/research/promotion-pipeline.mjs` — staged human-gated promotion pipeline (proposed → reviewed → approved → promoted); runtimeAuthority always 'none'; promoted stage emits capability-grant-request, never a grant
+- `tests/v6-4-research-os.test.mjs` — 14 test cases covering surface invariants and pipeline stage machine
+- Gate 16 added to release verifier (V6.4 Research OS Exit Gate)
+
+### Invariant
+Research result can never implicitly become runtime authority. Promotion requires explicit human reviewer and approver at every stage.
