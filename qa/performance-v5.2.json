@@ -35,30 +35,30 @@
   },
   "interaction": {
     "samples_ms": [
-      1.9,
-      0.8,
-      2.7,
-      0.4,
-      2.3,
-      0.4,
       2.1,
-      0.8,
+      0.7,
+      2.9,
+      0.6,
       2.4,
+      0.5,
+      2.6,
+      0.5,
+      2.6,
+      0.5,
+      2.1,
+      0.5,
+      2.2,
       0.5,
       2.3,
-      0.4,
-      2.5,
       0.5,
-      2.4,
+      2.6,
       0.5,
-      2.8,
-      0.6,
-      2.5,
-      0.5
+      2.6,
+      0.6
     ],
-    "p50_ms": 0.8,
-    "p95_ms": 2.7,
-    "max_ms": 2.8
+    "p50_ms": 0.7,
+    "p95_ms": 2.6,
+    "max_ms": 2.9
   },
   "render_churn": {
     "progress_tick_shell_render_delta": 0,
@@ -68,8 +68,8 @@
   "frames": {
     "samples": 29,
     "p50_ms": 66.6,
-    "p95_ms": 83.4,
-    "max_ms": 116.7,
+    "p95_ms": 66.7,
+    "max_ms": 66.8,
     "enforced": false,
     "note": "Environment-specific rAF evidence; reported, not a universal FPS claim."
   }

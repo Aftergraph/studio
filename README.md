@@ -1,6 +1,6 @@
-# Aftergraph Workspace V5 — Agentic Operating Environment
+# Aftergraph Studio — Unified Intelligence Operating Environment
 
-A local, runnable full-stack reference implementation of the approved **Aftergraph V5 C Agentic Operating Environment**.
+The sovereign operating environment for governed AI intelligence, durable work, and verified outcomes (Aftergraph Workspace v5 foundation, V6 Unified Intelligence OS).
 
 V5 preserves the low-chrome Chat/Work experience from V4 and adds **Space** as a first-class spatial work mode for durable objects, active agents, evidence, replay and multimodal intent.
 

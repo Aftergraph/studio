@@ -36,6 +36,8 @@ Aftergraph V6 does NOT physically merge specialist repositories into a monolith.
 | **Aftergraph/intelligence-systems-research** | Research programs, studies, experiments, claims, benchmarks, papers | Research evidence MUST NOT become runtime authority |
 | **Aftergraph/after-graph-governance** | Canonical cross-repo contracts, terminology, exact-head org truth | Governance review and boundary contracts |
 | **Aftergraph/.github** | Organization front-door / branding / ecosystem documentation | Documentation only. No runtime authority |
+| **Aftergraph/studio** | Official unified operating environment & client application | Sovereign human cockpit. Consumes federation kernel |
+| **Aftergraph/brand** | Canonical brand identity, visual language, and design system tokens | Visual truth & tokens. No runtime authority |
 
 ---
 

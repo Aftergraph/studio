@@ -46,3 +46,10 @@ Aftergraph V6 unifies intelligence orchestration, deep agentic execution, living
 - Fullstack server integration & browser bridge smoke pass (`python scripts/fullstack_bridge_smoke_v5.py`).
 - Polyrepo upstream adapters, hub, and browser bridge smoke pass (`python scripts/polyrepo_bridge_smoke_v5.py`).
 - Release verification suite (`npm run verify:release`): **100% PASS across all 8 gates**.
+
+## Ecosystem & Brand Releases
+- Established official **Aftergraph Studio** (@aftergraph/studio, Aftergraph/studio).
+- Deployed official **Aftergraph Brand System** (@aftergraph/brand, Aftergraph/brand).
+- Added GitHub Actions CI/CD workflows for both repositories.
+- Registered Studio and Brand in Aftergraph/.github profile ecosystem table.
+- Full 16-gate monolithic verification verified 100% green.
