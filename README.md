@@ -1,3 +1,5 @@
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Aftergraph/studio/badge)](https://scorecard.dev/viewer/?uri=github.com/Aftergraph/studio)
+
 # Aftergraph Studio — Unified Intelligence Operating Environment
 
 The sovereign operating environment for governed AI intelligence, durable work, and verified outcomes (Aftergraph Workspace v5 foundation, V6 Unified Intelligence OS).
