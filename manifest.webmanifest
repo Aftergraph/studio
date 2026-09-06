@@ -1,7 +1,7 @@
 {
   "name": "Aftergraph Studio",
   "short_name": "Studio",
-  "description": "Aftergraph Studio — Sovereign operating environment for governed AI intelligence, durable work, and verified outcomes.",
+  "description": "Aftergraph Studio — Agentic Operating Environment for sovereign AI intelligence, durable work, and verified outcomes.",
   "start_url": "/chat",
   "scope": "/",
   "display": "standalone",

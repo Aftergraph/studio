@@ -3,7 +3,7 @@
   "version": "6.0.0",
   "private": true,
   "type": "module",
-  "description": "Aftergraph Studio — Sovereign operating environment for governed AI intelligence, durable work, and verified outcomes.",
+  "description": "Aftergraph Studio — V6 Unified Intelligence Operating Environment for sovereign AI intelligence, durable work, and verified outcomes.",
   "scripts": {
     "start": "node server.mjs",
     "test": "node --test tests/*.test.mjs",
