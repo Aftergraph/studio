@@ -169,3 +169,21 @@ Product Cell → mission (human-approved) → workforce execution → verifier s
 - All amounts are finite, non-negative integer cents within safe integer range.
 - Budget overrun blocks settlement until explicit human approval.
 - Cost, evidence and outcome remain attributable; authority stays `none`.
+
+## [V8.0] — Institutional Intelligence
+
+### Added
+- `src/institution/institutional-graph.mjs` — organization, membership and
+  policy graph with scoped authorization and immutable projections.
+- `server/institutional-routes.mjs` — human-gated organization, membership
+  and policy mutations plus read-only projection and authorization reads.
+- `packages/ui/system/institution-summary.mjs` — Control-surface institutional
+  scope summary that never presents projection as authority.
+- `tests/v8-0-institutional-intelligence.test.mjs` — organization, policy,
+  cross-org, API and UI contract coverage.
+- `scripts/v6_release_verify.mjs` — Gate 24: V8.0 Institutional Intelligence.
+
+### Invariants
+- Cross-organization relations and authorization fail closed.
+- Policy and membership changes require human approval.
+- Explicit deny wins over allow; projections carry `authority: 'none'`.

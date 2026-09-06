@@ -539,6 +539,7 @@ export function bootstrapAftergraph(){
       events:state.events.filter(e=>e.type.includes('approval')||e.type.includes('mission')||e.type.includes('upstream')),
       service:state.upstreams?.services?.trustGateway||{},
       decisionError:ui.controlError||'',
+      institutionalProjection:state.institutional||null,
     });
   }
 
