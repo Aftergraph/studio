@@ -223,3 +223,28 @@ Product Cell → mission (human-approved) → workforce execution → verifier s
 - This entry does not claim offline-first federation, multi-node convergence,
   edge/cloud replication or distributed authority safety. Those belong to the
   separate roadmap V8.1 milestone.
+
+## [V8.1] — Distributed Aftergraph (single-process scope)
+
+### Added
+- Node identity (`src/distributed/node-identity.mjs`).
+- Offline-first append-only event logs with vector clocks
+  (`src/distributed/offline-event-log.mjs`, `src/distributed/vector-clock.mjs`).
+- Deterministic convergence with first-writer-wins conflict policy
+  (`src/distributed/convergence.mjs`).
+- Server sync endpoints `POST/GET /api/v1/sync/events` with actor, nodeId
+  and idempotency-key validation (`src/distributed/server-log.mjs`).
+- Offline-first client with local-first truth and fail-closed sync
+  (`src/distributed/offline-client.mjs`, `submitSync`/`readSync` in `src/api-client.mjs`).
+
+### Gates
+- V8.1 Distributed Node Identity Exit Gate.
+- V8.1 Distributed Convergence Exit Gate.
+- V8.1 Distributed Server Sync Exit Gate.
+- V8.1 Distributed Aftergraph Exit Gate (end-to-end offline → server →
+  convergence proof with active tamper attempt).
+
+### Boundary
+- Server and client logs are in-memory and single-process. Durable
+  multi-process/edge replication with persistent vector-clock cursors is the
+  upgrade path when real edge nodes exist.
