@@ -131,7 +131,7 @@ with tempfile.TemporaryDirectory(prefix='aftergraph-fullstack-bridge-') as td:
             restored.screenshot(path=str(ROOT/'screenshot-fullstack-v4.png'),full_page=True)
             restored.close();browser.close()
 
-        reset=api_json(base,'/api/v1/reset','POST',{})
+        reset=api_json(base,'/api/v1/reset','POST',{'actor':'demo-user','confirmationToken':'RESET_WORKSPACE','idempotencyKey':'reset-smoke'})
         check(any(m['id']=='mem2' for m in reset['state']['memory']),'full-stack test resets deterministic seed state')
     finally:
         proc.terminate()

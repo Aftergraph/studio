@@ -73,13 +73,13 @@ export function createApiClient({ baseUrl='', fetchImpl=globalThis.fetch, EventS
     context(conversationId){return request(`/api/v1/context?conversationId=${encodeURIComponent(conversationId)}`)},
     artifact(id){return request(`/api/v1/artifacts/${encodeURIComponent(id)}`)},
     sendMessage(id,{text,mode='Ask',actor='demo-user',reply=null,attachments=[]}={}){return request(`/api/v1/conversations/${encodeURIComponent(id)}/messages`,{method:'POST',body:JSON.stringify({text,mode,actor,reply,attachments})})},
-    decideApproval(id,decision,actor='demo-user'){return request(`/api/v1/approvals/${encodeURIComponent(id)}/decision`,{method:'POST',body:JSON.stringify({decision,actor})})},
-    setControl(id,mode){return request(`/api/v1/missions/${encodeURIComponent(id)}/control`,{method:'POST',body:JSON.stringify({mode})})},
+    decideApproval(id,decision,actor='demo-user',idempotencyKey=`approval-${id}-${Date.now()}`){return request(`/api/v1/approvals/${encodeURIComponent(id)}/decision`,{method:'POST',headers:{'idempotency-key':idempotencyKey},body:JSON.stringify({decision,actor,idempotencyKey})})},
+    setControl(id,mode,actor='demo-user',idempotencyKey=`control-${id}-${mode}-${Date.now()}`){return request(`/api/v1/missions/${encodeURIComponent(id)}/control`,{method:'POST',headers:{'idempotency-key':idempotencyKey},body:JSON.stringify({mode,actor,idempotencyKey})})},
     runtime(id,action){return request(`/api/v1/missions/${encodeURIComponent(id)}/runtime`,{method:'POST',body:JSON.stringify({action})})},
-    deleteMemory(id){return request(`/api/v1/memory/${encodeURIComponent(id)}`,{method:'DELETE'})},
+    deleteMemory(id,actor='demo-user',idempotencyKey=`memory-${id}-${Date.now()}`){return request(`/api/v1/memory/${encodeURIComponent(id)}`,{method:'DELETE',headers:{'idempotency-key':idempotencyKey},body:JSON.stringify({actor,idempotencyKey})})},
     updateSpace(id,action){return request(`/api/v1/spaces/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify({action})})},
     replay({cursor,playing,speed}={}){return request('/api/v1/replay',{method:'PATCH',body:JSON.stringify({cursor,playing,speed})})},
-    reset(){return request('/api/v1/reset',{method:'POST'})},
+    reset(actor='demo-user',confirmationToken='RESET_WORKSPACE',idempotencyKey=`reset-${Date.now()}`){return request('/api/v1/reset',{method:'POST',headers:{'idempotency-key':idempotencyKey},body:JSON.stringify({actor,confirmationToken,idempotencyKey})})},
     subscribe(onMessage,onError=()=>{},{onOpen=()=>{}}={}){
       if(typeof EventSourceImpl!=='function') return ()=>{};
       const source=new EventSourceImpl(`${base}/api/v1/events`);

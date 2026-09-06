@@ -187,3 +187,22 @@ Product Cell → mission (human-approved) → workforce execution → verifier s
 - Cross-organization relations and authorization fail closed.
 - Policy and membership changes require human approval.
 - Explicit deny wins over allow; projections carry `authority: 'none'`.
+
+## [V8.1-A] — Frontend Audit Remediation
+
+### Added
+- Explicit production/test fixture separation and provenance.
+- Backend payload validation at the resync boundary.
+- Consequential-action guard with actor capability checks, idempotency,
+  reset confirmation and UI loading/error semantics.
+- `docs/V8.1-DISTRIBUTED-DEFERRAL.md` records that roadmap V8.1 Distributed
+  Aftergraph remains open and is not conflated with this audit stream.
+
+### Gates
+- V8.1-A Backend Contract Boundary Exit Gate.
+- V8.1-A Destructive Action Guard Exit Gate.
+
+### Boundary
+- This entry does not claim offline-first federation, multi-node convergence,
+  edge/cloud replication or distributed authority safety. Those belong to the
+  separate roadmap V8.1 milestone.

@@ -11,6 +11,7 @@ import { MissionRuntimeHub } from '../src/server-runtime-hub.mjs';
 import { reduceSpatialState } from '../packages/spatial/index.mjs';
 import { buildReplayFrames } from '../src/replay.mjs';
 import { buildTemporalFrames, reconstructAt, counterfactualAt, futureTrajectory } from '../src/temporal/temporal-intelligence.mjs';
+import { createActionGuard, assertActorCapability, requireResetConfirmation, RESET_CONFIRMATION } from '../src/action-guard.mjs';
 import { createUpstreamHub } from '../src/integrations/upstream-hub.mjs';
 import { createFederationApiHandler } from './federation-routes.mjs';
 
@@ -54,7 +55,20 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
   const federationHandler=federation?.kernel?createFederationApiHandler(federation):null;
   const broadcast=payload=>sse.broadcast(payload);
   const ready = store.init();
-
+  const actionGuard=createActionGuard();
+  const beginAction=(req,body,capability,path,confirmation=false)=>{
+    const snapshot=store.snapshot();
+    if(!body?.actor) { const error=new Error('actor required');error.code='actor_required';error.status=422;throw error; }
+    try { assertActorCapability({state:snapshot,actor:body.actor,capability}); }
+    catch (error) { error.code='forbidden';error.status=403;throw error; }
+    if(confirmation) { try { requireResetConfirmation(body.confirmationToken); } catch(error) { error.code='confirmation_required';error.status=422;throw error; } }
+    const key=req.headers['idempotency-key']||body.idempotencyKey;
+    if(!key) { const error=new Error('idempotency key required');error.code='idempotency_conflict';error.status=422;throw error; }
+    try { return { key:`${req.method}:${path}:${key}`, state:actionGuard.begin(`${req.method}:${path}:${key}`) }; }
+    catch(error) { error.code='idempotency_conflict';error.status=409;throw error; }
+  };
+  const completeAction=(key,result)=>actionGuard.complete(key,result);
+  const failAction=(key,error)=>{actionGuard.fail(key,error?.message||error);throw error;};
   const runtimeHub = new MissionRuntimeHub({
     store,
     intervalMs:runtimeIntervalMs,
@@ -188,10 +202,15 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
         }
 
         if (url.pathname === '/api/v1/reset' && req.method === 'POST') {
-          const next = await store.reset();
-          await runtimeHub.reset();
-          broadcast({ state:next, runtimes:{} });
-          sendJson(res, 200, { state:next, runtimes:{} });
+          const body=await readJson(req);
+          const action=beginAction(req,body,'workspace.reset',url.pathname,true);
+          try {
+            const next = await store.reset();
+            await runtimeHub.reset();
+            completeAction(action.key,{status:'accepted'});
+            broadcast({ state:next, runtimes:{} });
+            sendJson(res, 200, { state:next, runtimes:{} });
+          } catch (error) { failAction(action.key,error); }
           return;
         }
 
@@ -266,9 +285,13 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
           if (!store.snapshot().approvals.some(a => a.id === id)) { sendJson(res, 404, { error:'approval_not_found' }); return; }
           const decision = String(body.decision || '');
           if (!['approved','rejected'].includes(decision)) { sendJson(res, 422, { error:'invalid_decision' }); return; }
-          const next = await store.replace(decideApproval(store.snapshot(), id, decision, body.actor || 'demo-user'));
-          broadcast({ state:next, runtimes:runtimeHub.snapshot() });
-          sendJson(res, 200, { state:next });
+          const action=beginAction(req,body,'approval.decide',url.pathname);
+          try {
+            const next = await store.replace(decideApproval(store.snapshot(), id, decision, body.actor));
+            completeAction(action.key,{status:'accepted'});
+            broadcast({ state:next, runtimes:runtimeHub.snapshot() });
+            sendJson(res, 200, { state:next });
+          } catch (error) { failAction(action.key,error); }
           return;
         }
 
@@ -278,10 +301,14 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
           const id = decodeURIComponent(match[1]);
           if (!store.snapshot().missions.some(m => m.id === id)) { sendJson(res, 404, { error:'mission_not_found' }); return; }
           if (!['takeover','observe'].includes(body.mode)) { sendJson(res, 422, { error:'invalid_control_mode' }); return; }
-          if (body.mode === 'takeover') await runtimeHub.pause(id);
-          const next = await store.replace(setTakeover(store.snapshot(), id, body.mode === 'takeover'));
-          broadcast({ state:next, runtimes:runtimeHub.snapshot() });
-          sendJson(res, 200, { state:next, runtime:runtimeHub.snapshot()[id] || null });
+          const action=beginAction(req,body,'mission.control',url.pathname);
+          try {
+            if (body.mode === 'takeover') await runtimeHub.pause(id);
+            const next = await store.replace(setTakeover(store.snapshot(), id, body.mode === 'takeover'));
+            completeAction(action.key,{status:'accepted',mode:body.mode});
+            broadcast({ state:next, runtimes:runtimeHub.snapshot() });
+            sendJson(res, 200, { state:next, runtime:runtimeHub.snapshot()[id] || null });
+          } catch (error) { failAction(action.key,error); }
           return;
         }
 
@@ -371,11 +398,16 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
 
         match = url.pathname.match(/^\/api\/v1\/memory\/([^/]+)$/);
         if (match && req.method === 'DELETE') {
+          const body=await readJson(req);
           const id = decodeURIComponent(match[1]);
           if (!store.snapshot().memory.some(m => m.id === id)) { sendJson(res, 404, { error:'memory_not_found' }); return; }
-          const next = await store.mutate(draft => { draft.memory = draft.memory.filter(m => m.id !== id); return draft; });
-          broadcast({ state:next, runtimes:runtimeHub.snapshot() });
-          sendJson(res, 200, { state:next });
+          const action=beginAction(req,body,'memory.revoke',url.pathname);
+          try {
+            const next = await store.mutate(draft => { draft.memory = draft.memory.filter(m => m.id !== id); return draft; });
+            completeAction(action.key,{status:'accepted'});
+            broadcast({ state:next, runtimes:runtimeHub.snapshot() });
+            sendJson(res, 200, { state:next });
+          } catch (error) { failAction(action.key,error); }
           return;
         }
 

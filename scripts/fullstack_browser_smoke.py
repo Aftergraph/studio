@@ -86,7 +86,7 @@ with tempfile.TemporaryDirectory(prefix='aftergraph-fullstack-') as td:
             page.screenshot(path=str(ROOT/'screenshot-fullstack-v4.png'),full_page=True)
             browser.close()
 
-        reset=api(base,'/api/v1/reset',method='POST')
+        reset=api(base,'/api/v1/reset',method='POST',body={'actor':'demo-user','confirmationToken':'RESET_WORKSPACE','idempotencyKey':'reset-browser-smoke'})
         check(any(m['id']=='mem2' for m in reset['state']['memory']),'reset restores deterministic seed after full-stack test')
     finally:
         proc.terminate()

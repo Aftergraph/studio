@@ -141,7 +141,7 @@ with tempfile.TemporaryDirectory(prefix='aftergraph-v5-bridge-') as td:
             check(len(errors)==0,'V5 full-stack browser flow has no uncaught page errors')
             page.close();browser.close()
 
-        reset=api(base,'/api/v1/reset','POST',{})
+        reset=api(base,'/api/v1/reset','POST',{'actor':'demo-user','confirmationToken':'RESET_WORKSPACE','idempotencyKey':'reset-smoke-v5'})
         check(reset['state']['spaces'][0]['id']=='space_primary','full-stack test resets deterministic V5 spatial seed')
     finally:
         proc.terminate()

@@ -51,6 +51,7 @@ export function bootstrapAftergraph(){
   let backendConnected=false;
   let backendRuntimes={};
   let backendSession=null;
+  const pendingActions=new Set();
   let renderScheduler=null;
   const surfaceLifecycle=createSurfaceLifecycle(['artifact','approval']);
   let lastProgress=new Map(state.missions.map(m=>[m.id,m.progress]));
@@ -77,6 +78,8 @@ export function bootstrapAftergraph(){
     return initial;
   }
   function saveState(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}catch{}}
+  function beginUiAction(key){if(pendingActions.has(key))return false;pendingActions.add(key);render();return true}
+  function endUiAction(key){pendingActions.delete(key);render()}
   function detectDevice(){return window.matchMedia('(max-width: 760px)').matches?'mobile':'desktop'}
   function initials(name=''){return String(name).split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase()||'A'}
   function statusPill(status,label=null){const raw=String(status||'unknown');return `<span class="status-pill ${raw.replace(/[^a-z0-9_-]/gi,'-').toLowerCase()}">${escapeHtml(label||raw.replaceAll('_',' '))}</span>`}
@@ -477,7 +480,7 @@ export function bootstrapAftergraph(){
   function renderApprovalFocus(){
     if(!ui.approvalOpen)return '';
     const approval=currentApproval();
-    const base=AGApproval({id:approval.id,title:approval.title,risk:approval.risk,state:approval.state,why:approval.why,impact:approval.impact,rollback:approval.rollback,authority:approval.authority,evidence:approval.evidence});
+    const base=AGApproval({id:approval.id,title:approval.title,risk:approval.risk,state:pendingActions.has(`approval:${approval.id}`)?'loading':approval.state,why:approval.why,impact:approval.impact,rollback:approval.rollback,authority:approval.authority,evidence:approval.evidence});
     return `<div class="ag-approval-backdrop" data-action="close-approval"></div><div class="ag-approval-shell attention-gravity">${base}<button class="ag-approval-close" data-action="close-approval" aria-label="Close approval">${AGIcon('close',{size:16})}</button>${ui.approvalEvidenceOpen?`<aside class="ag-evidence-reveal"><header>${AGIcon('evidence',{size:16})}<strong>Verification evidence</strong></header>${approval.evidence.map((id,i)=>`<div><span>${AGIcon('check',{size:13})}</span><span><strong>${escapeHtml(id)}</strong><small>${i===0?'Staging verification passed':'Health and rollback evidence sealed'}</small></span></div>`).join('')}</aside>`:''}</div>`;
   }
 
@@ -665,10 +668,10 @@ export function bootstrapAftergraph(){
       case 'resume-live':{const id=(state.activeDomain==='chat'?chatMission():currentMission())?.id;if(backendConnected&&id){void apiClient.runtime(id,'resume').then(payload=>{backendRuntimes={...backendRuntimes,[id]:payload.runtime};applyBackendPayload(payload);toast('Mission resumed')}).catch(backendFailed)}else if(liveRuntime){liveRuntime=resumeMission(liveRuntime);state=liveRuntime.state;startRuntime(liveRuntime.missionId)}break;}
       case 'toggle-immersive':ui.immersive=!ui.immersive;break;
       case 'toggle-pulse':ui.pulseOpen=!ui.pulseOpen;break;
-      case 'takeover':if(el.dataset.id){stopRuntimeTimer();state=setTakeover(state,el.dataset.id,true);if(liveRuntime?.missionId===el.dataset.id)liveRuntime=pauseMission(liveRuntime);saveState();toast('Human control active');if(backendConnected)void syncBackend(apiClient.setControl(el.dataset.id,'takeover'))}break;
-      case 'handback':if(el.dataset.id){state=setTakeover(state,el.dataset.id,false);saveState();toast('Control handed back');if(backendConnected)void syncBackend(apiClient.setControl(el.dataset.id,'observe'))}break;
+      case 'takeover':if(el.dataset.id){const key=`control:${el.dataset.id}:takeover`;if(!beginUiAction(key))break;stopRuntimeTimer();if(backendConnected){void apiClient.setControl(el.dataset.id,'takeover',state.user.id).then(payload=>{applyBackendPayload(payload);toast('Human control active');endUiAction(key)}).catch(error=>{toast('Takeover failed');endUiAction(key);console.warn('Takeover failed',error?.code||error)})}else{state=setTakeover(state,el.dataset.id,true);if(liveRuntime?.missionId===el.dataset.id)liveRuntime=pauseMission(liveRuntime);saveState();toast('Human control active');endUiAction(key)}}break;
+      case 'handback':if(el.dataset.id){const key=`control:${el.dataset.id}:observe`;if(!beginUiAction(key))break;if(backendConnected){void apiClient.setControl(el.dataset.id,'observe',state.user.id).then(payload=>{applyBackendPayload(payload);toast('Control handed back');endUiAction(key)}).catch(error=>{toast('Handback failed');endUiAction(key);console.warn('Handback failed',error?.code||error)})}else{state=setTakeover(state,el.dataset.id,false);saveState();toast('Control handed back');endUiAction(key)}}break;
       case 'show-evidence':ui.inspectorOpen=true;break;
-      case 'revoke-memory':state.memory=state.memory.filter(m=>m.id!==el.dataset.id);saveState();toast('Memory revoked');if(backendConnected&&el.dataset.id)void syncBackend(apiClient.deleteMemory(el.dataset.id));break;
+      case 'revoke-memory':if(el.dataset.id){const key=`memory:${el.dataset.id}`;if(!beginUiAction(key))break;if(backendConnected){void apiClient.deleteMemory(el.dataset.id,state.user.id).then(payload=>{applyBackendPayload(payload);toast('Memory revoked');endUiAction(key)}).catch(error=>{toast('Memory revoke failed');endUiAction(key);console.warn('Memory revoke failed',error?.code||error)})}else{state.memory=state.memory.filter(m=>m.id!==el.dataset.id);saveState();toast('Memory revoked');endUiAction(key)}}break;
       case 'copy-link':{const type=el.dataset.type,id=el.dataset.id;const link=location.origin+buildDeepLink(domainForObject(type),type,id);navigator.clipboard?.writeText(link).catch(()=>{});toast('Deep link copied');break}
       case 'sync-upstreams':if(backendConnected){void apiClient.syncUpstreams().then(payload=>{applyUpstreamPayload(payload);toast('Source truth synchronized')}).catch(error=>{console.warn('Upstream sync failed',error?.code||error);toast('Upstream sync failed')})}break;
       case 'reset-demo':stopRuntimeTimer();try{localStorage.removeItem(STORAGE_KEY)}catch{};state=createInitialState();liveRuntime=null;backendRuntimes={};toast('Demo reset');if(backendConnected)void syncBackend(apiClient.reset());break;
@@ -724,7 +727,12 @@ export function bootstrapAftergraph(){
     if(el.dataset.resultKind){executePalette(el);return}
     if(el.dataset.approvalAction){
       if(el.dataset.approvalAction==='inspect'){ui.approvalEvidenceOpen=!ui.approvalEvidenceOpen;render();return}
-      const decision=el.dataset.approvalAction==='approve'?'approved':'rejected';const approvalId=currentApproval().id;state=decideApproval(state,approvalId,decision,state.user.id);ui.approvalOpen=false;ui.approvalEvidenceOpen=false;saveState();toast(`Approval ${decision}`);render();if(backendConnected)void syncBackend(apiClient.decideApproval(approvalId,decision,state.user.id));return;
+      const approval=currentApproval(),approvalId=approval.id,key=`approval:${approvalId}`;
+      if(!beginUiAction(key))return;
+      const decision=el.dataset.approvalAction==='approve'?'approved':'rejected';
+      if(!backendConnected){state=decideApproval(state,approvalId,decision,state.user.id);ui.approvalOpen=false;ui.approvalEvidenceOpen=false;saveState();toast(`Approval ${decision}`);endUiAction(key);return}
+      void apiClient.decideApproval(approvalId,decision,state.user.id).then(payload=>{applyBackendPayload(payload);ui.approvalOpen=false;ui.approvalEvidenceOpen=false;toast(`Approval ${decision}`);endUiAction(key)}).catch(error=>{ui.controlError='Approval could not be confirmed. It remains pending.';toast('Approval failed');endUiAction(key);console.warn('Approval decision failed',error?.code||error)});
+      return
     }
     if(el.dataset.action){if(el.dataset.action==='close-palette'&&event.target!==el)return;runAction(el.dataset.action,el);render()}
   });

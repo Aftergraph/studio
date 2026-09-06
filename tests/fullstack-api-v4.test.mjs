@@ -49,14 +49,14 @@ test('chat writes persist across API reads', async () => {
 test('approval and takeover mutations use canonical state semantics', async () => {
   await withServer(async base => {
     const approval = await json(`${base}/api/v1/approvals/apr_prod_1/decision`, {
-      method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({decision:'approved', actor:'demo-user'}),
+      method:'POST', headers:{'content-type':'application/json','idempotency-key':'approval-test-1'}, body:JSON.stringify({decision:'approved', actor:'demo-user', idempotencyKey:'approval-test-1'}),
     });
     assert.equal(approval.response.status, 200);
     assert.equal(approval.body.state.approvals.find(a=>a.id==='apr_prod_1').state, 'approved');
     assert.equal(approval.body.state.missions.find(m=>m.id==='mission_release').state, 'running');
 
     const takeover = await json(`${base}/api/v1/missions/mission_q4/control`, {
-      method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({mode:'takeover'}),
+      method:'POST', headers:{'content-type':'application/json','idempotency-key':'control-test-1'}, body:JSON.stringify({mode:'takeover', actor:'demo-user', idempotencyKey:'control-test-1'}),
     });
     assert.equal(takeover.response.status, 200);
     assert.equal(takeover.body.state.missions.find(m=>m.id==='mission_q4').controlMode, 'takeover');
@@ -100,11 +100,11 @@ test('context, artifact, memory and reset endpoints are real server contracts', 
     assert.equal(artifact.response.status, 200);
     assert.equal(artifact.body.artifact.id, 'art_q4');
 
-    const deleted = await json(`${base}/api/v1/memory/mem2`, { method:'DELETE' });
+    const deleted = await json(`${base}/api/v1/memory/mem2`, { method:'DELETE', headers:{'content-type':'application/json','idempotency-key':'memory-test-1'}, body:JSON.stringify({actor:'demo-user', idempotencyKey:'memory-test-1'}) });
     assert.equal(deleted.response.status, 200);
     assert.equal(deleted.body.state.memory.some(m=>m.id==='mem2'), false);
 
-    const reset = await json(`${base}/api/v1/reset`, { method:'POST' });
+    const reset = await json(`${base}/api/v1/reset`, { method:'POST', headers:{'content-type':'application/json','idempotency-key':'reset-test-1'}, body:JSON.stringify({actor:'demo-user', confirmationToken:'RESET_WORKSPACE', idempotencyKey:'reset-test-1'}) });
     assert.equal(reset.response.status, 200);
     assert.equal(reset.body.state.memory.some(m=>m.id==='mem2'), true);
   });
@@ -191,5 +191,21 @@ test('canonical domain resources have scoped read endpoints', async()=>{
     assert.equal(system.body.version,'aftergraph.workspace.v5');
     assert.equal(system.body.telemetry.chain,'verified');
     assert.equal(typeof system.body.backend.runtimeCount,'number');
+  });
+});
+
+test('V81-016 destructive endpoints require actor, confirmation and idempotency', async()=>{
+  await withServer(async base=>{
+    const denied=await json(`${base}/api/v1/approvals/apr_prod_1/decision`,{method:'POST',headers:{'content-type':'application/json','idempotency-key':'deny-1'},body:JSON.stringify({decision:'approved',actor:'agent:worker',idempotencyKey:'deny-1'})});
+    assert.equal(denied.response.status,403);
+    const missing=await json(`${base}/api/v1/missions/mission_q4/control`,{method:'POST',headers:{'content-type':'application/json','idempotency-key':'missing-1'},body:JSON.stringify({mode:'takeover',idempotencyKey:'missing-1'})});
+    assert.equal(missing.response.status,422);
+    const noConfirm=await json(`${base}/api/v1/reset`,{method:'POST',headers:{'content-type':'application/json','idempotency-key':'reset-1'},body:JSON.stringify({actor:'demo-user',idempotencyKey:'reset-1'})});
+    assert.equal(noConfirm.response.status,422);
+    const body={decision:'approved',actor:'demo-user',idempotencyKey:'approval-once'};
+    const first=await json(`${base}/api/v1/approvals/apr_prod_1/decision`,{method:'POST',headers:{'content-type':'application/json','idempotency-key':'approval-once'},body:JSON.stringify(body)});
+    assert.equal(first.response.status,200);
+    const duplicate=await json(`${base}/api/v1/approvals/apr_prod_1/decision`,{method:'POST',headers:{'content-type':'application/json','idempotency-key':'approval-once'},body:JSON.stringify(body)});
+    assert.equal(duplicate.response.status,409);
   });
 });
