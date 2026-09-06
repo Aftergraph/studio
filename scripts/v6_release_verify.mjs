@@ -20,6 +20,7 @@ const GATES = [
   { name: 'V6.1 Live Federation & Engine Fault-Tolerance Exit Gate', cmd: 'node', args: ['--test', 'tests/v6-1-live-federation.test.mjs'] },
   { name: 'V6.2 Universal Search & Context Exit Gate', cmd: 'node', args: ['--test', 'tests/v6-2-universal-search-context.test.mjs'] },
   { name: 'V6.3 Capability Runtime Exit Gate', cmd: 'node', args: ['--test', 'tests/v6-3-capability-runtime.test.mjs'] },
+  { name: 'V6.4 Research OS Exit Gate', cmd: 'node', args: ['--test', 'tests/v6-4-research-os.test.mjs'] },
   { name: 'Axe-Core 4.10.3 Accessibility Gate (WCAG 2.2 AA)', cmd: 'python', args: ['scripts/a11y_smoke.py'] }
 ];
 

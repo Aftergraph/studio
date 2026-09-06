@@ -1,8 +1,8 @@
-# Aftergraph Studio (V6.3) — Implementation & Verification Status
+# Aftergraph Studio (V6.4) — Implementation & Verification Status
 
 **Target Architecture:** V6 Unified Intelligence Operating Environment  
-**Active Release:** 6.0.0 (V6.1 Live Federation, V6.2 Universal Context, V6.3 Capability Runtime, Studio & Brand System)  
-**Status:** 100% PASS (16/16 Release Verification Gates Active & Passing)  
+**Active Release:** 6.0.0 (V6.1 Live Federation, V6.2 Universal Context, V6.3 Capability Runtime, V6.4 Research OS, Studio & Brand System)  
+**Status:** 100% PASS (17/17 Release Verification Gates Active & Passing)  
 
 ---
 
@@ -15,16 +15,16 @@
 | **V6.1** | **COMPLETE** | Live Federation (real-time stream adapters across 9 repos, health/drift monitor, resync protocol) | 	ests/v6-1-live-federation.test.mjs |
 | **V6.2** | **COMPLETE** | Universal Search & Context (multi-family federated search index across 8 families, context-resolver, incomplete-result outage semantics) | 	ests/v6-2-universal-search-context.test.mjs |
 | **V6.3** | **COMPLETE** | Capability Runtime (skills, agents, tools, models, providers; Discovery ≠ Grant; Trust Gateway approvals; EvidenceGraph attestation; fullstack UI) | 	ests/v6-3-capability-runtime.test.mjs |
+| **V6.4** | **COMPLETE** | Research OS (5 typed surfaces: Study/Experiment/Claim/Evidence/Paper; staged promotion pipeline proposed→reviewed→approved→promoted; runtimeAuthority always 'none') | 	ests/v6-4-research-os.test.mjs (14/14 PASS) |
 | **Brand & Studio** | **COMPLETE** | Remote repos Aftergraph/brand and Aftergraph/studio established; master SVGs, design tokens, CI/CD pipelines deployed | GitHub Actions CI & 	ests/brand-package.test.mjs |
-| **V6.4** | **QUEUED** | Research OS (Study/Experiment/Claim/Evidence/Paper surfaces + promotion pipeline) | docs/ROADMAP.md |
 | **V6.5** | **QUEUED** | Venture OS (AVC Product Cells, goals, budgets, opportunities, missions, portfolio) | docs/ROADMAP.md |
 
 ---
 
-## 2. Monolithic Release Verification Matrix (16 Gates)
+## 2. Monolithic Release Verification Matrix (17 Gates)
 
 1. **Gate 1: Node Behavioral Tests** — 
-pm test (360/360 PASS)
+pm test (374/374 PASS)
 2. **Gate 2: Workspace Contracts & Syntax** — 
 ode scripts/verify.mjs (PASS)
 3. **Gate 3: Platform Source Contracts** — 
@@ -43,4 +43,5 @@ ode scripts/v6-secret-scan.mjs (0 leaks PASS)
 13. **Gate 13: V6.1 Live Federation Gate** — Invariant & engine fault tolerance (PASS)
 14. **Gate 14: V6.2 Universal Search & Context Gate** — Provenance & coverage (PASS)
 15. **Gate 15: V6.3 Capability Runtime Gate** — Policy, grants & execution (PASS)
-16. **Gate 16: Axe-Core 4.10.3 Accessibility Gate** — WCAG 2.2 AA (0 violations PASS)
+16. **Gate 16: V6.4 Research OS Gate** — 5 surfaces, promotion pipeline, runtimeAuthority=none invariant (14/14 PASS)
+17. **Gate 17: Axe-Core 4.10.3 Accessibility Gate** — WCAG 2.2 AA (0 violations PASS)
