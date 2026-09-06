@@ -248,3 +248,25 @@ Product Cell → mission (human-approved) → workforce execution → verifier s
 - Server and client logs are in-memory and single-process. Durable
   multi-process/edge replication with persistent vector-clock cursors is the
   upgrade path when real edge nodes exist.
+
+## [V8.2] — Personal + Organizational Brain
+
+### Added
+- Knowledge lifecycle (`src/brain/knowledge.mjs`): ephemeral birth with
+  provenance, confidence in 0..1, retention expiry, human-gated promotion
+  with evidence and low-confidence override.
+- Server memory lifecycle: `POST /api/v1/memory` (always ephemeral),
+  `POST /api/v1/memory/:id/promote` (human + evidence + capability gates),
+  `GET /api/v1/memory/authoritative` (ephemeral never leaks as authority).
+- Promotion UI: lifecycle status on memory items, promote action with
+  `aria-describedby` impact text, pending/disabled states, verified-artifact
+  evidence with fail-closed messaging.
+
+### Gates
+- V8.2 Brain Knowledge Lifecycle Exit Gate.
+- V8.2 Brain Server Promotion Exit Gate.
+- V8.2 Brain Promotion UI Exit Gate.
+
+### Boundary
+- Ephemeral knowledge cannot become authoritative without human promotion
+  plus evidence; expired entries lose authority automatically.
