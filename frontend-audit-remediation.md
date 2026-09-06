@@ -35,7 +35,9 @@ Evidence:
 
 ## V81-016 — Consequential action guard
 
-Status: IMPLEMENTATION COMPLETE — pending final CI promotion.
+Status: RESOLVED.
+
+Promoted at exact HEAD `3660b12`; GitHub Actions run `34062359350` passed.
 
 Changes:
 
