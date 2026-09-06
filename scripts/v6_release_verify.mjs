@@ -38,6 +38,7 @@ const GATES = [
   { name: 'V8.2 Brain Server Promotion Exit Gate', cmd: 'node', args: ['--test', 'tests/v82-brain-server.test.mjs'] },
   { name: 'V8.2 Brain Promotion UI Exit Gate', cmd: 'node', args: ['--test', 'tests/v82-brain-ui.test.mjs'] },
   { name: 'V8.3 Autonomy Bounds Exit Gate', cmd: 'node', args: ['--test', 'tests/v83-autonomy-bounds.test.mjs'] },
+  { name: 'V8.3 Autonomy Server Exit Gate', cmd: 'node', args: ['--test', 'tests/v83-autonomy-server.test.mjs'] },
   { name: 'Axe-Core 4.10.3 Accessibility Gate (WCAG 2.2 AA)', cmd: 'python', args: ['scripts/a11y_smoke.py'] }
 ];
 

@@ -12,6 +12,8 @@ import { reduceSpatialState } from '../packages/spatial/index.mjs';
 import { buildReplayFrames } from '../src/replay.mjs';
 import { buildTemporalFrames, reconstructAt, counterfactualAt, futureTrajectory } from '../src/temporal/temporal-intelligence.mjs';
 import { createActionGuard, assertActorCapability, requireResetConfirmation, RESET_CONFIRMATION } from '../src/action-guard.mjs';
+import { createKillSwitch, engageKill, releaseKill, assertAutonomyAllowed } from '../src/autonomy/bounds.mjs';
+import { CostLedger } from '../src/economy/outcome-economy.mjs';
 import { createKnowledgeEntry, promoteKnowledge, isAuthoritative } from '../src/brain/knowledge.mjs';
 import { createServerLog } from '../src/distributed/server-log.mjs';
 import { createUpstreamHub } from '../src/integrations/upstream-hub.mjs';
@@ -72,6 +74,9 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
   const completeAction=(key,result)=>actionGuard.complete(key,result);
   const failAction=(key,error)=>{actionGuard.fail(key,error?.message||error);throw error;};
   const syncLog=createServerLog();
+  const autonomyLedger=new CostLedger({id:'workspace-autonomy'});
+  const killSwitches=new Map();
+  const killFor=scope=>killSwitches.get(scope)??createKillSwitch({id:`ks-${scope}`,scope});
   const runtimeHub = new MissionRuntimeHub({
     store,
     intervalMs:runtimeIntervalMs,
@@ -457,6 +462,71 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
             broadcast({state:next,runtimes:runtimeHub.snapshot()});
             sendJson(res,200,{version:API_VERSION,entry});
           } catch(error){ actionGuard.fail(action.key,error?.message||error);sendJson(res,422,{error:error?.code||'promotion_rejected'}); }
+          return;
+        }
+
+        if (url.pathname === '/api/v1/autonomy/kill' && req.method === 'GET') {
+          const scope=url.searchParams.get('scope')||'';
+          if(!scope){sendJson(res,422,{error:'scope_required'});return;}
+          sendJson(res,200,{version:API_VERSION,switch:killFor(scope)});
+          return;
+        }
+
+        if (url.pathname === '/api/v1/autonomy/kill' && req.method === 'POST') {
+          const body=await readJson(req);
+          const action=beginAction(req,body,'autonomy.kill',url.pathname);
+          try {
+            if(!body?.scope||typeof body.scope!=='string')throw Object.assign(new Error('scope required'),{code:'scope_required'});
+            const sw=engageKill(killFor(body.scope),{by:body.actor,reason:body.reason});
+            killSwitches.set(body.scope,sw);
+            completeAction(action.key,{status:'accepted'});
+            sendJson(res,200,{version:API_VERSION,switch:sw});
+          } catch(error){ actionGuard.fail(action.key,error?.message||error);sendJson(res,422,{error:error?.code||'kill_rejected'}); }
+          return;
+        }
+
+        if (url.pathname === '/api/v1/autonomy/kill/release' && req.method === 'POST') {
+          const body=await readJson(req);
+          const action=beginAction(req,body,'autonomy.kill',url.pathname);
+          try {
+            if(!body?.scope||typeof body.scope!=='string')throw Object.assign(new Error('scope required'),{code:'scope_required'});
+            const sw=releaseKill(killFor(body.scope),{by:body.actor});
+            killSwitches.set(body.scope,sw);
+            completeAction(action.key,{status:'accepted'});
+            sendJson(res,200,{version:API_VERSION,switch:sw});
+          } catch(error){ actionGuard.fail(action.key,error?.message||error);sendJson(res,422,{error:error?.code||'kill_rejected'}); }
+          return;
+        }
+
+        if (url.pathname === '/api/v1/autonomy/cost' && req.method === 'POST') {
+          const body=await readJson(req);
+          const action=beginAction(req,body,'autonomy.record',url.pathname);
+          try {
+            const entry=autonomyLedger.record({
+              id:body.id??`cost_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+              missionId:body.missionId,kind:body.kind,amountCents:body.amountCents,
+              evidenceRef:body.evidenceRef??null,source:body.actor,
+            });
+            completeAction(action.key,{status:'accepted'});
+            sendJson(res,201,{version:API_VERSION,entry});
+          } catch(error){ actionGuard.fail(action.key,error?.message||error);sendJson(res,422,{error:error?.code||'invalid_cost_entry'}); }
+          return;
+        }
+
+        if (url.pathname === '/api/v1/autonomy/allowance' && req.method === 'POST') {
+          const body=await readJson(req);
+          const action=beginAction(req,body,'autonomy.check',url.pathname);
+          try {
+            if(!body?.missionId)throw Object.assign(new Error('missionId required'),{code:'mission_id_required'});
+            if(!Number.isInteger(body?.budgetCents))throw Object.assign(new Error('budgetCents required'),{code:'budget_required'});
+            const result=assertAutonomyAllowed({
+              killSwitch:killFor(`mission:${body.missionId}`),ledger:autonomyLedger,
+              missionId:body.missionId,budgetCents:body.budgetCents,
+              policyOk:body.policyOk??true,evidenceRef:body.evidenceRef??null,
+            });
+            completeAction(action.key,{status:'accepted'});
+            sendJson(res,200,{version:API_VERSION,...result});
+          } catch(error){ actionGuard.fail(action.key,error?.message||error);sendJson(res,422,{error:error?.code||'allowance_rejected'}); }
           return;
         }
 
