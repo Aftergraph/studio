@@ -10,6 +10,7 @@ import { WorkspaceStateStore } from '../src/server-store.mjs';
 import { MissionRuntimeHub } from '../src/server-runtime-hub.mjs';
 import { reduceSpatialState } from '../packages/spatial/index.mjs';
 import { buildReplayFrames } from '../src/replay.mjs';
+import { buildTemporalFrames, reconstructAt, counterfactualAt, futureTrajectory } from '../src/temporal/temporal-intelligence.mjs';
 import { createUpstreamHub } from '../src/integrations/upstream-hub.mjs';
 import { createFederationApiHandler } from './federation-routes.mjs';
 
@@ -317,6 +318,25 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
           });
           broadcast({ state:next, runtimes:runtimeHub.snapshot() });
           sendJson(res, 200, { state:next, space:next.spaces[index] });
+          return;
+        }
+
+        if (url.pathname === '/api/v1/temporal' && req.method === 'GET') {
+          const snapshot = store.snapshot();
+          const frames = buildTemporalFrames(snapshot.events || [], {});
+          const cursor = Number(url.searchParams.get('cursor') ?? snapshot.replay?.cursor ?? 0);
+          const mode = url.searchParams.get('mode') || 'historical';
+          let temporal = { mode: 'historical', cursor: Math.max(0, Math.min(frames.length - 1, Math.trunc(cursor) || 0)), state: reconstructAt(frames, cursor), frames };
+          if (mode === 'counterfactual') {
+            const hypothetical = JSON.parse(url.searchParams.get('event') || '{}');
+            temporal = counterfactualAt(frames, cursor, hypothetical);
+          } else if (mode === 'forecast') {
+            const steps = JSON.parse(url.searchParams.get('steps') || '[]');
+            temporal = futureTrajectory(frames, cursor, steps);
+          } else if (!frames.length) {
+            temporal = { mode: 'historical', cursor: -1, state: {}, frames: [] };
+          }
+          sendJson(res, 200, { ok: true, temporal, authority: 'none' });
           return;
         }
 

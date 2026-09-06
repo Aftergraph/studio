@@ -59,6 +59,25 @@ test('replay cursor is server-owned state and clamps to durable event history',a
   });
 });
 
+test('V7.3 temporal endpoint returns historical, counterfactual and forecast projections',async()=>{
+  await withServer(async base=>{
+    const historical=await json(`${base}/api/v1/temporal?cursor=1`);
+    assert.equal(historical.response.status,200);
+    assert.equal(historical.body.authority,'none');
+    assert.equal(historical.body.temporal.mode,'historical');
+    assert.ok(Array.isArray(historical.body.temporal.frames));
+    const event=encodeURIComponent(JSON.stringify({id:'cf-1',patch:{status:'cancelled'}}));
+    const branch=await json(`${base}/api/v1/temporal?mode=counterfactual&cursor=1&event=${event}`);
+    assert.equal(branch.response.status,200);
+    assert.equal(branch.body.temporal.mode,'counterfactual');
+    assert.equal(branch.body.temporal.executed,false);
+    const steps=encodeURIComponent(JSON.stringify([{id:'f1',label:'Review',confidence:0.7}]));
+    const forecast=await json(`${base}/api/v1/temporal?mode=forecast&cursor=1&steps=${steps}`);
+    assert.equal(forecast.response.status,200);
+    assert.equal(forecast.body.temporal.mode,'forecast');
+    assert.equal(forecast.body.temporal.executed,false);
+  });
+});
 test('multimodal intent attachment metadata persists through the full-stack chat contract',async()=>{
   await withServer(async base=>{
     const write=await json(`${base}/api/v1/conversations/conv_q4/messages`,{

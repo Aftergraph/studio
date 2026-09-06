@@ -134,3 +134,21 @@ Product Cell → mission (human-approved) → workforce execution → verifier s
 - Agents cannot self-assign, self-promote, self-approve, or self-verify.
 - `verifier !== executor`; verification requires prior execution evidence.
 - Team topology and handoffs carry `authority: 'none'`.
+
+## [V7.3] — Temporal Intelligence
+
+### Added
+- `src/temporal/temporal-intelligence.mjs` — deterministic historical
+  reconstruction, immutable counterfactual branches, and explicit future
+  trajectories.
+- `GET /api/v1/temporal` — read-only temporal projection endpoint for
+  historical, counterfactual, and forecast modes.
+- Replay UI now exposes Historical, Counterfactual, and Forecast modes.
+- `tests/v7-3-temporal-intelligence.test.mjs` — temporal invariants and
+  zero-authority exit-chain coverage.
+- `scripts/v6_release_verify.mjs` — Gate 22: V7.3 Temporal Intelligence Exit Gate.
+
+### Invariants
+- Temporal views are deterministic and immutable.
+- Counterfactuals never mutate historical state or execute actions.
+- Future trajectories are forecasts only: `executed: false`, `authority: 'none'`.
