@@ -65,7 +65,9 @@ test('Brain server: promotion requires human, evidence and confidence', async ()
     });
     const id = created.body.entry.id;
     const agent = await promote(base, id, { actor: 'agent:worker', evidence: 'ev1' });
-    assert.ok([403, 422].includes(agent.response.status), 'agent cannot promote');
+    // ponytail: per-user isolation — another actor's memory is invisible (404),
+    // unregistered actors are forbidden (403), invalid promotion is 422.
+    assert.ok([403, 404, 422].includes(agent.response.status), 'agent cannot promote');
     const noEvidence = await promote(base, id, { actor: 'demo-user' });
     assert.equal(noEvidence.response.status, 422);
     const lowConf = await promote(base, id, { actor: 'demo-user', evidence: 'ev1' });

@@ -54,7 +54,43 @@ export function upstreamConfigFromEnv(env=process.env) {
 
 export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, upstreamConfig = null, federation = null, fixtures = true } = {}) {
   const rootDir = resolveRoot(root);
-  const store = new WorkspaceStateStore({ stateFile, initialState: createInitialState({ fixtures }) });
+  // ponytail: per-user workspace isolation. One store+hub+synclog per actor id,
+  // lazily created; autonomy ledger and kill-switches stay global (portfolio stop).
+  const DEFAULT_ACTOR = 'demo-user';
+  const stores = new Map();
+  const hubs = new Map();
+  const syncLogs = new Map();
+  const storeFor = (actor) => {
+    const id = actor || DEFAULT_ACTOR;
+    let entry = stores.get(id);
+    if (!entry) {
+      entry = new WorkspaceStateStore({ stateFile: stateFile ? `${stateFile}.${id}` : undefined, initialState: createInitialState({ fixtures }) });
+      entry.readyP = entry.init();
+      stores.set(id, entry);
+    }
+    return entry;
+  };
+  const hubFor = (actor) => {
+    const id = actor || DEFAULT_ACTOR;
+    let hub = hubs.get(id);
+    if (!hub) {
+      hub = new MissionRuntimeHub({
+        store: storeFor(id),
+        intervalMs: runtimeIntervalMs,
+        onChange: payload => broadcast(payload),
+        isHalted: missionId => killSwitches.get(`mission:${missionId}`)?.engaged === true,
+      });
+      hubs.set(id, hub);
+    }
+    return hub;
+  };
+  const logFor = (actor) => {
+    const id = actor || DEFAULT_ACTOR;
+    let log = syncLogs.get(id);
+    if (!log) { log = createServerLog(); syncLogs.set(id, log); }
+    return log;
+  };
+  const store = storeFor(DEFAULT_ACTOR);
   const upstreamHub=createUpstreamHub(upstreamConfig || upstreamConfigFromEnv());
   const sse=createSSEBroker({version:API_VERSION});
   const federationHandler=federation?.kernel?createFederationApiHandler(federation):null;
@@ -72,32 +108,41 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
     ]});
   } catch { /* seeded already */ }
   const beginAction=(req,body,capability,path,confirmation=false)=>{
-    const snapshot=store.snapshot();
+    const snapshot=storeFor(body?.actor).snapshot();
     if(!body?.actor) { const error=new Error('actor required');error.code='actor_required';error.status=422;throw error; }
     try { assertActorCapability({state:snapshot,actor:body.actor,capability,users:userRegistry}); }
     catch (error) { error.code='forbidden';error.status=403;throw error; }
     if(confirmation) { try { requireResetConfirmation(body.confirmationToken); } catch(error) { error.code='confirmation_required';error.status=422;throw error; } }
     const key=req.headers['idempotency-key']||body.idempotencyKey;
     if(!key) { const error=new Error('idempotency key required');error.code='idempotency_conflict';error.status=422;throw error; }
-    try { return { key:`${req.method}:${path}:${key}`, state:actionGuard.begin(`${req.method}:${path}:${key}`) }; }
+    try { return { key:`${body?.actor || DEFAULT_ACTOR}:${req.method}:${path}:${key}`, state:actionGuard.begin(`${body?.actor || DEFAULT_ACTOR}:${req.method}:${path}:${key}`) }; }
     catch(error) { error.code='idempotency_conflict';error.status=409;throw error; }
   };
   const completeAction=(key,result)=>actionGuard.complete(key,result);
   const failAction=(key,error)=>{actionGuard.fail(key,error?.message||error);throw error;};
-  const syncLog=createServerLog();
+  const syncLog=logFor(DEFAULT_ACTOR);
   const autonomyLedger=new CostLedger({id:'workspace-autonomy'});
   const killSwitches=new Map();
   const killFor=scope=>killSwitches.get(scope)??createKillSwitch({id:`ks-${scope}`,scope});
-  const runtimeHub = new MissionRuntimeHub({
-    store,
-    intervalMs:runtimeIntervalMs,
-    onChange:payload => broadcast(payload),
-    isHalted:missionId=>killSwitches.get(`mission:${missionId}`)?.engaged===true,
-  });
+  const runtimeHub = hubFor(DEFAULT_ACTOR);
 
   const server = http.createServer(async (req, res) => {
     await ready;
     const url = new URL(req.url || '/', 'http://127.0.0.1');
+    // ponytail: per-request scope. GETs scope via ?actor=; mutating routes
+    // rescope from body right after readJson (see rescope calls below).
+    const queryActor = url.searchParams.get('actor') || undefined;
+    let store = storeFor(queryActor);
+    let runtimeHub = hubFor(queryActor);
+    let syncLog = logFor(queryActor);
+    await store.readyP;
+    const rescope = async (actor) => {
+      const scoped = actor || queryActor;
+      store = storeFor(scoped);
+      runtimeHub = hubFor(scoped);
+      syncLog = logFor(scoped);
+      await store.readyP;
+    };
 
     if (url.pathname === '/healthz') {
       sendJson(res, 200, { status:'ok', app:'aftergraph-workspace-v5-reference', api:API_VERSION });
@@ -124,7 +169,8 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
         }
 
         if (url.pathname === '/api/v1/upstreams/sync' && req.method === 'POST') {
-          const upstreams=await upstreamHub.sync();
+          await rescope();
+                    const upstreams=await upstreamHub.sync();
           const next=await store.mutate(draft=>{
             draft.upstreams=upstreams;
             draft.events.unshift({id:`ev_${Date.now()}`,type:'upstreams.synced',text:'Canonical Aftergraph upstream projections synchronized',time:'now'});
@@ -223,7 +269,8 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
 
         if (url.pathname === '/api/v1/reset' && req.method === 'POST') {
           const body=await readJson(req);
-          const action=beginAction(req,body,'workspace.reset',url.pathname,true);
+          await rescope(body?.actor);
+                    const action=beginAction(req,body,'workspace.reset',url.pathname,true);
           try {
             const next = await store.reset();
             await runtimeHub.reset();
@@ -236,6 +283,7 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
 
         if (url.pathname === '/api/v1/sync/events' && req.method === 'POST') {
           const body=await readJson(req);
+          await rescope(body?.actor);
           if(!body?.actor){sendJson(res,422,{error:'actor_required'});return;}
           if(!body?.nodeId||typeof body.nodeId!=='string'){sendJson(res,422,{error:'node_id_required'});return;}
           if(!Array.isArray(body?.events)){sendJson(res,422,{error:'events_required'});return;}
@@ -256,6 +304,7 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
 
         if (url.pathname === '/api/v1/conversations' && req.method === 'POST') {
           const body = await readJson(req);
+          await rescope(body?.actor);
           const id = String(body.id || `conv_${Date.now()}`);
           if (!/^conv_[a-zA-Z0-9_-]+$/.test(id)) { sendJson(res, 422, { error:'invalid_conversation_id' }); return; }
           if (store.snapshot().conversations.some(c => c.id === id)) { sendJson(res, 409, { error:'conversation_exists' }); return; }
@@ -273,7 +322,8 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
 
         let match = url.pathname.match(/^\/api\/v1\/needs\/([^/]+)$/);
         if (match && req.method === 'DELETE') {
-          const id = decodeURIComponent(match[1]);
+          await rescope();
+                    const id = decodeURIComponent(match[1]);
           if (!store.snapshot().needsYou.some(n => n.id === id)) { sendJson(res, 404, { error:'need_not_found' }); return; }
           const next = await store.mutate(draft => {
             draft.needsYou = draft.needsYou.filter(n => n.id !== id);
@@ -288,6 +338,7 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
         match = url.pathname.match(/^\/api\/v1\/conversations\/([^/]+)\/messages$/);
         if (match && req.method === 'POST') {
           const body = await readJson(req);
+          await rescope(body?.actor);
           const text = String(body.text || '').trim();
           if (!text) { sendJson(res, 422, { error:'message_required' }); return; }
           const conversationId = decodeURIComponent(match[1]);
@@ -321,6 +372,7 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
         match = url.pathname.match(/^\/api\/v1\/approvals\/([^/]+)\/decision$/);
         if (match && req.method === 'POST') {
           const body = await readJson(req);
+          await rescope(body?.actor);
           const id = decodeURIComponent(match[1]);
           if (!store.snapshot().approvals.some(a => a.id === id)) { sendJson(res, 404, { error:'approval_not_found' }); return; }
           const decision = String(body.decision || '');
@@ -338,6 +390,7 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
         match = url.pathname.match(/^\/api\/v1\/missions\/([^/]+)\/control$/);
         if (match && req.method === 'POST') {
           const body = await readJson(req);
+          await rescope(body?.actor);
           const id = decodeURIComponent(match[1]);
           if (!store.snapshot().missions.some(m => m.id === id)) { sendJson(res, 404, { error:'mission_not_found' }); return; }
           if (!['takeover','observe'].includes(body.mode)) { sendJson(res, 422, { error:'invalid_control_mode' }); return; }
@@ -355,6 +408,7 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
         match = url.pathname.match(/^\/api\/v1\/missions\/([^/]+)\/runtime$/);
         if (match && req.method === 'POST') {
           const body = await readJson(req);
+          await rescope(body?.actor);
           const id = decodeURIComponent(match[1]);
           if (!store.snapshot().missions.some(m => m.id === id)) { sendJson(res, 404, { error:'mission_not_found' }); return; }
           let runtime;
@@ -370,6 +424,7 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
         match = url.pathname.match(/^\/api\/v1\/spaces\/([^/]+)$/);
         if (match && req.method === 'PATCH') {
           const body = await readJson(req);
+          await rescope(body?.actor);
           const id = decodeURIComponent(match[1]);
           const snapshot = store.snapshot();
           const index = (snapshot.spaces || []).findIndex(space => space.id === id);
@@ -409,6 +464,7 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
 
         if (url.pathname === '/api/v1/replay' && req.method === 'PATCH') {
           const body = await readJson(req);
+          await rescope(body?.actor);
           const snapshot = store.snapshot();
           const frames = buildReplayFrames(snapshot.events || []);
           const max = Math.max(0, frames.length - 1);
@@ -446,6 +502,7 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
 
         if (url.pathname === '/api/v1/memory' && req.method === 'POST') {
           const body=await readJson(req);
+          await rescope(body?.actor);
           const action=beginAction(req,body,'memory.write',url.pathname);
           try {
             const entry=createKnowledgeEntry({
@@ -463,6 +520,7 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
         match = url.pathname.match(/^\/api\/v1\/memory\/([^/]+)\/promote$/);
         if (match && req.method === 'POST') {
           const body=await readJson(req);
+          await rescope(body?.actor);
           const id=decodeURIComponent(match[1]);
           const found=store.snapshot().memory.find(m=>m.id===id);
           if(!found){sendJson(res,404,{error:'memory_not_found'});return;}
@@ -578,6 +636,7 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
         match = url.pathname.match(/^\/api\/v1\/memory\/([^/]+)$/);
         if (match && req.method === 'DELETE') {
           const body=await readJson(req);
+          await rescope(body?.actor);
           const id = decodeURIComponent(match[1]);
           if (!store.snapshot().memory.some(m => m.id === id)) { sendJson(res, 404, { error:'memory_not_found' }); return; }
           const action=beginAction(req,body,'memory.revoke',url.pathname);
@@ -602,9 +661,10 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
 
   server.on('close', () => {
     runtimeHub.stopAll();
+    for (const hub of hubs.values()) { try { hub.stopAll(); } catch {} }
     sse.closeAll();
   });
-  server.workspace = { store, runtimeHub, upstreamHub, federation, ready };
+  server.workspace = { store, runtimeHub, upstreamHub, federation, ready, stores, hubs };
   return server;
 }
 
