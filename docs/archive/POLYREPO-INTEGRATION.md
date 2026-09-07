@@ -1,3 +1,5 @@
+> ⚠️ **SUPERSEDED** — This V5.1 doc is archived. Current polyrepo plan: see `POLYREPO-INTEGRATION-V6.md`.
+
 # Aftergraph V5.1 Polyrepo Integration
 
 ## Scope

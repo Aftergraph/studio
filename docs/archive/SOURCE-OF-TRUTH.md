@@ -1,3 +1,5 @@
+> ⚠️ **SUPERSEDED** — This pre-V6 mapping is archived. Current source-of-truth: see `SOURCE-OF-TRUTH-V6.md`.
+
 # Source-of-Truth Mapping — Aftergraph Workspace V5
 
 This package is the local full-stack reference implementation of the approved **Aftergraph V5 C Agentic Operating Environment**. It builds on the previously verified Aftergraph architecture but is not represented as a byte-identical checkout of upstream repositories.
