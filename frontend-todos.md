@@ -31,6 +31,8 @@ Raw scan counts are evidence leads, not automatic refactor instructions. Each it
 **Scope:** `L`
 **Auto-fix safe:** `no`
 
+**Owner:** design-system
+
 ## [P1] [HC-B] Repeated spacing and dimensions lack an explicit scale
 
 **Location:** `styles/components.css; styles/views.css; styles/shell.css`
@@ -56,6 +58,8 @@ Raw scan counts are evidence leads, not automatic refactor instructions. Each it
 **Priority:** `P1`
 **Scope:** `L`
 **Auto-fix safe:** `no`
+
+**Owner:** design-system
 
 ## [P1] [HC-B] Z-index values are not centrally owned
 
@@ -83,6 +87,8 @@ Raw scan counts are evidence leads, not automatic refactor instructions. Each it
 **Scope:** `M`
 **Auto-fix safe:** `no`
 
+**Owner:** design-system
+
 ## [P1] [HC-E] Breakpoints are duplicated across CSS layers
 
 **Location:** `styles/responsive.css:4; styles/shell.css:114; styles/views.css:2,11,23`
@@ -108,6 +114,8 @@ Raw scan counts are evidence leads, not automatic refactor instructions. Each it
 **Priority:** `P1`
 **Scope:** `M`
 **Auto-fix safe:** `no`
+
+**Owner:** frontend
 
 ## [P1] [HC-C] API paths are embedded in clients and runtime helpers
 
@@ -135,6 +143,8 @@ Raw scan counts are evidence leads, not automatic refactor instructions. Each it
 **Scope:** `M`
 **Auto-fix safe:** `no`
 
+**Owner:** frontend
+
 ## [P1] [HC-E] Navigation and domain metadata are split across registries
 
 **Location:** `src/domain.mjs; src/workspace-shell.mjs; src/router.mjs; src/app/bootstrap.mjs`
@@ -161,6 +171,8 @@ Raw scan counts are evidence leads, not automatic refactor instructions. Each it
 **Scope:** `L`
 **Auto-fix safe:** `no`
 
+**Owner:** frontend
+
 ## [P0] [HC-F] Runtime mock data is mixed with initial production shell state
 
 **Location:** `src/state.mjs:13-110`
@@ -186,6 +198,7 @@ Raw scan counts are evidence leads, not automatic refactor instructions. Each it
 **Priority:** `P0`
 **Scope:** `L`
 **Auto-fix safe:** `no`
+**Owner:** backend
 
 ## [P1] [HC-D] Status strings and presentation mappings are distributed
 
@@ -213,6 +226,8 @@ Raw scan counts are evidence leads, not automatic refactor instructions. Each it
 **Scope:** `L`
 **Auto-fix safe:** `no`
 
+**Owner:** frontend
+
 ## [P1] [HC-D] Currency and number formatting is locally formatted
 
 **Location:** `src/ui-helpers.mjs:23; src/app/bootstrap.mjs:460; packages/ui/work/outcome-receipt.mjs`
@@ -238,6 +253,8 @@ Raw scan counts are evidence leads, not automatic refactor instructions. Each it
 **Priority:** `P1`
 **Scope:** `M`
 **Auto-fix safe:** `no`
+
+**Owner:** frontend
 
 ## [P1] [HC-C] Direct localStorage ownership in bootstrap
 
@@ -265,6 +282,8 @@ Raw scan counts are evidence leads, not automatic refactor instructions. Each it
 **Scope:** `M`
 **Auto-fix safe:** `no`
 
+**Owner:** frontend
+
 ## [P2] [HC-H] Inline runtime styles bypass component tokens
 
 **Location:** `src/app/bootstrap.mjs:274,283,298; packages/brand/react.mjs:41`
@@ -290,6 +309,8 @@ Raw scan counts are evidence leads, not automatic refactor instructions. Each it
 **Priority:** `P2`
 **Scope:** `M`
 **Auto-fix safe:** `no`
+
+**Owner:** frontend
 
 ## [P1] [HC-I] Accessibility state coverage is not represented as a shared contract
 
@@ -317,6 +338,8 @@ Raw scan counts are evidence leads, not automatic refactor instructions. Each it
 **Scope:** `L`
 **Auto-fix safe:** `no`
 
+**Owner:** frontend
+
 ## [P2] [HC-G] Hardcoded UI copy is embedded in render functions
 
 **Location:** `src/app/bootstrap.mjs; src/views/*; packages/ui/*`
@@ -342,6 +365,8 @@ Raw scan counts are evidence leads, not automatic refactor instructions. Each it
 **Priority:** `P2`
 **Scope:** `M`
 **Auto-fix safe:** `no`
+
+**Owner:** docs
 
 ## [P1] [HC-G] State booleans permit invalid combinations
 
@@ -369,6 +394,8 @@ Raw scan counts are evidence leads, not automatic refactor instructions. Each it
 **Scope:** `L`
 **Auto-fix safe:** `no`
 
+**Owner:** frontend
+
 ## [P0] [HC-F] Backend response assumptions lack a single validation boundary
 
 **Location:** `src/backend-reconciliation.mjs; src/runtime/*; src/federation/browser-client.mjs`
@@ -394,6 +421,7 @@ Raw scan counts are evidence leads, not automatic refactor instructions. Each it
 **Priority:** `P0`
 **Scope:** `L`
 **Auto-fix safe:** `no`
+**Owner:** backend
 
 ## [P0] [HC-I] Destructive action protection is not one shared primitive
 
@@ -420,6 +448,7 @@ Raw scan counts are evidence leads, not automatic refactor instructions. Each it
 **Priority:** `P0`
 **Scope:** `L`
 **Auto-fix safe:** `no`
+**Owner:** backend
 
 ## [P1] [HC-E] Duplicate component primitives and local variants need consolidation review
 
@@ -447,6 +476,8 @@ Raw scan counts are evidence leads, not automatic refactor instructions. Each it
 **Scope:** `L`
 **Auto-fix safe:** `no`
 
+**Owner:** design-system
+
 ## [P2] [HC-J] Dead/legacy markers require classification before cleanup
 
 **Location:** `styles/*; src/*; scripts/*`
@@ -472,6 +503,8 @@ Raw scan counts are evidence leads, not automatic refactor instructions. Each it
 **Priority:** `P2`
 **Scope:** `M`
 **Auto-fix safe:** `no`
+
+**Owner:** docs
 
 ## [P1] [HC-I] Responsive audit needs explicit narrow/tablet/wide evidence
 
@@ -499,6 +532,8 @@ Raw scan counts are evidence leads, not automatic refactor instructions. Each it
 **Scope:** `M`
 **Auto-fix safe:** `no`
 
+**Owner:** frontend
+
 ## [P1] [HC-E] Canonical ownership is undocumented for several frontend constants
 
 **Location:** `styles/tokens.css; src/domain.mjs; src/state.mjs; src/api-client.mjs`
@@ -524,6 +559,8 @@ Raw scan counts are evidence leads, not automatic refactor instructions. Each it
 **Priority:** `P1`
 **Scope:** `S`
 **Auto-fix safe:** `yes`
+
+**Owner:** docs
 
 ## P0/P1 queue
 
