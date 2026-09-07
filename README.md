@@ -144,7 +144,7 @@ See:
 - `docs/superpowers/specs/2026-09-06-aftergraph-v6-unified-intelligence-operating-environment-design.md`
 - `docs/superpowers/plans/2026-09-06-aftergraph-v6-unified-intelligence-operating-environment.md`
 
-V6.0 (Unified Intelligence OS) is the verified foundation. Milestones V6.1 through V8.3 (Live Federation, Universal Search, Capability Runtime, Research OS, Venture OS, Intent OS, Adaptive Workspace, Agent Society, Temporal Intelligence, Outcome Economy, Institutional Intelligence, Distributed Aftergraph, Personal Brain, Autonomous Operations) remain open in `docs/ROADMAP.md`; V9.0 and V10.0 are north-star horizons.
+V6.0 (Unified Intelligence OS) is the verified foundation. Milestones V6.1 through V8.3 are delivered (Live Federation, Universal Search, Capability Runtime, Research OS, Venture OS, Intent OS, Adaptive Workspace, Agent Society, Temporal Intelligence, Outcome Economy, Institutional Intelligence, Distributed Aftergraph, Personal Brain, Autonomous Operations); V9.0 and V10.0 are north-star horizons. See `docs/ROADMAP.md` and `CHANGELOG-v6.md`.
 
 
 ## V5.1 polyrepo integration
