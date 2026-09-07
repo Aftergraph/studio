@@ -28,6 +28,10 @@ export class WorkspaceStateStore {
 
   snapshot() { return clone(this.state); }
 
+  // ponytail: drain lets server close await in-flight persists so test
+  // teardown never rmdirs a directory with pending per-user state writes.
+  drain() { return this.writeChain.catch(() => {}); }
+
   async replace(nextState) {
     this.state = clone(nextState);
     await this.persist();

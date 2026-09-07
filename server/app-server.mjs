@@ -702,6 +702,18 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
     sse.closeAll();
   });
   server.workspace = { store, runtimeHub, upstreamHub, federation, ready, stores, hubs };
+  // ponytail: close drains per-user persists first — teardown rmdir otherwise
+  // races in-flight stateFile writes (CI ENOTEMPTY flake).
+  const rawClose = server.close.bind(server);
+  server.close = (callback) => {
+    try { runtimeHub.stopAll(); } catch {}
+    for (const hub of hubs.values()) { try { hub.stopAll(); } catch {} }
+    Promise.all([...stores.values()].map(entry => entry.drain())).then(
+      () => rawClose(callback),
+      () => rawClose(callback),
+    );
+    return server;
+  };
   return server;
 }
 
