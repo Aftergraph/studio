@@ -1,3 +1,5 @@
+> ⚠️ **SUPERSEDED** — This V5.2 build status is archived. Current status: see `V6-IMPLEMENTATION-STATUS.md`.
+
 # Aftergraph V5.2 Calm Intelligence — Current Build Status
 
 **Build type:** current integrated development build, not final release freeze  

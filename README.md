@@ -137,11 +137,14 @@ The local server/runtime is real and persistence-backed; external provider/tool 
 
 See:
 
-- `SOURCE-OF-TRUTH.md`
+- `SOURCE-OF-TRUTH-V6.md`
+- `V6-IMPLEMENTATION-STATUS.md`
 - `QA-REPORT.md`
 - `CHANGELOG-v5.md`
-- `docs/superpowers/specs/2026-09-05-aftergraph-v5-agentic-operating-environment-design.md`
-- `docs/superpowers/plans/2026-09-05-aftergraph-v5-implementation.md`
+- `docs/superpowers/specs/2026-09-06-aftergraph-v6-unified-intelligence-operating-environment-design.md`
+- `docs/superpowers/plans/2026-09-06-aftergraph-v6-unified-intelligence-operating-environment.md`
+
+V6.0 (Unified Intelligence OS) is the verified foundation. Milestones V6.1 through V8.3 (Live Federation, Universal Search, Capability Runtime, Research OS, Venture OS, Intent OS, Adaptive Workspace, Agent Society, Temporal Intelligence, Outcome Economy, Institutional Intelligence, Distributed Aftergraph, Personal Brain, Autonomous Operations) remain open in `docs/ROADMAP.md`; V9.0 and V10.0 are north-star horizons.
 
 
 ## V5.1 polyrepo integration

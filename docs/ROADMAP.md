@@ -16,6 +16,8 @@
 | **V7.4** | **Outcome Economy** | Cost, budget, CPVO, effort, resource use, outcome settlement | Financial provenance på alle consequential missions |
 | **V8.0** | **Institutional Intelligence** | Governance, organizations, policies, institutions og multi-tenant agent systems som first-class graph | Cross-org authority isolation + external conformance |
 | **V8.1** | **Distributed Aftergraph** | Flere nodes, devices og runtimes, edge/local/cloud federation | Offline-first + eventual convergence uden authority leakage |
+
+> **V8.1-A** — navngivne sub-milestone for Distributed Aftergraph er defineret; se `docs/V8.1-DISTRIBUTED-DEFERRAL.md` for scope, deferrals og exit gates.
 | **V8.2** | **Personal + Organizational Brain** | Unified memory/knowledge med provenance, retention, confidence og promotion | Ephemeral knowledge kan ikke blive authoritative uden promotion |
 | **V8.3** | **Autonomous Operations** | Proactive missions, incident response, maintenance, recurring workflows | Autonomy bounded af budgets, policy, evidence og kill switches |
 | **V9.0** | **Verified Autonomous Organization** | Hele loopet fra mål → strategi → arbejde → verification → learning → næste mål | Langvarig autonom drift med human sovereignty |

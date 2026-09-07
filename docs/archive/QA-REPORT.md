@@ -1,3 +1,5 @@
+> ⚠️ **SUPERSEDED** — This pre-V6 report is archived. Current QA status: see `QA-REPORT-V6.md`.
+
 # Aftergraph Workspace V5 — QA Report
 
 ## Scope
