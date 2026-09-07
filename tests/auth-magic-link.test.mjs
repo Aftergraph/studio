@@ -29,6 +29,23 @@ test('wrong secret is rejected', () => {
   assert.throws(() => verifyMagicToken(token, { secret: 'other' }), /bad_signature/);
 });
 
+test('auth server: requireAuth mode rejects bare actors, accepts tokens', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'aftergraph-auth-strict-'));
+  const server = createAppServer({ root: new URL('../', import.meta.url), stateFile: join(dir, 'ws.json'), runtimeIntervalMs: 20, authSecret: SECRET, requireAuth: true });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const port = server.address().port;
+    assert.ok(server.workspace.bootToken, 'bootstraps a demo-user token');
+    const bare = await post(port, '/api/v1/memory', { actor: 'demo-user', scope: 's', label: 'l', value: 'v', source: 't' }, 'strict-bare-1');
+    assert.equal(bare.status, 401, 'bare actor rejected in requireAuth mode');
+    const authed = await post(port, '/api/v1/memory', { actor: 'demo-user', scope: 's', label: 'l', value: 'v', source: 't' }, 'strict-ok-1', { authorization: `Bearer ${server.workspace.bootToken}` });
+    assert.equal(authed.status, 201, 'boot token accepted');
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 async function withServer(fn) {
   const dir = await mkdtemp(join(tmpdir(), 'aftergraph-auth-'));
   const server = createAppServer({ root: new URL('../', import.meta.url), stateFile: join(dir, 'ws.json'), runtimeIntervalMs: 20, authSecret: SECRET });

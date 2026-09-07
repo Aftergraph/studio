@@ -53,9 +53,13 @@ export function upstreamConfigFromEnv(env=process.env) {
   };
 }
 
-export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, upstreamConfig = null, federation = null, fixtures = true, authSecret = null } = {}) {
+export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, upstreamConfig = null, federation = null, fixtures = true, authSecret = null, requireAuth = process.env.AFTERGRAPH_REQUIRE_AUTH === 'true' } = {}) {
   const rootDir = resolveRoot(root);
   const secret = authSecret || authSecretFromEnv();
+  // ponytail: requireAuth turns Bearer binding into enforcement. The operator
+  // bootstraps with the boot token (valid 24h); email challenge is the
+  // documented follow-up before multi-operator production.
+  const bootToken = requireAuth ? issueMagicToken({ userId: 'demo-user', secret, ttlMs: 24 * 60 * 60 * 1000 }) : null;
   // ponytail: per-user workspace isolation. One store+hub+synclog per actor id,
   // lazily created; autonomy ledger and kill-switches stay global (portfolio stop).
   const DEFAULT_ACTOR = 'demo-user';
@@ -139,6 +143,12 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
     let syncLog = logFor(DEFAULT_ACTOR);
     const rescope = async (actor) => {
       const bearer = subjectFromAuthHeader(req, { secret });
+      // ponytail: enforcement mode — every API route except the auth booth
+      // itself requires a valid Bearer token.
+      if (requireAuth && !bearer && !url.pathname.startsWith('/api/v1/auth/')) {
+        const error = new Error('authentication required');
+        error.code = 'authentication_required'; error.status = 401; throw error;
+      }
       const scoped = bearer || actor || queryActor;
       // ponytail: fail-closed — only registered users own a workspace.
       // demo-user is seeded at boot; everyone else must POST /api/v1/users first.
@@ -701,7 +711,7 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
     for (const hub of hubs.values()) { try { hub.stopAll(); } catch {} }
     sse.closeAll();
   });
-  server.workspace = { store, runtimeHub, upstreamHub, federation, ready, stores, hubs };
+  server.workspace = { store, runtimeHub, upstreamHub, federation, ready, stores, hubs, bootToken };
   // ponytail: close drains per-user persists first — teardown rmdir otherwise
   // races in-flight stateFile writes (CI ENOTEMPTY flake).
   const rawClose = server.close.bind(server);
