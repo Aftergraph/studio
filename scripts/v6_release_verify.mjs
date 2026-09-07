@@ -42,6 +42,7 @@ const GATES = [
   { name: 'V8.3 Autonomy Halt and Kill UI Exit Gate', cmd: 'node', args: ['--test', 'tests/v83-autonomy-ui.test.mjs'] },
   { name: 'User Profile Server Exit Gate', cmd: 'node', args: ['--test', 'tests/user-routes.test.mjs'] },
   { name: 'P1-009 Shared Currency Formatter Exit Gate', cmd: 'node', args: ['--test', 'tests/economy-currency.test.mjs'] },
+  { name: 'User Workspace Isolation Exit Gate', cmd: 'node', args: ['--test', 'tests/user-isolation.test.mjs'] },
   { name: 'Axe-Core 4.10.3 Accessibility Gate (WCAG 2.2 AA)', cmd: 'python', args: ['scripts/a11y_smoke.py'] }
 ];
 
