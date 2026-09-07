@@ -39,7 +39,8 @@ How to host a single-tenant Aftergraph Studio instance with auth enforcement on.
 
 ## 4. Known ceilings (next slices)
 
-- Token issuance is capability-gated, not email-challenged. Do not expose
+- Token issuance is capability-gated (not email-challenged) and throttled
+  to 10 issuances per IP per hour. Do not expose
   `/api/v1/auth/magic-link` to untrusted operators without an email
   challenge in front.
 - Idle user scopes are evicted past `maxUserStores` (default 100, never the

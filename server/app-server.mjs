@@ -16,6 +16,7 @@ import { createUser, getUser, updateCapabilities } from '../src/user/user-store.
 import { createGoal } from '../src/goal/goal-schema.mjs';
 import { assessGoalDrift } from '../src/goal/goal-drift.mjs';
 import { issueMagicToken, subjectFromAuthHeader, authSecretFromEnv } from '../src/auth/magic-link.mjs';
+import { createRateLimiter } from '../src/auth/rate-limit.mjs';
 import { createKillSwitch, engageKill, releaseKill, assertAutonomyAllowed } from '../src/autonomy/bounds.mjs';
 import { CostLedger } from '../src/economy/outcome-economy.mjs';
 import { createKnowledgeEntry, promoteKnowledge, isAuthoritative } from '../src/brain/knowledge.mjs';
@@ -62,6 +63,8 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
   // bootstraps with the boot token (valid 24h); email challenge is the
   // documented follow-up before multi-operator production.
   const bootToken = requireAuth ? issueMagicToken({ userId: 'demo-user', secret, ttlMs: 24 * 60 * 60 * 1000 }) : null;
+  // ponytail: auth-booth abuse brake — 10 issuances per IP per hour.
+  const magicLinkLimiter = createRateLimiter({ maxHits: 10, windowMs: 60 * 60 * 1000 });
   // ponytail: per-user workspace isolation. One store+hub+synclog per actor id,
   // lazily created; autonomy ledger and kill-switches stay global (portfolio stop).
   const DEFAULT_ACTOR = 'demo-user';
@@ -650,6 +653,8 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
         if (url.pathname === '/api/v1/auth/magic-link' && req.method === 'POST') {
           const body=await readJson(req);
           await rescope(body?.actor);
+          const throttle=magicLinkLimiter.hit(req.socket?.remoteAddress || 'unknown');
+          if(!throttle.allowed){sendJson(res,429,{error:'rate_limited',retryAfterSec:throttle.retryAfterSec});return;}
           const action=beginAction(req,body,'auth.issue',url.pathname);
           try {
             if(!body?.userId||!getUser(body.userId)){actionGuard.fail(action.key,'unknown user');sendJson(res,404,{error:'user_not_found'});return;}

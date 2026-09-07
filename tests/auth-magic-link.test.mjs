@@ -46,6 +46,19 @@ test('auth server: requireAuth mode rejects bare actors, accepts tokens', async 
   }
 });
 
+test('auth server: magic-link issuance is rate limited per IP', async () => {
+  await withServer(async port => {
+    const admin = await post(port, '/api/v1/users', { actor: 'demo-user', id: 'rl-user', capabilities: [] }, 'rl-seed');
+    assert.equal(admin.status, 201);
+    let last = 0;
+    for (let i = 0; i < 11; i++) {
+      const r = await post(port, '/api/v1/auth/magic-link', { actor: 'demo-user', userId: 'rl-user' }, `rl-${i}`);
+      last = r.status;
+    }
+    assert.equal(last, 429, 'eleventh issuance in the hour is throttled');
+  });
+});
+
 async function withServer(fn) {
   const dir = await mkdtemp(join(tmpdir(), 'aftergraph-auth-'));
   const server = createAppServer({ root: new URL('../', import.meta.url), stateFile: join(dir, 'ws.json'), runtimeIntervalMs: 20, authSecret: SECRET });
