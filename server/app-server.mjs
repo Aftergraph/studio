@@ -13,6 +13,7 @@ import { buildReplayFrames } from '../src/replay.mjs';
 import { buildTemporalFrames, reconstructAt, counterfactualAt, futureTrajectory } from '../src/temporal/temporal-intelligence.mjs';
 import { createActionGuard, assertActorCapability, requireResetConfirmation, RESET_CONFIRMATION } from '../src/action-guard.mjs';
 import { createUser, getUser, updateCapabilities } from '../src/user/user-store.mjs';
+import { issueMagicToken, subjectFromAuthHeader, authSecretFromEnv } from '../src/auth/magic-link.mjs';
 import { createKillSwitch, engageKill, releaseKill, assertAutonomyAllowed } from '../src/autonomy/bounds.mjs';
 import { CostLedger } from '../src/economy/outcome-economy.mjs';
 import { createKnowledgeEntry, promoteKnowledge, isAuthoritative } from '../src/brain/knowledge.mjs';
@@ -52,8 +53,9 @@ export function upstreamConfigFromEnv(env=process.env) {
   };
 }
 
-export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, upstreamConfig = null, federation = null, fixtures = true } = {}) {
+export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, upstreamConfig = null, federation = null, fixtures = true, authSecret = null } = {}) {
   const rootDir = resolveRoot(root);
+  const secret = authSecret || authSecretFromEnv();
   // ponytail: per-user workspace isolation. One store+hub+synclog per actor id,
   // lazily created; autonomy ledger and kill-switches stay global (portfolio stop).
   const DEFAULT_ACTOR = 'demo-user';
@@ -104,7 +106,7 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
     createUser({id:'demo-user',name:'Demo User',role:'operator',capabilities:[
       'approval.decide','autonomy.check','autonomy.kill','autonomy.record',
       'memory.promote','memory.revoke','memory.write','mission.control',
-      'workspace.reset','user.manage',
+      'workspace.reset','user.manage','auth.issue',
     ]});
   } catch { /* seeded already */ }
   const beginAction=(req,body,capability,path,confirmation=false)=>{
@@ -136,11 +138,19 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
     let runtimeHub = hubFor(DEFAULT_ACTOR);
     let syncLog = logFor(DEFAULT_ACTOR);
     const rescope = async (actor) => {
-      const scoped = actor || queryActor;
+      const bearer = subjectFromAuthHeader(req, { secret });
+      const scoped = bearer || actor || queryActor;
       // ponytail: fail-closed — only registered users own a workspace.
       // demo-user is seeded at boot; everyone else must POST /api/v1/users first.
       if (!getUser(scoped || DEFAULT_ACTOR)) {
         const error = new Error('forbidden: unknown actor');
+        error.code = 'forbidden'; error.status = 403; throw error;
+      }
+      // ponytail: when a Bearer token is present it binds the request —
+      // a claimed actor that differs from the token subject is rejected.
+      const claimed = actor || queryActor;
+      if (bearer && claimed && bearer !== claimed) {
+        const error = new Error('forbidden: token subject mismatch');
         error.code = 'forbidden'; error.status = 403; throw error;
       }
       store = storeFor(scoped);
@@ -602,6 +612,28 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
             completeAction(action.key,{status:'accepted'});
             sendJson(res,200,{version:API_VERSION,...result});
           } catch(error){ actionGuard.fail(action.key,error?.message||error);sendJson(res,422,{error:error?.code||'allowance_rejected'}); }
+          return;
+        }
+
+        if (url.pathname === '/api/v1/auth/magic-link' && req.method === 'POST') {
+          const body=await readJson(req);
+          await rescope(body?.actor);
+          const action=beginAction(req,body,'auth.issue',url.pathname);
+          try {
+            if(!body?.userId||!getUser(body.userId)){actionGuard.fail(action.key,'unknown user');sendJson(res,404,{error:'user_not_found'});return;}
+            const token=issueMagicToken({userId:body.userId,secret});
+            completeAction(action.key,{status:'accepted'});
+            sendJson(res,201,{version:API_VERSION,token,userId:body.userId});
+          } catch(error){ actionGuard.fail(action.key,error?.message||error);sendJson(res,422,{error:error?.code||'token_issue_failed'}); }
+          return;
+        }
+
+        if (url.pathname === '/api/v1/auth/me' && req.method === 'GET') {
+          try {
+            const subject=subjectFromAuthHeader(req,{secret});
+            if(!subject){sendJson(res,401,{error:'authentication_required'});return;}
+            sendJson(res,200,{version:API_VERSION,userId:subject});
+          } catch(error){ sendApiError(res,error); }
           return;
         }
 
