@@ -26,3 +26,17 @@ export function signOut({ client } = {}) {
   client.setAuthToken(null);
   return { signedOut: true };
 }
+
+export async function inviteUser({ client, userId, capabilities = [] } = {}) {
+  const id = String(userId || '').trim();
+  if (!id) throw new Error('user id required');
+  if (!Array.isArray(capabilities) || !capabilities.length) throw new Error('tick at least one capability');
+  try {
+    const created = await client.createUser({ id, capabilities });
+    if (!created?.user) throw new Error('user not created');
+    return created;
+  } catch (error) {
+    if (error?.code === 'invalid_capability') throw new Error('server rejected a capability — refresh the list');
+    throw error;
+  }
+}

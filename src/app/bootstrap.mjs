@@ -4,11 +4,11 @@ import { createInitialState, resolveNeed, decideApproval, setTakeover, appendCha
 import { searchIndex } from '../search.mjs';
 import { escapeHtml, attentionCount, compactMoney, progressLabel, authorityLabel, capabilityLabel } from '../ui-helpers.mjs';
 import { formatMoney, eurosToCents } from '../economy/currency.mjs';
-import { requestAuthToken, signInWithToken, signOut } from '../auth/ui-actions.mjs';
+import { requestAuthToken, signInWithToken, signOut, inviteUser } from '../auth/ui-actions.mjs';
 import { PRIMARY_NAV, canonicalDomainForNav, commandDomainEntries } from '../workspace-shell.mjs';
 import { icon } from '../icons.mjs';
 import { AGIcon } from '../../packages/icons/index.mjs';
-import { AGTrajectory, AGArtifact, AGApproval, AGAuthPanel, AGNeedYou, AGComposer, AGAgentPresence, AGAgentCluster, AGActionDock, AGOutcomeReceipt, AGCommandPalette, AGPulseRail, AGContextSummary, AGMemoryItem, AGWorkSummary, AGTelemetryStrip, AGAgentCard, AGDelegationStrip, AGConnectionRow, AGArtifactRow, AGEventRow, AGUpstreamServiceRow, AGExternalWorkRow, AGDetectionProposalRow, AGSourceTruthBadge } from '../../packages/ui/index.mjs';
+import { AGTrajectory, AGArtifact, AGApproval, AGAuthPanel, AGUserInvite, AGNeedYou, AGComposer, AGAgentPresence, AGAgentCluster, AGActionDock, AGOutcomeReceipt, AGCommandPalette, AGPulseRail, AGContextSummary, AGMemoryItem, AGWorkSummary, AGTelemetryStrip, AGAgentCard, AGDelegationStrip, AGConnectionRow, AGArtifactRow, AGEventRow, AGUpstreamServiceRow, AGExternalWorkRow, AGDetectionProposalRow, AGSourceTruthBadge } from '../../packages/ui/index.mjs';
 import { composeLivingLayout } from '../../packages/runtime-ui/index.mjs';
 import { animateElement, morphSurface, prefersReducedMotion } from '../../packages/motion/index.mjs';
 import { createLiveRuntime, stepMission, pauseMission, resumeMission } from '../live-runtime.mjs';
@@ -492,7 +492,9 @@ export function bootstrapAftergraph(){
 
   function renderAuthFocus(){
     if(!ui.auth?.open)return '';
-    return `<div class="ag-approval-backdrop" data-action="close-auth"></div><div class="ag-approval-shell attention-gravity">${AGAuthPanel({state:ui.auth.panel,userId:ui.auth.userId,token:ui.auth.token,error:ui.auth.error})}<button class="ag-approval-close" data-action="close-auth" aria-label="Close sign in">${AGIcon('close',{size:16})}</button></div>`;
+    const canInvite=(state.user.capabilities||[]).includes('user.manage');
+    const invite=canInvite?AGUserInvite({capabilities:ui.auth.grantable||[],created:ui.auth.created||null,error:ui.auth.inviteError||''}):'';
+    return `<div class="ag-approval-backdrop" data-action="close-auth"></div><div class="ag-approval-shell attention-gravity">${AGAuthPanel({state:ui.auth.panel,userId:ui.auth.userId,token:ui.auth.token,error:ui.auth.error})}${invite}<button class="ag-approval-close" data-action="close-auth" aria-label="Close sign in">${AGIcon('close',{size:16})}</button></div>`;
   }
 
   function renderPalette(){
@@ -690,6 +692,16 @@ export function bootstrapAftergraph(){
     const action=el.dataset.authAction;
     if(action==='back'){ui.auth={...(ui.auth||{}),panel:'request',token:'',error:''};render();return}
     if(!backendConnected){toast('Sign-in needs server connection');return}
+    if(action==='invite'){
+      const input=document.querySelector('#invite-user-id');
+      const caps=[...document.querySelectorAll('input[name="capability"]:checked')].map(el=>el.value);
+      try{
+        const created=await inviteUser({client:apiClient,userId:input?.value,capabilities:caps});
+        ui.auth={...(ui.auth||{}),created:created.user,inviteError:''};
+        toast(`Created ${created.user.id}`);
+      }catch(error){ui.auth={...(ui.auth||{}),inviteError:error?.message||'invite failed'};}
+      render();return;
+    }
     if(action==='request'){
       const input=document.querySelector('#auth-user-id');
       try{
@@ -719,7 +731,7 @@ export function bootstrapAftergraph(){
       case 'delegate':state.composerMode='Delegate';state.activeDomain='chat';state.primaryMode='chat';toast('Delegate mode ready');break;
       case 'open-palette':ui.paletteOpen=true;ui.paletteQuery='';ui.paletteIndex=0;break;
       case 'close-palette':ui.paletteOpen=false;break;
-      case 'open-auth':ui.auth={...(ui.auth||{}),open:true,error:''};break;
+      case 'open-auth':ui.auth={...(ui.auth||{}),open:true,error:'',created:null,inviteError:''};if(backendConnected&&(state.user.capabilities||[]).includes('user.manage')&&!ui.auth.grantable){void apiClient.listCapabilities().then(payload=>{ui.auth={...(ui.auth||{}),grantable:payload?.capabilities||[]};render()}).catch(()=>{})}break;
       case 'close-auth':ui.auth={...(ui.auth||{}),open:false,error:''};break;
       case 'sign-out':{signOut({client:apiClient});try{pickStorage().removeItem('aftergraph.auth.token')}catch{};toast('Signed out — reloading');try{location.reload()}catch{};break;}
       case 'open-artifact':{ui.pulseOpen=false;const m=state.activeDomain==='chat'?chatMission():currentMission();const artifact=state.artifacts.find(a=>a.missionId===m?.id)||currentArtifact();if(artifact)ui.selectedArtifactId=artifact.id;ui.artifactOpen=true;break}

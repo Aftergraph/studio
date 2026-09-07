@@ -47,6 +47,7 @@ export const apiGoals = () => '/api/v1/goals';
 export const apiGoalProgress = id => `/api/v1/goals/${e(id)}/progress`;
 export const apiMissionGoal = id => `/api/v1/missions/${e(id)}/goal`;
 export const apiLessons = () => '/api/v1/lessons';
+export const apiCapabilities = () => '/api/v1/capabilities';
 
 // federation / browser-client routes
 export const apiFederationIntegrations = () => '/api/v1/federation/integrations';

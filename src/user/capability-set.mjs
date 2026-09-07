@@ -39,3 +39,8 @@ export function normalizeCapabilities(input) {
   
   return Object.freeze(result);
 }
+
+// ponytail: single source for invite checkboxes and directory listings.
+export function listGrantableCapabilities() {
+  return Object.freeze([...ALLOWLIST, 'autonomy.check', 'autonomy.record', 'autonomy.kill']);
+}
