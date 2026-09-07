@@ -164,3 +164,5 @@ V5 UI
 ```
 
 `POST /api/v1/upstreams/sync` is read-only. Consequential writes are explicit and delegated to the canonical owning service. Background upstream/SSE updates cannot steal the user's local Chat/Work/Space or domain navigation.
+
+<!-- merge-queue pilot probe -->
