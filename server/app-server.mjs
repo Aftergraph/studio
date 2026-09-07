@@ -14,6 +14,7 @@ import { buildTemporalFrames, reconstructAt, counterfactualAt, futureTrajectory 
 import { createActionGuard, assertActorCapability, requireResetConfirmation, RESET_CONFIRMATION } from '../src/action-guard.mjs';
 import { createUser, getUser, updateCapabilities } from '../src/user/user-store.mjs';
 import { createGoal } from '../src/goal/goal-schema.mjs';
+import { createLesson } from '../src/goal/goal-lesson.mjs';
 import { assessGoalDrift } from '../src/goal/goal-drift.mjs';
 import { issueMagicToken, subjectFromAuthHeader, authSecretFromEnv } from '../src/auth/magic-link.mjs';
 import { createRateLimiter } from '../src/auth/rate-limit.mjs';
@@ -739,6 +740,26 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
 
         if (url.pathname === '/api/v1/goals' && req.method === 'GET') {
           sendJson(res,200,{version:API_VERSION,goals:store.snapshot().goals||[]});
+          return;
+        }
+
+        if (url.pathname === '/api/v1/lessons' && req.method === 'POST') {
+          const body=await readJson(req);
+          await rescope(body?.actor);
+          const action=beginAction(req,body,'goal.manage',url.pathname);
+          try {
+            const lesson=createLesson({id:body.id,missionId:body.missionId,verdict:body.verdict,lesson:body.lesson,by:body.by,goalId:body.goalId});
+            await store.mutate(draft=>{draft.lessons=[lesson,...(draft.lessons||[])];return draft;});
+            completeAction(action.key,{status:'accepted'});
+            sendJson(res,201,{version:API_VERSION,lesson});
+          } catch(error){ actionGuard.fail(action.key,error?.message||error);sendJson(res,/lesson_|goal_owner/.test(error?.message||'')?422:(error?.code||'invalid_lesson'),{error:error?.code||error?.message||'invalid_lesson'}); }
+          return;
+        }
+
+        if (url.pathname === '/api/v1/lessons' && req.method === 'GET') {
+          const verdict=url.searchParams.get('verdict');
+          const lessons=(store.snapshot().lessons||[]).filter(l=>!verdict||l.verdict===verdict);
+          sendJson(res,200,{version:API_VERSION,lessons});
           return;
         }
 
