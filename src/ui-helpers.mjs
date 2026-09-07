@@ -1,3 +1,5 @@
+import { formatMoney, eurosToCents, currencyCode } from './economy/currency.mjs';
+
 export function escapeHtml(value = '') {
   return String(value)
     .replaceAll('&', '&amp;')
@@ -19,8 +21,10 @@ export function missionStatusLabel(mission) {
   return String(mission.state || 'unknown').replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
+// ponytail: legacy euro-float signature kept; delegates to the single
+// integer-cent formatter so all money displays agree.
 export function compactMoney(value, currency='€') {
-  return `${currency}${Number(value || 0).toFixed(2)}`;
+  return formatMoney(eurosToCents(value), { currency: currencyCode(currency) });
 }
 
 export function progressLabel(value) {

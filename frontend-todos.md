@@ -246,10 +246,10 @@ Raw scan counts are evidence leads, not automatic refactor instructions. Each it
 **Dependencies:** src/economy/outcome-economy.mjs; localization policy
 
 **Acceptance criteria:**
-- [ ] All money displays use one formatter
-- [ ] Integer-cent precision is preserved
-- [ ] Locale/currency tests cover EUR and fallback
-- [ ] Existing tests and visual behavior are verified
+- [x] All money displays use one formatter
+- [x] Integer-cent precision is preserved
+- [x] Locale/currency tests cover EUR and fallback
+- [x] Existing tests and visual behavior are verified
 
 **Priority:** `P1`
 **Scope:** `M`
