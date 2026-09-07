@@ -47,6 +47,7 @@ const GATES = [
   { name: 'V9.0 Goals Server Exit Gate', cmd: 'node', args: ['--test', 'tests/v90-goals-server.test.mjs'] },
   { name: 'V9.0 Goal Drift Exit Gate', cmd: 'node', args: ['--test', 'tests/v90-goal-drift.test.mjs'] },
   { name: 'Magic-Link Auth Exit Gate', cmd: 'node', args: ['--test', 'tests/auth-magic-link.test.mjs'] },
+  { name: 'Auth Rate Limit Exit Gate', cmd: 'node', args: ['--test', 'tests/auth-rate-limit.test.mjs'] },
   { name: 'V81-019 Viewport Sweep Exit Gate', cmd: 'python', args: ['scripts/viewport_sweep.py'] },
   { name: 'Login UI Slice-1 Exit Gate', cmd: 'node', args: ['--test', 'tests/auth-panel.test.mjs'] },
   { name: 'Login UI Slice-2 Exit Gate', cmd: 'node', args: ['--test', 'tests/auth-ui-actions.test.mjs'] },
