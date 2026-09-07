@@ -10,7 +10,7 @@ Expo/SwiftUI are source/type/parse verified only. No simulator/device claim is m
 
 ## Fresh release evidence
 
-- **151/151 Node tests passed**.
+- **552/552 Node tests passed**.
 - `npm run verify` passed all syntax, source/conformance, PWA, CSP, secret-pattern and platform checks.
 - V4 interaction-regression browser suite passed inside the V5 shell.
 - V5 Space browser suite passed on desktop and 390px mobile.

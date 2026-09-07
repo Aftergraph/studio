@@ -38,21 +38,21 @@ Aftergraph V6 unifies intelligence orchestration, deep agentic execution, living
 - Result: **0 critical, 0 serious, 0 moderate, 0 minor violations**.
 
 ## Verification Summary
-- **302/302** Node tests pass (`npm test`).
+- **552/552** Node tests pass (`npm test`).
 - **39/39** Workspace syntax, architecture, and contract assertions pass (`node scripts/verify.mjs`).
 - Platform source checks pass (`node scripts/platform_verify.mjs`).
 - Exact-head source truth checks pass (`node scripts/verify-upstreams.mjs`).
 - Browser smoke checks pass (`python scripts/browser_smoke.py`, `python scripts/browser_smoke_v5.py`).
 - Fullstack server integration & browser bridge smoke pass (`python scripts/fullstack_bridge_smoke_v5.py`).
 - Polyrepo upstream adapters, hub, and browser bridge smoke pass (`python scripts/polyrepo_bridge_smoke_v5.py`).
-- Release verification suite (`npm run verify:release`): **100% PASS across all 8 gates**.
+- Release verification suite (`npm run verify:release`): **100% PASS across all 36 gates**.
 
 ## Ecosystem & Brand Releases
 - Established official **Aftergraph Studio** (@aftergraph/studio, Aftergraph/studio).
 - Deployed official **Aftergraph Brand System** (@aftergraph/brand, Aftergraph/brand).
 - Added GitHub Actions CI/CD workflows for both repositories.
 - Registered Studio and Brand in Aftergraph/.github profile ecosystem table.
-- Full 16-gate monolithic verification verified 100% green.
+- Full 36-gate monolithic verification verified 100% green.
 ## [V6.1] — Live Federation
 
 ### Added

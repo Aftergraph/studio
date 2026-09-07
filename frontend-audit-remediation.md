@@ -1,6 +1,6 @@
 # V8.1 Remediation Log
 
-This log tracks the frontend-audit remediation stream separately from the roadmap milestone V8.1 Distributed Aftergraph. The roadmap milestone remains open and is explicitly deferred in `docs/V8.1-DISTRIBUTED-DEFERRAL.md`.
+This log tracks the frontend-audit remediation stream for the delivered V8.1 Distributed Aftergraph milestone.
 
 ## V81-007 — Runtime fixture separation
 
