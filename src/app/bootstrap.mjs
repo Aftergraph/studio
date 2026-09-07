@@ -33,6 +33,7 @@ import { createFederationBrowserClient } from '../federation/browser-client.mjs'
 import { createFederationSession } from '../runtime/federation-session.mjs';
 import { renderResearchSurface } from '../views/research-view.mjs';
 import { renderCapabilitiesSurface } from '../views/capabilities-view.mjs';
+import { createStorageAdapter } from '../storage-adapter.mjs';
 
 
 export function bootstrapAftergraph(){
@@ -40,6 +41,10 @@ export function bootstrapAftergraph(){
   const STORAGE_KEY='aftergraph-workspace-v5';
   const app=document.querySelector('#app');
   const toastRegion=document.querySelector('#toast-region');
+  // ponytail: localStorage access throws on opaque origins (set_content/file);
+  // fall back to memory so the shell still boots and persistence just skips.
+  const pickStorage=()=>{try{const s=globalThis.localStorage;void s.length;return s}catch{const m=new Map();return{getItem:k=>m.has(k)?m.get(k):null,setItem:(k,v)=>{m.set(k,String(v))},removeItem:k=>{m.delete(k)}}}};
+  const storageAdapter=createStorageAdapter({storage:pickStorage(),key:STORAGE_KEY,version:1});
   let state=loadState();
   let liveRuntime=null;
   let liveTimer=null;
@@ -71,13 +76,11 @@ export function bootstrapAftergraph(){
 
   function loadState(){
     const initial=createInitialState({fixtures:location.protocol!=='http:'});
-    try{
-      const raw=localStorage.getItem(STORAGE_KEY);
-      if(raw){const parsed=JSON.parse(raw);if(!(initial.fixtureMode===false&&parsed.fixtureMode===true))return {...initial,...parsed}}
-    }catch{}
+    const loaded=storageAdapter.load();
+    if(loaded&&!(initial.fixtureMode===false&&loaded.fixtureMode===true))return {...initial,...loaded};
     return initial;
   }
-  function saveState(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}catch{}}
+  function saveState(){storageAdapter.save(state)}
   function beginUiAction(key){if(pendingActions.has(key))return false;pendingActions.add(key);render();return true}
   function endUiAction(key){pendingActions.delete(key);render()}
   function detectDevice(){return window.matchMedia('(max-width: 760px)').matches?'mobile':'desktop'}
