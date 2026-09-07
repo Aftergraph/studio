@@ -7,6 +7,11 @@ const ALLOWLIST = Object.freeze([
   ...OPERATIONS,
   'memory.write',
   'memory.promote',
+  'memory.revoke',
+  'approval.decide',
+  'mission.control',
+  'workspace.reset',
+  'user.manage',
 ]);
 
 const PREFIXES = Object.freeze(['autonomy.']);
