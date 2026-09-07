@@ -11,5 +11,8 @@ if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
   const stateFile=process.env.AFTERGRAPH_STATE_FILE||path.join(root,'.runtime','workspace-state.json');
   const runtimeIntervalMs=Number(process.env.AFTERGRAPH_RUNTIME_INTERVAL_MS||1250);
   const server=createAppServer({root,stateFile,runtimeIntervalMs,fixtures:process.env.AFTERGRAPH_DEMO_FIXTURES==='true'});
-  server.listen(port,host,()=>console.log(`Aftergraph Workspace v5 reference app: http://${host}:${port}`));
+  server.listen(port,host,()=>{
+    console.log(`Aftergraph Workspace v5 reference app: http://${host}:${port}`);
+    if(server.workspace.bootToken)console.log(`Operator boot token (valid 24h, AFTERGRAPH_AUTH_SECRET): ${server.workspace.bootToken}`);
+  });
 }
