@@ -32,6 +32,7 @@
   --text: #080c14;
   --text-2: #4f5868;
   --text-3: #8993a4;
+  --text-emphasis: #0e1630;
   --border: #e5e8ed;
   --border-strong: #d7dce3;
   --accent: #0c52ef;
@@ -70,6 +71,7 @@ html[data-theme="dark"] {
   --text: #f5f7fa;
   --text-2: #8993a4;
   --text-3: #6c7687;
+  --text-emphasis: #dce8f6;
   --border: rgba(137, 147, 164, 0.20);
   --border-strong: rgba(66, 199, 232, 0.35);
   --accent: #42c7e8;
