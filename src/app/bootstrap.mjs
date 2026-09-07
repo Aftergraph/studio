@@ -2,12 +2,13 @@ import { DOMAINS, getDomain, domainForObject } from '../domain.mjs';
 import { routeFromLocation, buildDeepLink } from '../router.mjs';
 import { createInitialState, resolveNeed, decideApproval, setTakeover, appendChatMessage, conversationMissionId } from '../state.mjs';
 import { searchIndex } from '../search.mjs';
-import { escapeHtml, attentionCount, compactMoney, progressLabel } from '../ui-helpers.mjs';
+import { escapeHtml, attentionCount, compactMoney, progressLabel, authorityLabel, capabilityLabel } from '../ui-helpers.mjs';
 import { formatMoney, eurosToCents } from '../economy/currency.mjs';
+import { requestAuthToken, signInWithToken, signOut } from '../auth/ui-actions.mjs';
 import { PRIMARY_NAV, canonicalDomainForNav, commandDomainEntries } from '../workspace-shell.mjs';
 import { icon } from '../icons.mjs';
 import { AGIcon } from '../../packages/icons/index.mjs';
-import { AGTrajectory, AGArtifact, AGApproval, AGNeedYou, AGComposer, AGAgentPresence, AGAgentCluster, AGActionDock, AGOutcomeReceipt, AGCommandPalette, AGPulseRail, AGContextSummary, AGMemoryItem, AGWorkSummary, AGTelemetryStrip, AGAgentCard, AGDelegationStrip, AGConnectionRow, AGArtifactRow, AGEventRow, AGUpstreamServiceRow, AGExternalWorkRow, AGDetectionProposalRow, AGSourceTruthBadge } from '../../packages/ui/index.mjs';
+import { AGTrajectory, AGArtifact, AGApproval, AGAuthPanel, AGNeedYou, AGComposer, AGAgentPresence, AGAgentCluster, AGActionDock, AGOutcomeReceipt, AGCommandPalette, AGPulseRail, AGContextSummary, AGMemoryItem, AGWorkSummary, AGTelemetryStrip, AGAgentCard, AGDelegationStrip, AGConnectionRow, AGArtifactRow, AGEventRow, AGUpstreamServiceRow, AGExternalWorkRow, AGDetectionProposalRow, AGSourceTruthBadge } from '../../packages/ui/index.mjs';
 import { composeLivingLayout } from '../../packages/runtime-ui/index.mjs';
 import { animateElement, morphSurface, prefersReducedMotion } from '../../packages/motion/index.mjs';
 import { createLiveRuntime, stepMission, pauseMission, resumeMission } from '../live-runtime.mjs';
@@ -157,6 +158,7 @@ export function bootstrapAftergraph(){
   function setBackendPhase(phase){
     ui.backendStatus=phase;
     backendConnected=phase==='current';
+    if(phase==='current')void restoreAuthSession();
     document.documentElement.dataset.backend=phase==='current'?'connected':phase;
     document.querySelector('.ag-app')?.setAttribute('data-backend-state',phase==='current'?'connected':'local');
     document.querySelector('.ag-backend-state')?.setAttribute('data-state',phase);
@@ -270,7 +272,7 @@ export function bootstrapAftergraph(){
         <button class="ag-icon-button" data-action="toggle-immersive" aria-pressed="${ui.immersive}" aria-label="Toggle immersive mode">${AGIcon('sparkle',{size:17})}</button>
         <button class="ag-icon-button" data-action="context-preview" aria-label="Inspect context">${AGIcon('inspect',{size:17})}</button>
         <button class="ag-icon-button has-attention" data-action="show-control" aria-label="Review attention items">${AGIcon('shield',{size:17})}${state.approvals.some(a=>a.state==='pending')?'<i></i>':''}</button>
-        <span class="ag-profile">${initials(state.user.name)}</span>
+        <button class="ag-profile" data-action="open-auth" aria-label="Sign in as ${escapeHtml(state.user.id)}" title="Signed in as ${escapeHtml(state.user.id)} — open sign in">${initials(state.user.name)}</button>
       </div>
     </header>`;
   }
@@ -474,7 +476,7 @@ export function bootstrapAftergraph(){
       const connection=state.connections.find(c=>c.id===ui.selectedConnectionId)||state.connections[0];kicker='Connection';title=connection.name;
       body=`<section><span>Capability scope</span>${AGConnectionRow({connection})}<div class="ag-permission-list">${connection.permissions.map(p=>`<code>${escapeHtml(p)}</code>`).join('')}</div></section>`;
     }else{
-      const context=AGContextSummary({conversation:currentConversation()?.title||'None',mission:mission?.title||'None',agent:mission?.agent||'Friday',authority:state.user.capabilities.includes('*')?'Operator':'Scoped',evidence:mission?.evidenceCount||0,backend:backendConnected?'connected':'local'});
+      const context=AGContextSummary({conversation:currentConversation()?.title||'None',mission:mission?.title||'None',agent:mission?.agent||'Friday',authority:authorityLabel(state.user.capabilities),evidence:mission?.evidenceCount||0,backend:backendConnected?'connected':'local'});
       const memories=state.memory.map(m=>AGMemoryItem({id:m.id,label:m.label,scope:m.scope,source:m.source,promoted:m.promoted,status:m.status,confidence:m.confidence,pendingAction:pendingActions.has(`memory:${m.id}`)?'promote-memory':null})).join('');
       body=`<section><span>Active context</span>${context}</section><section><span>Mounted memory</span><div class="ag-memory-list">${memories}</div></section>`;
     }
@@ -486,6 +488,11 @@ export function bootstrapAftergraph(){
     const approval=currentApproval();
     const base=AGApproval({id:approval.id,title:approval.title,risk:approval.risk,state:pendingActions.has(`approval:${approval.id}`)?'loading':approval.state,why:approval.why,impact:approval.impact,rollback:approval.rollback,authority:approval.authority,evidence:approval.evidence});
     return `<div class="ag-approval-backdrop" data-action="close-approval"></div><div class="ag-approval-shell attention-gravity">${base}<button class="ag-approval-close" data-action="close-approval" aria-label="Close approval">${AGIcon('close',{size:16})}</button>${ui.approvalEvidenceOpen?`<aside class="ag-evidence-reveal"><header>${AGIcon('evidence',{size:16})}<strong>Verification evidence</strong></header>${approval.evidence.map((id,i)=>`<div><span>${AGIcon('check',{size:13})}</span><span><strong>${escapeHtml(id)}</strong><small>${i===0?'Staging verification passed':'Health and rollback evidence sealed'}</small></span></div>`).join('')}</aside>`:''}</div>`;
+  }
+
+  function renderAuthFocus(){
+    if(!ui.auth?.open)return '';
+    return `<div class="ag-approval-backdrop" data-action="close-auth"></div><div class="ag-approval-shell attention-gravity">${AGAuthPanel({state:ui.auth.panel,userId:ui.auth.userId,token:ui.auth.token,error:ui.auth.error})}<button class="ag-approval-close" data-action="close-auth" aria-label="Close sign in">${AGIcon('close',{size:16})}</button></div>`;
   }
 
   function renderPalette(){
@@ -527,7 +534,7 @@ export function bootstrapAftergraph(){
   function renderBrainDomain(){
     const domain=getDomain('brain');
     const mission=state.activeDomain==='chat'?chatMission():currentMission();
-    const context=AGContextSummary({conversation:currentConversation()?.title||'None',mission:mission?.title||'None',agent:mission?.agent||'Friday',authority:state.user.capabilities.includes('*')?'Operator':'Scoped',evidence:mission?.evidenceCount||0,backend:backendConnected?'connected':'local'});
+    const context=AGContextSummary({conversation:currentConversation()?.title||'None',mission:mission?.title||'None',agent:mission?.agent||'Friday',authority:authorityLabel(state.user.capabilities),evidence:mission?.evidenceCount||0,backend:backendConnected?'connected':'local'});
     const brain=state.upstreams?.works?.brain||[];
     const brainRows=brain.map(item=>`<div class="ag-upstream-brain-row"><span>${AGIcon('brain',{size:14})}</span><span><strong>${escapeHtml(item.path||item.id||'Brain object')}</strong><small>${escapeHtml(item.class||item.state||'WORKS brain')}</small></span></div>`).join('');
     return `<main id="main-content" class="ag-domain-page" data-domain-surface="brain">${renderDomainHeader(domain,'Brain','Inspectable context, durable memory and the sources currently shaping system behavior.',`${state.memory.length} memories · ${state.connections.length} sources`)}<div class="ag-domain-layout"><div class="ag-domain-main"><section class="ag-domain-section"><div class="ag-section-heading"><span>Active context</span><small>${backendConnected?'Server-backed':'Local reference'}</small></div>${context}</section><section class="ag-domain-section"><div class="ag-section-heading"><span>Memory</span><small>Revocable</small></div><div class="ag-memory-list">${state.memory.map(m=>AGMemoryItem({id:m.id,label:m.label,scope:m.scope,source:m.source,promoted:m.promoted,status:m.status,confidence:m.confidence,pendingAction:pendingActions.has(`memory:${m.id}`)?'promote-memory':null})).join('')}</div></section>${brain.length?`<section class="ag-domain-section"><div class="ag-section-heading"><span>Company Brain</span>${AGSourceTruthBadge({owner:'WORKS',contract:'brain.ns/1.0',sha:state.upstreams?.services?.works?.headSha||''})}</div><div class="ag-upstream-brain-list">${brainRows}</div></section>`:''}</div><aside class="ag-domain-rail"><div class="ag-section-heading"><span>Mounted sources</span><small>${state.connections.length}</small></div>${state.connections.map(connection=>AGConnectionRow({connection})).join('')}</aside></div></main>`;
@@ -580,7 +587,7 @@ export function bootstrapAftergraph(){
       telemetry:state.telemetry||{},
       syncedAt:state.upstreams?.syncedAt||'',
       backendPhase:ui.backendStatus||'offline',
-      identity:{name:state.user.name,role:state.user.role,capabilityLabel:state.user.capabilities.includes('*')?'full capability set':'scoped capabilities'},
+      identity:{name:state.user.name,role:state.user.role,capabilityLabel:capabilityLabel(state.user.capabilities)},
       events:state.events||[],
     });
   }
@@ -607,7 +614,7 @@ export function bootstrapAftergraph(){
     const artifactMobile=ui.artifactOpen&&ui.device==='mobile';
     const shellClass=[ui.immersive?'is-immersive':'',layout.gravity.mode==='approval-focus'?'attention-gravity':'',mission?.verified?'has-settled-outcome':''].filter(Boolean).join(' ');
     const globalPulse=activeMode()==='space'?'':renderPulseRail(mission);
-    app.innerHTML=`<div class="ag-app ${shellClass}" data-backend-state="${backendConnected?'connected':'local'}" data-attention="${layout.gravity.mode}" data-theme-state="${layout.ambient.mode}" style="--artifact-width:${ui.artifactWidth}%">${renderAmbient(layout,mission)}${renderSidebar()}<section class="ag-frame">${renderTopbar()}<div class="ag-body">${renderView()}</div></section>${artifactMobile?renderArtifactSurface('fullscreen'):''}${globalPulse}${renderContextInspector()}${renderApprovalFocus()}${renderPalette()}</div>`;
+    app.innerHTML=`<div class="ag-app ${shellClass}" data-backend-state="${backendConnected?'connected':'local'}" data-attention="${layout.gravity.mode}" data-theme-state="${layout.ambient.mode}" style="--artifact-width:${ui.artifactWidth}%">${renderAmbient(layout,mission)}${renderSidebar()}<section class="ag-frame">${renderTopbar()}<div class="ag-body">${renderView()}</div></section>${artifactMobile?renderArtifactSurface('fullscreen'):''}${globalPulse}${renderContextInspector()}${renderApprovalFocus()}${renderAuthFocus()}${renderPalette()}</div>`;
     postRender(mission,layout);
   }
 
@@ -666,6 +673,44 @@ export function bootstrapAftergraph(){
   }
   function stopRuntimeTimer(){if(liveTimer){clearInterval(liveTimer);liveTimer=null}}
 
+  // ponytail: login wiring lives here; pure flows in src/auth/ui-actions.mjs.
+  let authRestored=false;
+  async function restoreAuthSession(){
+    if(authRestored)return;authRestored=true;
+    let saved=null;try{saved=pickStorage().getItem('aftergraph.auth.token')}catch{}
+    if(!saved)return;
+    try{
+      const {user}=await signInWithToken({client:apiClient,token:saved});
+      state.user={id:user.id,name:user.name||user.id,role:user.role||'member',capabilities:user.capabilities||[]};
+      ui.auth={...(ui.auth||{}),userId:user.id};
+      saveState();render();toast(`Signed in as ${user.id}`);
+    }catch{try{pickStorage().removeItem('aftergraph.auth.token')}catch{}}
+  }
+  async function handleAuthClick(el){
+    const action=el.dataset.authAction;
+    if(action==='back'){ui.auth={...(ui.auth||{}),panel:'request',token:'',error:''};render();return}
+    if(!backendConnected){toast('Sign-in needs server connection');return}
+    if(action==='request'){
+      const input=document.querySelector('#auth-user-id');
+      try{
+        const issued=await requestAuthToken({client:apiClient,userId:input?.value||ui.auth?.userId});
+        ui.auth={open:true,panel:'token',userId:issued.userId,token:issued.token,error:''};
+      }catch(error){ui.auth={...(ui.auth||{}),error:error?.message||'request failed'};}
+      render();return;
+    }
+    if(action==='signin'){
+      const token=el.dataset.token||ui.auth?.token;
+      try{
+        const {user}=await signInWithToken({client:apiClient,token});
+        state.user={id:user.id,name:user.name||user.id,role:user.role||'member',capabilities:user.capabilities||[]};
+        try{pickStorage().setItem('aftergraph.auth.token',token)}catch{}
+        ui.auth={open:false,panel:'request',userId:user.id,token:'',error:''};
+        saveState();toast(`Signed in as ${user.id}`);
+      }catch(error){ui.auth={...(ui.auth||{}),error:error?.message||'sign-in failed'};}
+      render();return;
+    }
+  }
+
   function runAction(action,el={dataset:{}}){
     switch(action){
       case 'new-chat':{ui.followLatest=true;ui.forceFollowLatest=true;ui.messageScrollTop=0;const id=`conv_${Date.now()}`;const title='New conversation';state.conversations.unshift({id,missionId:null,title,updated:'now',status:'idle',messages:[]});state.activeConversationId=id;state.activeDomain='chat';state.primaryMode='chat';ui.artifactOpen=false;saveState();if(backendConnected)void syncBackend(apiClient.createConversation({id,title}));break}
@@ -674,6 +719,9 @@ export function bootstrapAftergraph(){
       case 'delegate':state.composerMode='Delegate';state.activeDomain='chat';state.primaryMode='chat';toast('Delegate mode ready');break;
       case 'open-palette':ui.paletteOpen=true;ui.paletteQuery='';ui.paletteIndex=0;break;
       case 'close-palette':ui.paletteOpen=false;break;
+      case 'open-auth':ui.auth={...(ui.auth||{}),open:true,error:''};break;
+      case 'close-auth':ui.auth={...(ui.auth||{}),open:false,error:''};break;
+      case 'sign-out':{signOut({client:apiClient});try{pickStorage().removeItem('aftergraph.auth.token')}catch{};toast('Signed out — reloading');try{location.reload()}catch{};break;}
       case 'open-artifact':{ui.pulseOpen=false;const m=state.activeDomain==='chat'?chatMission():currentMission();const artifact=state.artifacts.find(a=>a.missionId===m?.id)||currentArtifact();if(artifact)ui.selectedArtifactId=artifact.id;ui.artifactOpen=true;break}
       case 'close-artifact':ui.artifactOpen=false;break;
       case 'context-preview':ui.inspectorKind='context';ui.inspectorOpen=true;break;
@@ -715,7 +763,8 @@ export function bootstrapAftergraph(){
   }
 
   app.addEventListener('click',event=>{
-    const el=event.target.closest('button,[data-action],[data-space-action],[data-presence-action],[data-space-add],[data-replay-index],[data-viz-action],[data-capability],[data-context-remove],[data-composer-action],[data-replay-action]');if(!el)return;
+    const el=event.target.closest('button,[data-action],[data-auth-action],[data-space-action],[data-presence-action],[data-space-add],[data-replay-index],[data-viz-action],[data-capability],[data-context-remove],[data-composer-action],[data-replay-action]');if(!el)return;
+    if(el.dataset.authAction){void handleAuthClick(el);return}
     if(el.dataset.spaceAction){handleSpaceAction(el);return}
     if(el.dataset.spaceCommand){updateSpace({type:'space.mode',mode:el.dataset.spaceCommand});return}
     if(el.dataset.spaceAdd){addSpaceSurface(el.dataset.spaceAdd);return}

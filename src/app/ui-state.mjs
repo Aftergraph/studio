@@ -31,6 +31,7 @@ export function createUIState(state={},device='desktop') {
     diagnostic:null,
     controlError:'',
     resyncMetric:null,
+    auth:{ open:false, panel:'request', userId:'', token:'', error:'' },
   };
 }
 
