@@ -12,6 +12,7 @@ import { reduceSpatialState } from '../packages/spatial/index.mjs';
 import { buildReplayFrames } from '../src/replay.mjs';
 import { buildTemporalFrames, reconstructAt, counterfactualAt, futureTrajectory } from '../src/temporal/temporal-intelligence.mjs';
 import { createActionGuard, assertActorCapability, requireResetConfirmation, RESET_CONFIRMATION } from '../src/action-guard.mjs';
+import { createUser, getUser, updateCapabilities } from '../src/user/user-store.mjs';
 import { createKillSwitch, engageKill, releaseKill, assertAutonomyAllowed } from '../src/autonomy/bounds.mjs';
 import { CostLedger } from '../src/economy/outcome-economy.mjs';
 import { createKnowledgeEntry, promoteKnowledge, isAuthoritative } from '../src/brain/knowledge.mjs';
@@ -60,10 +61,20 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
   const broadcast=payload=>sse.broadcast(payload);
   const ready = store.init();
   const actionGuard=createActionGuard();
+  // ponytail: registry is module-singleton; seed is idempotent (overwrite),
+  // so repeated server instances in tests converge on the same demo-user.
+  const userRegistry={getUser};
+  try {
+    createUser({id:'demo-user',name:'Demo User',role:'operator',capabilities:[
+      'approval.decide','autonomy.check','autonomy.kill','autonomy.record',
+      'memory.promote','memory.revoke','memory.write','mission.control',
+      'workspace.reset','user.manage',
+    ]});
+  } catch { /* seeded already */ }
   const beginAction=(req,body,capability,path,confirmation=false)=>{
     const snapshot=store.snapshot();
     if(!body?.actor) { const error=new Error('actor required');error.code='actor_required';error.status=422;throw error; }
-    try { assertActorCapability({state:snapshot,actor:body.actor,capability}); }
+    try { assertActorCapability({state:snapshot,actor:body.actor,capability,users:userRegistry}); }
     catch (error) { error.code='forbidden';error.status=403;throw error; }
     if(confirmation) { try { requireResetConfirmation(body.confirmationToken); } catch(error) { error.code='confirmation_required';error.status=422;throw error; } }
     const key=req.headers['idempotency-key']||body.idempotencyKey;
@@ -528,6 +539,39 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
             completeAction(action.key,{status:'accepted'});
             sendJson(res,200,{version:API_VERSION,...result});
           } catch(error){ actionGuard.fail(action.key,error?.message||error);sendJson(res,422,{error:error?.code||'allowance_rejected'}); }
+          return;
+        }
+
+        if (url.pathname === '/api/v1/users' && req.method === 'POST') {
+          const body=await readJson(req);
+          const action=beginAction(req,body,'user.manage',url.pathname);
+          try {
+            const user=createUser({id:body.id,name:body.name,role:body.role,capabilities:body.capabilities});
+            completeAction(action.key,{status:'accepted'});
+            sendJson(res,201,{version:API_VERSION,user});
+          } catch(error){ actionGuard.fail(action.key,error?.message||error);sendJson(res,422,{error:error?.code||'invalid_user'}); }
+          return;
+        }
+
+        match = url.pathname.match(/^\/api\/v1\/users\/([^/]+)\/capabilities$/);
+        if (match && req.method === 'PATCH') {
+          const body=await readJson(req);
+          const id=decodeURIComponent(match[1]);
+          if(!getUser(id)){sendJson(res,404,{error:'user_not_found'});return;}
+          const action=beginAction(req,body,'user.manage',url.pathname);
+          try {
+            const user=updateCapabilities(id,body.capabilities);
+            completeAction(action.key,{status:'accepted'});
+            sendJson(res,200,{version:API_VERSION,user});
+          } catch(error){ actionGuard.fail(action.key,error?.message||error);sendJson(res,422,{error:error?.code||'invalid_capabilities'}); }
+          return;
+        }
+
+        match = url.pathname.match(/^\/api\/v1\/users\/([^/]+)$/);
+        if (match && req.method === 'GET') {
+          const user=getUser(decodeURIComponent(match[1]));
+          if(!user){sendJson(res,404,{error:'user_not_found'});return;}
+          sendJson(res,200,{version:API_VERSION,user});
           return;
         }
 

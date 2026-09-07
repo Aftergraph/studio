@@ -38,6 +38,9 @@ export const apiAutonomyKillRelease = () => '/api/v1/autonomy/kill/release';
 export const apiSyncEventsSubmit = () => '/api/v1/sync/events';
 export const apiSyncEventsRead = () => '/api/v1/sync/events';
 export const apiEvents = () => '/api/v1/events';
+export const apiUsers = () => '/api/v1/users';
+export const apiUser = id => `/api/v1/users/${e(id)}`;
+export const apiUserCapabilities = id => `/api/v1/users/${e(id)}/capabilities`;
 
 // federation / browser-client routes
 export const apiFederationIntegrations = () => '/api/v1/federation/integrations';
