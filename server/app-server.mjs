@@ -14,6 +14,7 @@ import { buildTemporalFrames, reconstructAt, counterfactualAt, futureTrajectory 
 import { createActionGuard, assertActorCapability, requireResetConfirmation, RESET_CONFIRMATION } from '../src/action-guard.mjs';
 import { createUser, getUser, updateCapabilities } from '../src/user/user-store.mjs';
 import { createGoal } from '../src/goal/goal-schema.mjs';
+import { assessGoalDrift } from '../src/goal/goal-drift.mjs';
 import { issueMagicToken, subjectFromAuthHeader, authSecretFromEnv } from '../src/auth/magic-link.mjs';
 import { createKillSwitch, engageKill, releaseKill, assertAutonomyAllowed } from '../src/autonomy/bounds.mjs';
 import { CostLedger } from '../src/economy/outcome-economy.mjs';
@@ -744,7 +745,8 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
           if(!goal){sendJson(res,404,{error:'goal_not_found'});return;}
           const linked=(snapshot.missions||[]).filter(m=>m.goalId===id);
           const averageProgress=linked.length?linked.reduce((sum,m)=>sum+(Number(m.progress)||0),0)/linked.length:null;
-          sendJson(res,200,{version:API_VERSION,goalId:id,linkedMissions:linked.length,averageProgress});
+          const drift=assessGoalDrift({goal,missions:snapshot.missions||[]});
+          sendJson(res,200,{version:API_VERSION,goalId:id,linkedMissions:linked.length,averageProgress,drifted:drift.drifted,driftReasons:drift.reasons});
           return;
         }
 
