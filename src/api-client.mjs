@@ -28,9 +28,10 @@ async function readBody(response) {
 export function createApiClient({ baseUrl='', fetchImpl=globalThis.fetch, EventSourceImpl=globalThis.EventSource }={}) {
   const base=normalizeBase(baseUrl);
   if (typeof fetchImpl !== 'function') throw new Error('fetch implementation required');
+  let authToken=null;
 
   const request=async(path,options={})=>{
-    const headers={...(options.body?{'content-type':'application/json'}:{}),...(options.headers||{})};
+    const headers={...(options.body?{'content-type':'application/json'}:{}),...(authToken?{authorization:`Bearer ${authToken}`}:{}),...(options.headers||{})};
     let response;
     try { response=await fetchImpl(`${base}${path}`,{...options,headers}); }
     catch (cause) {
@@ -42,7 +43,7 @@ export function createApiClient({ baseUrl='', fetchImpl=globalThis.fetch, EventS
   };
 
   const requestWithMeta=async(path,options={})=>{
-    const headers={...(options.body?{'content-type':'application/json'}:{}),...(options.headers||{})};
+    const headers={...(options.body?{'content-type':'application/json'}:{}),...(authToken?{authorization:`Bearer ${authToken}`}:{}),...(options.headers||{})};
     let response;
     try { response=await fetchImpl(`${base}${path}`,{...options,headers}); }
     catch (cause) { const error=new Error('backend_unavailable');error.code='backend_unavailable';error.cause=cause;throw error; }
@@ -52,6 +53,7 @@ export function createApiClient({ baseUrl='', fetchImpl=globalThis.fetch, EventS
   };
 
   return Object.freeze({
+    setAuthToken(token){authToken=token||null;return authToken;},
     async detect(){try{const body=await request(apiHealthz());return body?.status==='ok'}catch{return false}},
     state(){return request(apiState())},
     stateWithMeta(){return requestWithMeta(apiState())},
