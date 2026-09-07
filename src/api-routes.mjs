@@ -41,6 +41,8 @@ export const apiEvents = () => '/api/v1/events';
 export const apiUsers = () => '/api/v1/users';
 export const apiUser = id => `/api/v1/users/${e(id)}`;
 export const apiUserCapabilities = id => `/api/v1/users/${e(id)}/capabilities`;
+export const apiAuthMagicLink = () => '/api/v1/auth/magic-link';
+export const apiAuthMe = () => '/api/v1/auth/me';
 
 // federation / browser-client routes
 export const apiFederationIntegrations = () => '/api/v1/federation/integrations';

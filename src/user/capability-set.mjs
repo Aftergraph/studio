@@ -12,6 +12,7 @@ const ALLOWLIST = Object.freeze([
   'mission.control',
   'workspace.reset',
   'user.manage',
+  'auth.issue',
 ]);
 
 const PREFIXES = Object.freeze(['autonomy.']);

@@ -1,0 +1,67 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { issueMagicToken, verifyMagicToken } from '../src/auth/magic-link.mjs';
+import { createAppServer } from '../server.mjs';
+
+const SECRET = 'test-secret-123';
+
+test('token round-trips to the same user', () => {
+  const token = issueMagicToken({ userId: 'alice', secret: SECRET });
+  assert.equal(verifyMagicToken(token, { secret: SECRET }).userId, 'alice');
+});
+
+test('tampered token is rejected', () => {
+  const token = issueMagicToken({ userId: 'alice', secret: SECRET });
+  const tampered = token.slice(0, -2) + (token.endsWith('AA') ? 'BB' : 'AA');
+  assert.throws(() => verifyMagicToken(tampered, { secret: SECRET }), /bad_signature/);
+});
+
+test('expired token is rejected', () => {
+  const token = issueMagicToken({ userId: 'alice', secret: SECRET, ttlMs: 1000, now: 1000 });
+  assert.throws(() => verifyMagicToken(token, { secret: SECRET, now: 5000 }), /expired/);
+});
+
+test('wrong secret is rejected', () => {
+  const token = issueMagicToken({ userId: 'alice', secret: SECRET });
+  assert.throws(() => verifyMagicToken(token, { secret: 'other' }), /bad_signature/);
+});
+
+async function withServer(fn) {
+  const dir = await mkdtemp(join(tmpdir(), 'aftergraph-auth-'));
+  const server = createAppServer({ root: new URL('../', import.meta.url), stateFile: join(dir, 'ws.json'), runtimeIntervalMs: 20, authSecret: SECRET });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  try {
+    await fn(server.address().port);
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+async function post(port, path, body, key, headers = {}) {
+  const res = await fetch(`http://127.0.0.1:${port}${path}`, {
+    method: 'POST', headers: { 'content-type': 'application/json', 'idempotency-key': key, ...headers },
+    body: JSON.stringify(body),
+  });
+  return { status: res.status, json: await res.json() };
+}
+
+test('auth server: token issuance is capability-gated and binding enforced', async () => {
+  await withServer(async port => {
+    const admin = await post(port, '/api/v1/users', { actor: 'demo-user', id: 'alice', capabilities: ['memory.write'] }, 'auth-alice');
+    assert.equal(admin.status, 201);
+    const issued = await post(port, '/api/v1/auth/magic-link', { actor: 'demo-user', userId: 'alice' }, 'auth-issue-1');
+    assert.equal(issued.status, 201);
+    assert.match(issued.json.token, /^v1\./);
+    const me = await fetch(`http://127.0.0.1:${port}/api/v1/auth/me`, { headers: { authorization: `Bearer ${issued.json.token}` } });
+    assert.equal(me.status, 200);
+    assert.equal((await me.json()).userId, 'alice');
+    const mismatch = await post(port, '/api/v1/memory', { actor: 'bob', scope: 's', label: 'l', value: 'v', source: 't' }, 'auth-mm-1', { authorization: `Bearer ${issued.json.token}` });
+    assert.equal(mismatch.status, 403, 'token subject must match actor');
+    const bad = await fetch(`http://127.0.0.1:${port}/api/v1/auth/me`, { headers: { authorization: 'Bearer v1.forged.sig' } });
+    assert.equal(bad.status, 403, 'forged token rejected');
+  });
+});

@@ -43,6 +43,7 @@ const GATES = [
   { name: 'User Profile Server Exit Gate', cmd: 'node', args: ['--test', 'tests/user-routes.test.mjs'] },
   { name: 'P1-009 Shared Currency Formatter Exit Gate', cmd: 'node', args: ['--test', 'tests/economy-currency.test.mjs'] },
   { name: 'User Workspace Isolation Exit Gate', cmd: 'node', args: ['--test', 'tests/user-isolation.test.mjs'] },
+  { name: 'Magic-Link Auth Exit Gate', cmd: 'node', args: ['--test', 'tests/auth-magic-link.test.mjs'] },
   { name: 'Axe-Core 4.10.3 Accessibility Gate (WCAG 2.2 AA)', cmd: 'python', args: ['scripts/a11y_smoke.py'] }
 ];
 
