@@ -1,1 +1,18 @@
-export function createFederationBrowserClient({baseUrl='',fetchImpl=globalThis.fetch}={}){const get=async path=>{const r=await fetchImpl(`${baseUrl}${path}`,{headers:{accept:'application/json'},credentials:'same-origin'});const body=await r.json();if(!r.ok){const e=new Error(body?.error||`http_${r.status}`);e.status=r.status;throw e}return body};return Object.freeze({integrations:()=>get('/api/v1/federation/integrations'),objects:()=>get('/api/v1/federation/objects'),object:id=>get(`/api/v1/federation/objects/${encodeURIComponent(id)}`),search:(q,{tenantId=null}={})=>{const p=new URLSearchParams({q:String(q??'')});if(tenantId)p.set('tenantId',tenantId);return get(`/api/v1/federation/search?${p}`)},now:()=>get('/api/v1/federation/now'),capabilities:(q='')=>get(`/api/v1/federation/capabilities?q=${encodeURIComponent(q)}`)})}
+import { apiFederationCapabilities, apiFederationIntegrations, apiFederationNow, apiFederationObject, apiFederationObjects, apiFederationSearch } from '../api-routes.mjs';
+
+export function createFederationBrowserClient({baseUrl='',fetchImpl=globalThis.fetch}={}){
+  const get=async path=>{
+    const r=await fetchImpl(`${baseUrl}${path}`,{headers:{accept:'application/json'},credentials:'same-origin'});
+    const body=await r.json();
+    if(!r.ok){const e=new Error(body?.error||`http_${r.status}`);e.status=r.status;throw e}
+    return body;
+  };
+  return Object.freeze({
+    integrations:()=>get(apiFederationIntegrations()),
+    objects:()=>get(apiFederationObjects()),
+    object:id=>get(apiFederationObject(id)),
+    search:(q,{tenantId=null}={})=>get(apiFederationSearch(q,{tenantId})),
+    now:()=>get(apiFederationNow()),
+    capabilities:(q='')=>get(apiFederationCapabilities(q)),
+  });
+}

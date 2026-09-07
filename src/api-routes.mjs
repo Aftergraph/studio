@@ -1,0 +1,52 @@
+// ponytail: frozen pure functions — no state, no deps, no runtime cost beyond string concat
+const e = encodeURIComponent;
+
+export const apiHealthz = () => '/healthz';
+export const apiState = () => '/api/v1/state';
+export const apiNeeds = () => '/api/v1/needs';
+export const apiMissions = () => '/api/v1/missions';
+export const apiAgents = () => '/api/v1/agents';
+export const apiArtifacts = () => '/api/v1/artifacts';
+export const apiConnections = () => '/api/v1/connections';
+export const apiSpaces = () => '/api/v1/spaces';
+export const apiSystem = () => '/api/v1/system';
+export const apiUpstreams = () => '/api/v1/upstreams';
+export const apiUpstreamsSync = () => '/api/v1/upstreams/sync';
+export const apiUpstreamApprovalDecision = id => `/api/v1/upstreams/trust-gateway/approvals/${e(id)}/decision`;
+export const apiUpstreamWorkControl = id => `/api/v1/upstreams/works/${e(id)}/control`;
+export const apiWorkIntelligenceReview = id => `/api/v1/upstreams/work-intelligence/${e(id)}/review`;
+export const apiWorkIntelligencePromote = id => `/api/v1/upstreams/work-intelligence/${e(id)}/promote`;
+export const apiAieTaskCancel = id => `/api/v1/upstreams/aie/tasks/${e(id)}/cancel`;
+export const apiAieMessages = () => '/api/v1/upstreams/aie/messages';
+export const apiConversations = () => '/api/v1/conversations';
+export const apiNeed = id => `/api/v1/needs/${e(id)}`;
+export const apiContext = conversationId => `/api/v1/context?conversationId=${e(conversationId)}`;
+export const apiArtifact = id => `/api/v1/artifacts/${e(id)}`;
+export const apiConversationMessages = id => `/api/v1/conversations/${e(id)}/messages`;
+export const apiApprovalDecision = id => `/api/v1/approvals/${e(id)}/decision`;
+export const apiMissionControl = id => `/api/v1/missions/${e(id)}/control`;
+export const apiMissionRuntime = id => `/api/v1/missions/${e(id)}/runtime`;
+export const apiMemory = id => `/api/v1/memory/${e(id)}`;
+export const apiMemoryPromote = id => `/api/v1/memory/${e(id)}/promote`;
+export const apiAuthoritativeMemory = () => '/api/v1/memory/authoritative';
+export const apiSpace = id => `/api/v1/spaces/${e(id)}`;
+export const apiReplay = () => '/api/v1/replay';
+export const apiReset = () => '/api/v1/reset';
+export const apiAutonomyKillRead = scope => `/api/v1/autonomy/kill?scope=${e(scope)}`;
+export const apiAutonomyKillEngage = () => '/api/v1/autonomy/kill';
+export const apiAutonomyKillRelease = () => '/api/v1/autonomy/kill/release';
+export const apiSyncEventsSubmit = () => '/api/v1/sync/events';
+export const apiSyncEventsRead = () => '/api/v1/sync/events';
+export const apiEvents = () => '/api/v1/events';
+
+// federation / browser-client routes
+export const apiFederationIntegrations = () => '/api/v1/federation/integrations';
+export const apiFederationObjects = () => '/api/v1/federation/objects';
+export const apiFederationObject = id => `/api/v1/federation/objects/${e(id)}`;
+export const apiFederationSearch = (q, { tenantId = null } = {}) => {
+  const p = new URLSearchParams({ q: String(q ?? '') });
+  if (tenantId) p.set('tenantId', tenantId);
+  return `/api/v1/federation/search?${p}`;
+};
+export const apiFederationNow = () => '/api/v1/federation/now';
+export const apiFederationCapabilities = (q = '') => `/api/v1/federation/capabilities?q=${e(q)}`;

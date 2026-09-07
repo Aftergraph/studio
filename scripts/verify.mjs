@@ -38,7 +38,7 @@ const styles=['tokens','reset','shell','components','views','motion','responsive
 const serverDir=readdirSync(path.join(root,'server')).filter(x=>x.endsWith('.mjs')).map(x=>read(`server/${x}`)).join('\n');
 const appDir=readdirSync(path.join(root,'src/app')).filter(x=>x.endsWith('.mjs')).map(x=>read(`src/app/${x}`)).join('\n');
 const ui=readdirSync(path.join(root,'packages/ui'),{recursive:true}).filter(x=>x.endsWith('.mjs')).map(x=>read(`packages/ui/${x}`)).join('\n');
-const html=read('index.html'), main=read('src/main.mjs')+'\n'+appDir, shell=read('src/workspace-shell.mjs'), domain=read('src/domain.mjs'), spatial=read('packages/spatial/index.mjs'), presence=read('packages/presence/index.mjs'), viz=read('packages/visualization/index.mjs'), composer=read('packages/composer/index.mjs'), interaction=read('packages/interaction/index.mjs'), motion=read('packages/motion/index.mjs'), server=read('server.mjs')+'\n'+serverDir, sw=read('sw.js'), api=read('src/api-client.mjs'), replay=read('src/replay.mjs');
+const html=read('index.html'), main=read('src/main.mjs')+'\n'+appDir, shell=read('src/workspace-shell.mjs'), domain=read('src/domain.mjs'), spatial=read('packages/spatial/index.mjs'), presence=read('packages/presence/index.mjs'), viz=read('packages/visualization/index.mjs'), composer=read('packages/composer/index.mjs'), interaction=read('packages/interaction/index.mjs'), motion=read('packages/motion/index.mjs'), server=read('server.mjs')+'\n'+serverDir, sw=read('sw.js'), api=read('src/api-client.mjs'), routes=read('src/api-routes.mjs'), replay=read('src/replay.mjs');
 const files=[html,styles,main,ui,spatial,presence,viz,composer,interaction,motion,server].join('\n');
 check('V5/V6 identity',html.includes('Aftergraph Workspace')||html.includes('Aftergraph V5')||html.includes('Aftergraph V6')||html.includes('Operating Environment'));
 check('Seven design layers',['tokens','reset','shell','components','views','motion','responsive'].every(l=>html.includes(`/styles/${l}.css`)));
@@ -50,8 +50,8 @@ check('Semantic zoom',spatial.includes('AGSemanticZoom')&&main.includes('zoom-in
 check('Presence kernel',presence.includes('AGPresenceRail')&&presence.includes('derivePresence')&&main.includes('followedAgentId'));
 check('Visualization kernel',viz.includes('AGTrajectoryGraph')&&viz.includes('AGEvidenceGraph')&&viz.includes('AGReplayTimeline'));
 check('Multimodal intent composer',composer.includes('AGIntentComposer')&&composer.includes('Research')&&composer.includes('Delegate'));
-check('Replay time layer',replay.includes('buildReplayFrames')&&api.includes('/api/v1/replay')&&server.includes('/api/v1/replay'));
-check('Durable spatial server state',api.includes('/api/v1/spaces')&&server.includes('/api/v1/spaces'));
+check('Replay time layer',replay.includes('buildReplayFrames')&&(api.includes('/api/v1/replay')||routes.includes('/api/v1/replay'))&&server.includes('/api/v1/replay'));
+check('Durable spatial server state',(api.includes('/api/v1/spaces')||routes.includes('/api/v1/spaces'))&&server.includes('/api/v1/spaces'));
 check('Lifecycle-stable spatial motion',main.includes('diffSurfaceEntries')||styles.includes('ag-space-surface'));
 check('V4 living interaction preserved',main.includes('morphSurface')||main.includes('toggle-immersive')||styles.includes('.ag-app.is-immersive')||styles.includes('.ag-space-stage'));
 check('Reduced motion parity',styles.includes('prefers-reduced-motion')&&motion.includes('prefersReducedMotion'));
