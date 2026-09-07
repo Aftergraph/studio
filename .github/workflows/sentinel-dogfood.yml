@@ -1,0 +1,38 @@
+# Sentinel dogfood — purely informational, never blocks merge.
+# Bump sentinel SHA here to update the pinned revision:
+env:
+  SENTINEL_SHA: "9439d36"
+
+name: sentinel-dogfood
+
+on:
+  pull_request:
+
+jobs:
+  sentinel:
+    name: Sentinel (informational)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout studio PR
+        uses: actions/checkout@v4
+        with:
+          path: studio
+
+      - name: Checkout Aftergraph/sentinel at pinned SHA
+        uses: actions/checkout@v4
+        with:
+          repository: Aftergraph/sentinel
+          ref: ${{ env.SENTINEL_SHA }}
+          path: sentinel
+
+      - name: Setup Node.js 20+
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run Sentinel review
+        run: |
+          node sentinel/bin/sentinel.js review \
+            --pr "${{ github.event.pull_request.number }}" \
+            --repo Aftergraph/studio
