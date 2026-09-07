@@ -186,6 +186,7 @@ Raw scan counts are evidence leads, not automatic refactor instructions. Each it
 **Priority:** `P0`
 **Scope:** `L`
 **Auto-fix safe:** `no`
+**Status:** DONE
 
 ## [P1] [HC-D] Status strings and presentation mappings are distributed
 
@@ -394,6 +395,7 @@ Raw scan counts are evidence leads, not automatic refactor instructions. Each it
 **Priority:** `P0`
 **Scope:** `L`
 **Auto-fix safe:** `no`
+**Status:** DONE
 
 ## [P0] [HC-I] Destructive action protection is not one shared primitive
 
@@ -420,6 +422,7 @@ Raw scan counts are evidence leads, not automatic refactor instructions. Each it
 **Priority:** `P0`
 **Scope:** `L`
 **Auto-fix safe:** `no`
+**Status:** DONE
 
 ## [P1] [HC-E] Duplicate component primitives and local variants need consolidation review
 

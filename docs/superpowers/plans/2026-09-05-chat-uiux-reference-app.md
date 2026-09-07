@@ -1,5 +1,7 @@
 # Aftergraph Chat UI/UX Reference App Implementation Plan
 
+> **SUPERSEDED** — This plan is superseded by the V3→V4→V5 implementation track. 0 tasks from this plan were executed; all work landed through the later iterations instead. Retained for historical context only. Do not implement tasks below.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a local, dependency-free, production-style reference app implementing Aftergraph's canonical 9-domain adaptive Chat UI/UX contract.
