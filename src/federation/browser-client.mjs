@@ -1,4 +1,4 @@
-import * as R from '../api-routes.mjs';
+import { apiFederationCapabilities, apiFederationIntegrations, apiFederationNow, apiFederationObject, apiFederationObjects, apiFederationSearch } from '../api-routes.mjs';
 
 export function createFederationBrowserClient({baseUrl='',fetchImpl=globalThis.fetch}={}){
   const get=async path=>{
@@ -8,11 +8,11 @@ export function createFederationBrowserClient({baseUrl='',fetchImpl=globalThis.f
     return body;
   };
   return Object.freeze({
-    integrations:()=>get(R.federationIntegrations()),
-    objects:()=>get(R.federationObjects()),
-    object:id=>get(R.federationObject(id)),
-    search:(q,{tenantId=null}={})=>get(R.federationSearch(q,{tenantId})),
-    now:()=>get(R.federationNow()),
-    capabilities:(q='')=>get(R.federationCapabilities(q)),
+    integrations:()=>get(apiFederationIntegrations()),
+    objects:()=>get(apiFederationObjects()),
+    object:id=>get(apiFederationObject(id)),
+    search:(q,{tenantId=null}={})=>get(apiFederationSearch(q,{tenantId})),
+    now:()=>get(apiFederationNow()),
+    capabilities:(q='')=>get(apiFederationCapabilities(q)),
   });
 }

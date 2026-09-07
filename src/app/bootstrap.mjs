@@ -41,7 +41,10 @@ export function bootstrapAftergraph(){
   const STORAGE_KEY='aftergraph-workspace-v5';
   const app=document.querySelector('#app');
   const toastRegion=document.querySelector('#toast-region');
-  const storageAdapter=createStorageAdapter({storage:localStorage,key:STORAGE_KEY,version:1});
+  // ponytail: localStorage access throws on opaque origins (set_content/file);
+  // fall back to memory so the shell still boots and persistence just skips.
+  const pickStorage=()=>{try{const s=globalThis.localStorage;void s.length;return s}catch{const m=new Map();return{getItem:k=>m.has(k)?m.get(k):null,setItem:(k,v)=>{m.set(k,String(v))},removeItem:k=>{m.delete(k)}}}};
+  const storageAdapter=createStorageAdapter({storage:pickStorage(),key:STORAGE_KEY,version:1});
   let state=loadState();
   let liveRuntime=null;
   let liveTimer=null;
