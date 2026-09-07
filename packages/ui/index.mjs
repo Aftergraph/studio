@@ -10,6 +10,7 @@ export { AGWorkSummary } from './work/work-summary.mjs';
 export { AGOutcomeReceipt } from './work/outcome-receipt.mjs';
 export { AGArtifact, AGArtifactToolbar, AGArtifactRow } from './work/artifact.mjs';
 export { AGApproval } from './trust/approval.mjs';
+export { AGAuthPanel } from './trust/auth-panel.mjs';
 export { AGConfirmationSheet } from './trust/confirmation-sheet.mjs';
 export { AGNeedYou } from './trust/need-you.mjs';
 export { AGEvidence } from './trust/evidence.mjs';

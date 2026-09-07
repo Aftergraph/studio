@@ -45,6 +45,7 @@ const GATES = [
   { name: 'User Workspace Isolation Exit Gate', cmd: 'node', args: ['--test', 'tests/user-isolation.test.mjs'] },
   { name: 'Magic-Link Auth Exit Gate', cmd: 'node', args: ['--test', 'tests/auth-magic-link.test.mjs'] },
   { name: 'V81-019 Viewport Sweep Exit Gate', cmd: 'python', args: ['scripts/viewport_sweep.py'] },
+  { name: 'Login UI Slice-1 Exit Gate', cmd: 'node', args: ['--test', 'tests/auth-panel.test.mjs'] },
   { name: 'Axe-Core 4.10.3 Accessibility Gate (WCAG 2.2 AA)', cmd: 'python', args: ['scripts/a11y_smoke.py'] }
 ];
 
