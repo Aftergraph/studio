@@ -43,6 +43,9 @@ export const apiUser = id => `/api/v1/users/${e(id)}`;
 export const apiUserCapabilities = id => `/api/v1/users/${e(id)}/capabilities`;
 export const apiAuthMagicLink = () => '/api/v1/auth/magic-link';
 export const apiAuthMe = () => '/api/v1/auth/me';
+export const apiGoals = () => '/api/v1/goals';
+export const apiGoalProgress = id => `/api/v1/goals/${e(id)}/progress`;
+export const apiMissionGoal = id => `/api/v1/missions/${e(id)}/goal`;
 
 // federation / browser-client routes
 export const apiFederationIntegrations = () => '/api/v1/federation/integrations';

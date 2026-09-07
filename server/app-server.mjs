@@ -13,6 +13,7 @@ import { buildReplayFrames } from '../src/replay.mjs';
 import { buildTemporalFrames, reconstructAt, counterfactualAt, futureTrajectory } from '../src/temporal/temporal-intelligence.mjs';
 import { createActionGuard, assertActorCapability, requireResetConfirmation, RESET_CONFIRMATION } from '../src/action-guard.mjs';
 import { createUser, getUser, updateCapabilities } from '../src/user/user-store.mjs';
+import { createGoal } from '../src/goal/goal-schema.mjs';
 import { issueMagicToken, subjectFromAuthHeader, authSecretFromEnv } from '../src/auth/magic-link.mjs';
 import { createKillSwitch, engageKill, releaseKill, assertAutonomyAllowed } from '../src/autonomy/bounds.mjs';
 import { CostLedger } from '../src/economy/outcome-economy.mjs';
@@ -130,7 +131,7 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
     createUser({id:'demo-user',name:'Demo User',role:'operator',capabilities:[
       'approval.decide','autonomy.check','autonomy.kill','autonomy.record',
       'memory.promote','memory.revoke','memory.write','mission.control',
-      'workspace.reset','user.manage','auth.issue',
+      'workspace.reset','user.manage','auth.issue','goal.manage',
     ]});
   } catch { /* seeded already */ }
   const beginAction=(req,body,capability,path,confirmation=false)=>{
@@ -713,6 +714,55 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
             broadcast({ state:next, runtimes:runtimeHub.snapshot() });
             sendJson(res, 200, { state:next });
           } catch (error) { failAction(action.key,error); }
+          return;
+        }
+
+        if (url.pathname === '/api/v1/goals' && req.method === 'POST') {
+          const body=await readJson(req);
+          await rescope(body?.actor);
+          const action=beginAction(req,body,'goal.manage',url.pathname);
+          try {
+            const goal=createGoal({id:body.id??`goal_${Date.now().toString(36)}`,owner:body.owner,successCriteria:body.successCriteria,budgetCents:body.budgetCents,horizonEnd:body.horizonEnd,parentGoalId:body.parentGoalId});
+            if((store.snapshot().goals||[]).some(g=>g.id===goal.id))throw Object.assign(new Error('duplicate goal'),{code:'goal_duplicate_id'});
+            await store.mutate(draft=>{draft.goals=[goal,...(draft.goals||[])];return draft;});
+            completeAction(action.key,{status:'accepted'});
+            sendJson(res,201,{version:API_VERSION,goal});
+          } catch(error){ actionGuard.fail(action.key,error?.message||error);sendJson(res,/goal_owner|goal_successCriteria|goal_budget|goal_horizon/.test(error?.message||'')?422:(error?.code||'invalid_goal'),{error:error?.code||error?.message||'invalid_goal'}); }
+          return;
+        }
+
+        if (url.pathname === '/api/v1/goals' && req.method === 'GET') {
+          sendJson(res,200,{version:API_VERSION,goals:store.snapshot().goals||[]});
+          return;
+        }
+
+        match = url.pathname.match(/^\/api\/v1\/goals\/([^/]+)\/progress$/);
+        if (match && req.method === 'GET') {
+          const id=decodeURIComponent(match[1]);
+          const snapshot=store.snapshot();
+          const goal=(snapshot.goals||[]).find(g=>g.id===id);
+          if(!goal){sendJson(res,404,{error:'goal_not_found'});return;}
+          const linked=(snapshot.missions||[]).filter(m=>m.goalId===id);
+          const averageProgress=linked.length?linked.reduce((sum,m)=>sum+(Number(m.progress)||0),0)/linked.length:null;
+          sendJson(res,200,{version:API_VERSION,goalId:id,linkedMissions:linked.length,averageProgress});
+          return;
+        }
+
+        match = url.pathname.match(/^\/api\/v1\/missions\/([^/]+)\/goal$/);
+        if (match && req.method === 'PATCH') {
+          const body=await readJson(req);
+          await rescope(body?.actor);
+          const id=decodeURIComponent(match[1]);
+          const action=beginAction(req,body,'mission.control',url.pathname);
+          try {
+            const snapshot=store.snapshot();
+            if(!(snapshot.goals||[]).some(g=>g.id===body.goalId)){actionGuard.fail(action.key,'unknown goal');sendJson(res,404,{error:'goal_not_found'});return;}
+            if(!snapshot.missions.some(m=>m.id===id)){actionGuard.fail(action.key,'unknown mission');sendJson(res,404,{error:'mission_not_found'});return;}
+            const next=await store.mutate(draft=>{draft.missions=draft.missions.map(m=>m.id===id?{...m,goalId:body.goalId}:m);return draft;});
+            completeAction(action.key,{status:'accepted'});
+            broadcast({ state:next, runtimes:runtimeHub.snapshot() });
+            sendJson(res,200,{version:API_VERSION,mission:next.missions.find(m=>m.id===id)});
+          } catch(error){ actionGuard.fail(action.key,error?.message||error);sendJson(res,422,{error:error?.code||'link_rejected'}); }
           return;
         }
 
