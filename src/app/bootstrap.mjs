@@ -3,6 +3,7 @@ import { routeFromLocation, buildDeepLink } from '../router.mjs';
 import { createInitialState, resolveNeed, decideApproval, setTakeover, appendChatMessage, conversationMissionId } from '../state.mjs';
 import { searchIndex } from '../search.mjs';
 import { escapeHtml, attentionCount, compactMoney, progressLabel } from '../ui-helpers.mjs';
+import { formatMoney, eurosToCents } from '../economy/currency.mjs';
 import { PRIMARY_NAV, canonicalDomainForNav, commandDomainEntries } from '../workspace-shell.mjs';
 import { icon } from '../icons.mjs';
 import { AGIcon } from '../../packages/icons/index.mjs';
@@ -468,7 +469,7 @@ export function bootstrapAftergraph(){
     let kicker='Context',title='What the system can use',body='';
     if(ui.inspectorKind==='agent'){
       const agent=currentAgent();kicker='Agent';title=agent.name;
-      body=`<section><span>Runtime identity</span><dl class="ag-context-summary"><div><dt>Role</dt><dd>${escapeHtml(agent.role)}</dd></div><div><dt>State</dt><dd>${escapeHtml(agent.state)}</dd></div><div><dt>Current task</dt><dd>${escapeHtml(agent.task)}</dd></div><div><dt>Authority</dt><dd>${escapeHtml(agent.authority)}</dd></div><div><dt>Spend</dt><dd>€${Number(agent.spend||0).toFixed(2)}</dd></div><div><dt>Evidence</dt><dd>${agent.evidence} records</dd></div></dl></section>`;
+      body=`<section><span>Runtime identity</span><dl class="ag-context-summary"><div><dt>Role</dt><dd>${escapeHtml(agent.role)}</dd></div><div><dt>State</dt><dd>${escapeHtml(agent.state)}</dd></div><div><dt>Current task</dt><dd>${escapeHtml(agent.task)}</dd></div><div><dt>Authority</dt><dd>${escapeHtml(agent.authority)}</dd></div><div><dt>Spend</dt><dd>${formatMoney(eurosToCents(agent.spend))}</dd></div><div><dt>Evidence</dt><dd>${agent.evidence} records</dd></div></dl></section>`;
     }else if(ui.inspectorKind==='connection'){
       const connection=state.connections.find(c=>c.id===ui.selectedConnectionId)||state.connections[0];kicker='Connection';title=connection.name;
       body=`<section><span>Capability scope</span>${AGConnectionRow({connection})}<div class="ag-permission-list">${connection.permissions.map(p=>`<code>${escapeHtml(p)}</code>`).join('')}</div></section>`;

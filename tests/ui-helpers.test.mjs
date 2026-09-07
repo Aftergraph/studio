@@ -18,5 +18,5 @@ test('mission status distinguishes verified from merely completed', () => {
 });
 
 test('money formatting is compact and stable', () => {
-  assert.equal(compactMoney(8.49, '€'), '€8.49');
+  assert.equal(compactMoney(8.49, '€'), '8,49 €');
 });
