@@ -13,6 +13,7 @@ import { buildReplayFrames } from '../src/replay.mjs';
 import { buildTemporalFrames, reconstructAt, counterfactualAt, futureTrajectory } from '../src/temporal/temporal-intelligence.mjs';
 import { createActionGuard, assertActorCapability, requireResetConfirmation, RESET_CONFIRMATION } from '../src/action-guard.mjs';
 import { createUser, getUser, updateCapabilities } from '../src/user/user-store.mjs';
+import { listGrantableCapabilities } from '../src/user/capability-set.mjs';
 import { createGoal } from '../src/goal/goal-schema.mjs';
 import { createLesson } from '../src/goal/goal-lesson.mjs';
 import { assessGoalDrift } from '../src/goal/goal-drift.mjs';
@@ -705,6 +706,11 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
           const user=getUser(decodeURIComponent(match[1]));
           if(!user){sendJson(res,404,{error:'user_not_found'});return;}
           sendJson(res,200,{version:API_VERSION,user});
+          return;
+        }
+
+        if (url.pathname === '/api/v1/capabilities' && req.method === 'GET') {
+          sendJson(res,200,{version:API_VERSION,capabilities:listGrantableCapabilities()});
           return;
         }
 
