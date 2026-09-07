@@ -37,6 +37,7 @@
   --accent: #0c52ef;
   --accent-soft: #eaf1ff;
   --accent-strong: #003ebd;
+  --text-active: #0c52ef;
   --success: #15985d;
   --success-soft: #e8f7ef;
   --warning: #b57300;
@@ -74,6 +75,7 @@ html[data-theme="dark"] {
   --accent: #42c7e8;
   --accent-soft: rgba(66, 199, 232, 0.14);
   --accent-strong: #70d8f0;
+  --text-active: #dcecff;
   --success: #24c4ad;
   --success-soft: rgba(36, 196, 173, 0.14);
   --warning: #f0a64a;
