@@ -39,7 +39,15 @@ export function createActionGuard({ ttlMs = 5000, now = () => Date.now() } = {})
   });
 }
 
-export function assertActorCapability({ state, actor, capability }) {
+export function assertActorCapability({ state, actor, capability, users = null }) {
+  if (users && typeof users.getUser === 'function') {
+    const user = users.getUser(actor);
+    if (!user) { const error = new Error('forbidden: unknown actor'); error.code = 'forbidden'; throw error; }
+    if (!(user.capabilities || []).includes(capability)) {
+      const error = new Error(`forbidden: missing capability ${capability}`); error.code = 'forbidden'; throw error;
+    }
+    return true;
+  }
   if (!actor || actor !== state?.user?.id) throw new Error('forbidden: actor identity mismatch');
   const capabilities = state.user.capabilities || [];
   if (!capabilities.includes('*') && !capabilities.includes(capability)) {
