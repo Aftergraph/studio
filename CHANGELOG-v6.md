@@ -292,3 +292,23 @@ Product Cell → mission (human-approved) → workforce execution → verifier s
 - Autonomy stays bounded by kill switches, budgets, policy and evidence;
   overruns and kills require human action, and the halt is enforced in the
   auto-stepper itself rather than only at the API edge.
+
+## [V9.0] — Users, Auth and Goals (production track)
+
+### Added
+- Per-actor workspace isolation (`server/app-server.mjs`): one store, hub
+  and sync log per registered user; fail-closed 403 for unknown actors;
+  LRU eviction past `maxUserStores` with disk reseed.
+- HMAC magic-link auth (`src/auth/`): issuance, Bearer binding, per-IP
+  rate limit, `REQUIRE_AUTH` enforcement with operator boot token.
+- Login UI (`AGAuthPanel`, `AGUserInvite`): sign-in, session restore,
+  operator invite with grantable capability directory.
+- Goals, drift and lessons (`src/goal/`): workspace-scoped goals with
+  mission linkage and progress rollup, drift monitor, human-authored
+  outcome lessons with verdict filter.
+- Shared integer-cent money formatter (`src/economy/currency.mjs`).
+- Viewport sweep evidence (`scripts/viewport_sweep.py`): 320–1920 widths.
+- Production runbook (`docs/PRODUCTION.md`).
+
+### Gates
+- 635/635 Node tests; 49/49 release gates green.

@@ -107,7 +107,7 @@ The release gate additionally runs the V4-in-V5 regression browser suite and arc
 
 ### Current verified release gate
 
-- **552/552 Node tests passed**.
+- **635/635 Node tests passed**.
 - Source/conformance and syntax checks passed.
 - Expo TypeScript/source contracts passed.
 - SwiftUI parse/source contracts passed.
