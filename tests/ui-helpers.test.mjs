@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { escapeHtml, attentionCount, missionStatusLabel, compactMoney } from '../src/ui-helpers.mjs';
+import { escapeHtml, attentionCount, missionStatusLabel, compactMoney, authorityLabel, capabilityLabel } from '../src/ui-helpers.mjs';
 import { createInitialState } from '../src/state.mjs';
 
 test('escapeHtml neutralizes executable markup', () => {
@@ -19,4 +19,12 @@ test('mission status distinguishes verified from merely completed', () => {
 
 test('money formatting is compact and stable', () => {
   assert.equal(compactMoney(8.49, '€'), '8,49 €');
+});
+
+test('authority labels derive from capabilities, not wildcards', () => {
+  assert.equal(authorityLabel(['user.manage', 'memory.write']), 'Operator');
+  assert.equal(authorityLabel(['memory.write']), 'Scoped');
+  assert.equal(authorityLabel(['*']), 'Operator');
+  assert.equal(capabilityLabel(['user.manage']), 'full capability set');
+  assert.equal(capabilityLabel(['memory.write']), 'scoped capabilities');
 });

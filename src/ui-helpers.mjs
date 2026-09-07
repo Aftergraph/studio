@@ -27,6 +27,18 @@ export function compactMoney(value, currency='€') {
   return formatMoney(eurosToCents(value), { currency: currencyCode(currency) });
 }
 
+// ponytail: post-wildcard authority labels. Operator = can manage users;
+// everything else is scoped. Legacy '*' still maps to Operator.
+export function authorityLabel(capabilities = []) {
+  const caps = Array.isArray(capabilities) ? capabilities : [];
+  return caps.includes('user.manage') || caps.includes('*') ? 'Operator' : 'Scoped';
+}
+
+export function capabilityLabel(capabilities = []) {
+  const caps = Array.isArray(capabilities) ? capabilities : [];
+  return caps.includes('user.manage') || caps.includes('*') ? 'full capability set' : 'scoped capabilities';
+}
+
 export function progressLabel(value) {
   return `${Math.max(0, Math.min(100, Number(value || 0)))}%`;
 }
