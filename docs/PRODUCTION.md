@@ -42,7 +42,8 @@ How to host a single-tenant Aftergraph Studio instance with auth enforcement on.
 - Token issuance is capability-gated, not email-challenged. Do not expose
   `/api/v1/auth/magic-link` to untrusted operators without an email
   challenge in front.
-- No per-user state eviction: idle user stores stay in memory until restart.
+- Idle user scopes are evicted past `maxUserStores` (default 100, never the
+  default scope) and reseed from their per-user stateFile on next access.
 - Backups are file copies of `.runtime/`; no point-in-time restore UI.
 - Single-process scope (V8.1): horizontal scaling needs the distributed
   log work, currently deferred beyond single-process convergence.

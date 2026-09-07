@@ -53,7 +53,7 @@ export function upstreamConfigFromEnv(env=process.env) {
   };
 }
 
-export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, upstreamConfig = null, federation = null, fixtures = true, authSecret = null, requireAuth = process.env.AFTERGRAPH_REQUIRE_AUTH === 'true' } = {}) {
+export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, upstreamConfig = null, federation = null, fixtures = true, authSecret = null, requireAuth = process.env.AFTERGRAPH_REQUIRE_AUTH === 'true', maxUserStores = 100 } = {}) {
   const rootDir = resolveRoot(root);
   const secret = authSecret || authSecretFromEnv();
   // ponytail: requireAuth turns Bearer binding into enforcement. The operator
@@ -72,9 +72,29 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
     if (!entry) {
       entry = new WorkspaceStateStore({ stateFile: stateFile ? `${stateFile}.${id}` : undefined, initialState: createInitialState({ fixtures }) });
       entry.readyP = entry.init();
+      entry.lastAccess = Date.now();
       stores.set(id, entry);
+      evictIdleStores();
     }
+    entry.lastAccess = Date.now();
     return entry;
+  };
+  // ponytail: bound memory — evict least-recently-used idle scopes past the
+  // cap. Default scope is never evicted; evicted users reseed on next access
+  // (persisted stateFile reloads their data).
+  const evictIdleStores = () => {
+    if (stores.size <= maxUserStores) return;
+    const candidates = [...stores.keys()]
+      .filter(key => key !== DEFAULT_ACTOR)
+      .map(key => ({ key, at: stores.get(key).lastAccess || 0 }))
+      .sort((a, b) => a.at - b.at);
+    for (const { key } of candidates) {
+      if (stores.size <= maxUserStores) break;
+      try { hubs.get(key)?.stopAll?.(); } catch {}
+      hubs.delete(key);
+      syncLogs.delete(key);
+      stores.delete(key);
+    }
   };
   const hubFor = (actor) => {
     const id = actor || DEFAULT_ACTOR;
