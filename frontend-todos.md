@@ -526,10 +526,10 @@ Raw scan counts are evidence leads, not automatic refactor instructions. Each it
 **Dependencies:** FIN visual QA; browser smoke harness
 
 **Acceptance criteria:**
-- [ ] 320/390/768/1024/1440/1920 widths are checked
-- [ ] No horizontal overflow or clipped primary actions
-- [ ] Evidence is tied to exact revision
-- [ ] Existing tests and visual behavior are verified
+- [x] 320/390/768/1024/1440/1920 widths are checked
+- [x] No horizontal overflow or clipped primary actions
+- [x] Evidence is tied to exact revision
+- [x] Existing tests and visual behavior are verified
 
 **Priority:** `P1`
 **Scope:** `M`
