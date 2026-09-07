@@ -18,6 +18,7 @@ export function createInitialState({ fixtures = true } = {}) {
     theme:'system',
     activeSpaceId:'space_primary',
     spaces:[createDefaultSpace()],
+    goals:[],
     replay:{ cursor:0, playing:false, speed:1 },
     upstreams:{ syncedAt:null, services:{}, trustGateway:{identity:null,approvals:[],needsYou:[],audit:null}, works:{works:[],brain:[]}, aie:{tasks:[]}, workIntelligence:{workItems:[]}, governance:{missionStates:[]} },
     needsYou:[
