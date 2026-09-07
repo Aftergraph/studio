@@ -48,6 +48,8 @@ test('memory written by alice is invisible to bob', async () => {
 
 test('conversations are isolated per actor', async () => {
   await withServer(async port => {
+    await seedUser(port, 'alice', []);
+    await seedUser(port, 'bob', []);
     const a = await post(port, '/api/v1/conversations', { actor: 'alice', title: 'A' }, 'conv-a-1');
     assert.equal(a.status, 201);
     const stateB = await (await fetch(`http://127.0.0.1:${port}/api/v1/state?actor=bob`)).json();
@@ -59,5 +61,14 @@ test('demo-user default scope is unaffected', async () => {
   await withServer(async port => {
     const state = await (await fetch(`http://127.0.0.1:${port}/api/v1/state`)).json();
     assert.ok(Array.isArray(state.state.conversations), 'default scope readable without actor');
+  });
+});
+
+test('unregistered actors are rejected everywhere', async () => {
+  await withServer(async port => {
+    const w = await post(port, '/api/v1/conversations', { actor: 'ghost', title: 'G' }, 'ghost-conv-1');
+    assert.equal(w.status, 403, 'ghost cannot create conversations');
+    const g = await fetch(`http://127.0.0.1:${port}/api/v1/state?actor=ghost`);
+    assert.equal(g.status, 403, 'ghost cannot read state');
   });
 });

@@ -132,22 +132,27 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
     // ponytail: per-request scope. GETs scope via ?actor=; mutating routes
     // rescope from body right after readJson (see rescope calls below).
     const queryActor = url.searchParams.get('actor') || undefined;
-    let store = storeFor(queryActor);
-    let runtimeHub = hubFor(queryActor);
-    let syncLog = logFor(queryActor);
-    await store.readyP;
+    let store = storeFor(DEFAULT_ACTOR);
+    let runtimeHub = hubFor(DEFAULT_ACTOR);
+    let syncLog = logFor(DEFAULT_ACTOR);
     const rescope = async (actor) => {
       const scoped = actor || queryActor;
+      // ponytail: fail-closed — only registered users own a workspace.
+      // demo-user is seeded at boot; everyone else must POST /api/v1/users first.
+      if (!getUser(scoped || DEFAULT_ACTOR)) {
+        const error = new Error('forbidden: unknown actor');
+        error.code = 'forbidden'; error.status = 403; throw error;
+      }
       store = storeFor(scoped);
       runtimeHub = hubFor(scoped);
       syncLog = logFor(scoped);
       await store.readyP;
     };
-
     if (url.pathname === '/healthz') {
       sendJson(res, 200, { status:'ok', app:'aftergraph-workspace-v5-reference', api:API_VERSION });
       return;
     }
+    try { await rescope(); } catch (error) { sendApiError(res, error); return; }
 
     if (url.pathname === '/api/v1/events' && req.method === 'GET') {
       sse.attach(req,res,{state:store.snapshot(),runtimes:runtimeHub.snapshot()});
