@@ -116,7 +116,7 @@ The release gate additionally runs the V4-in-V5 regression browser suite and arc
 - Browser → V5 API client → real Node backend → durable state bridge passed.
 - No uncaught browser page errors were observed in the release smoke flows.
 
-See `QA-REPORT.md` for the exact scope and environment boundary.
+See `QA-REPORT-V6.md` for the exact scope and environment boundary.
 
 ## PWA / offline
 
@@ -137,16 +137,19 @@ The local server/runtime is real and persistence-backed; external provider/tool 
 
 See:
 
-- `SOURCE-OF-TRUTH.md`
-- `QA-REPORT.md`
+- `SOURCE-OF-TRUTH-V6.md`
+- `V6-IMPLEMENTATION-STATUS.md`
+- `QA-REPORT-V6.md` (pre-V6 report archived at `docs/archive/QA-REPORT.md`)
 - `CHANGELOG-v5.md`
-- `docs/superpowers/specs/2026-09-05-aftergraph-v5-agentic-operating-environment-design.md`
-- `docs/superpowers/plans/2026-09-05-aftergraph-v5-implementation.md`
+- `docs/superpowers/specs/2026-09-06-aftergraph-v6-unified-intelligence-operating-environment-design.md`
+- `docs/superpowers/plans/2026-09-06-aftergraph-v6-unified-intelligence-operating-environment.md`
+
+V6.0 (Unified Intelligence OS) is the verified foundation. Milestones V6.1 through V8.3 are delivered (Live Federation, Universal Search, Capability Runtime, Research OS, Venture OS, Intent OS, Adaptive Workspace, Agent Society, Temporal Intelligence, Outcome Economy, Institutional Intelligence, Distributed Aftergraph, Personal Brain, Autonomous Operations); V9.0 and V10.0 are north-star horizons. See `docs/ROADMAP.md` and `CHANGELOG-v6.md`.
 
 
 ## V5.1 polyrepo integration
 
-V5.1 connects the workspace to independently verified source-truth boundaries for Trust Gateway, WORKS, AIE, Work Intelligence V2, After Graph Governance and ISR. See `POLYREPO-INTEGRATION.md`.
+V5.1 connects the workspace to independently verified source-truth boundaries for Trust Gateway, WORKS, AIE, Work Intelligence V2, After Graph Governance and ISR. See `POLYREPO-INTEGRATION-V6.md` (pre-V6 version archived at `docs/archive/POLYREPO-INTEGRATION.md`).
 
 The available container could not resolve `github.com`, so a normal `git clone` could not complete. The authenticated GitHub connector was used to verify default-branch heads and inspect the canonical contracts/source seams. Exact contracts are materialized under the sibling `upstreams/` directory, while reviewed interface notes are explicitly labelled as notes rather than source clones.
 
