@@ -8,7 +8,7 @@ jobs:
   auto-merge:
     # ponytail: only dependabot PRs can auto-merge; other actors skip green
     # instead of failing and blocking the merge queue.
-    if: github.actor == 'dependabot[bot]'
-    uses: Aftergraph/.github/.github/workflows/auto-merge-dependabot.yml@main
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && contains(github.event.pull_request.labels.*.name, 'auto-merge')
+    uses: Aftergraph/.github/.github/workflows/auto-merge-dependabot.yml@56d70aace61364978e23cd75c9925a54aa706e18 # main
     secrets:
       automerge_pat: ${{ secrets.AUTOMERGE_PAT }}
