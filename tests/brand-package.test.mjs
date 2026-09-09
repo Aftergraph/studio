@@ -22,8 +22,8 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 
 test('brand package exports canonical institutional metadata and grammar', () => {
   assert.equal(BRAND_METADATA.name, 'Aftergraph');
-  assert.equal(BRAND_METADATA.altName, 'ABDE Intelligence');
-  assert.equal(BRAND_METADATA.tagline, 'Infrastructure for governed autonomous intelligence');
+  assert.equal(BRAND_METADATA.altName, undefined);
+  assert.equal(BRAND_METADATA.tagline, 'Infrastructure for verifiable intelligent systems');
   assert.match(BRAND_METADATA.grammar, /graphs → boundaries → authority → execution → evidence → verified outcomes/);
   assert.equal(BRAND_METADATA.status, 'provisional-not-trademark-cleared');
 

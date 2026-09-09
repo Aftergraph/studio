@@ -1,11 +1,10 @@
 {
   "manifest": "aftergraph-brand-manifest",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "status": "provisional-not-trademark-cleared",
   "brand": {
     "name": "Aftergraph",
-    "altName": "ABDE Intelligence",
-    "tagline": "Infrastructure for governed autonomous intelligence",
+    "tagline": "Infrastructure for verifiable intelligent systems",
     "identity": "Institutional graph brand",
     "grammar": "graphs → boundaries → authority → execution → evidence → verified outcomes",
     "mission": "Govern autonomous execution through verifiable evidence and boundary-enforced graph semantics."
@@ -51,6 +50,8 @@
     "monogramInverse": "svg/aftergraph-monogram-inverse.svg",
     "appIcon": "svg/aftergraph-app-icon.svg",
     "socialBanner": "svg/aftergraph-social-banner.svg",
+    "favicon": "svg/favicon.svg",
+    "microMark": "identity/aftergraph-micro-mark.svg",
     "lockupHorizontal": "svg/aftergraph-lockup-horizontal.svg",
     "lockupHorizontalLight": "svg/aftergraph-lockup-horizontal-light.svg",
     "lockupStacked": "svg/aftergraph-lockup-stacked.svg",
@@ -63,6 +64,19 @@
       "infrastructure": "svg/team-infrastructure.svg"
     }
   },
+  "campaignAssets": {
+    "aftergraphOpenGraph": "social/og-aftergraph.svg",
+    "workIntelligenceOpenGraph": "social/og-work-intelligence.svg",
+    "docsOpenGraph": "social/og-docs.svg",
+    "socialSquare": "social/social-post-square.svg",
+    "xHeader": "social/x-header.svg",
+    "linkedInCover": "social/linkedin-cover.svg",
+    "youTubeBanner": "social/youtube-banner.svg",
+    "researchCover": "editorial/research-cover.svg",
+    "evidencePattern": "product/evidence-pattern.svg",
+    "verifiedSeal": "product/verified-seal.svg",
+    "wallpaper4k": "wallpaper/aftergraph-4k.svg"
+  },
   "surfaces": {
     "orgProfile": "profile/README.md",
     "orgAvatar": "svg/aftergraph-app-icon.svg",
@@ -74,7 +88,10 @@
     "javascript": "index.mjs",
     "css": "tokens.css",
     "react": "react.mjs",
-    "typescript": "types.d.ts"
+    "typescript": "types.d.ts",
+    "favicon": "exports/favicon",
+    "rasterIdentity": "exports/identity",
+    "rasterSocial": "exports/social"
   },
   "repository": "https://github.com/Aftergraph/brand"
 }

@@ -95,7 +95,7 @@ export function AftergraphMonogram({
 export function AftergraphWordmark({
   height = 36,
   variant = 'dark', // 'dark' | 'light' | 'transparent'
-  showTagline = true,
+  showTagline = false,
   className = '',
   style = {},
   ...props
@@ -149,7 +149,7 @@ export function AftergraphWordmark({
             fontSize: 26,
             fontWeight: 500,
           },
-          'Infrastructure for governed autonomous intelligence'
+          'Infrastructure for verifiable intelligent systems'
         )
       : null
   );

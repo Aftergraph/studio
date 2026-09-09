@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "grid": 24,
+  "stroke": 1.75,
+  "corner_radius": 2,
+  "concepts": [
+    "principal", "identity", "role", "mission", "objective", "acceptance-criterion",
+    "authority", "authority-lease", "delegation", "capability", "policy", "topology",
+    "budget", "state", "runtime", "execution", "trajectory", "verifier", "evidence",
+    "receipt", "provenance", "human-approval", "settlement", "revocation", "kill-switch",
+    "trust-domain", "boundary", "federation"
+  ],
+  "states": [
+    "canonical", "observed", "proposed", "verified", "unverified", "indeterminate",
+    "stale", "revoked", "conflict", "unknown", "withheld", "unavailable", "superseded"
+  ]
+}
