@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="Aftergraph social preview">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0E1630"/><stop offset="1" stop-color="#080C14"/></linearGradient><pattern id="p" width="48" height="48" patternUnits="userSpaceOnUse"><path d="M48 0H0v48" fill="none" stroke="#8993A4" stroke-opacity=".08"/></pattern></defs>
+  <rect width="1200" height="630" fill="url(#g)"/><rect width="1200" height="630" fill="url(#p)"/>
+  <g transform="translate(900 145) scale(1.15)"><path d="M128 24 218 76v104l-90 52-90-52V76z" fill="#080C14" stroke="#42C7E8" stroke-width="10" stroke-linejoin="round"/><path d="M78 92 128 62l50 30v72l-50 30-50-30zM128 62v132" fill="none" stroke="#F5F7FA" stroke-width="6"/><path d="m128 101 27 27-27 27-27-27z" fill="#42C7E8"/></g>
+  <text x="88" y="180" fill="#42C7E8" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="700" letter-spacing="5">AFTERGRAPH</text>
+  <text x="88" y="285" fill="#F5F7FA" font-family="Inter,Arial,sans-serif" font-size="54" font-weight="700">Infrastructure for</text><text x="88" y="350" fill="#F5F7FA" font-family="Inter,Arial,sans-serif" font-size="54" font-weight="700">verifiable intelligent systems.</text>
+  <text x="88" y="438" fill="#8993A4" font-family="Inter,Arial,sans-serif" font-size="25">Mission • Authority • Evidence • Verification</text>
+  <path d="M88 503h322" stroke="#42C7E8" stroke-width="3"/><text x="88" y="548" fill="#F5F7FA" font-family="JetBrains Mono,monospace" font-size="18">aftergraph.org</text>
+</svg>

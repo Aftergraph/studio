@@ -1,9 +1,9 @@
 # Aftergraph Design System (ADS) — Architectural Specification v1.0
 
-> **Status**: Institutional Canonical Specification  
-> **Brand**: Aftergraph (ABDE Intelligence)  
-> **Tagline**: *"Infrastructure for governed autonomous intelligence"*  
-> **Package**: `@aftergraph/brand`  
+> **Status**: Institutional Canonical Specification
+> **Brand**: Aftergraph
+> **Tagline**: *"Infrastructure for verifiable intelligent systems"*
+> **Package**: `@aftergraph/brand`
 > **Repository**: `Aftergraph/brand`
 
 ---

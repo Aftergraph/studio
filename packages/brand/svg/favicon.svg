@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Aftergraph">
+  <rect width="64" height="64" rx="14" fill="#080C14"/>
+  <path d="M32 8 55 21v26L32 60 9 47V21z" fill="none" stroke="#42C7E8" stroke-width="4" stroke-linejoin="round"/>
+  <path d="m32 18 13 8v14l-13 8-13-8V26zM32 18v30" fill="none" stroke="#F5F7FA" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="m32 25 7 7-7 7-7-7z" fill="#42C7E8"/>
+</svg>

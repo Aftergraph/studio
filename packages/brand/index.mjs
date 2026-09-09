@@ -1,15 +1,14 @@
 /**
  * @aftergraph/brand
  * Official brand identity, design tokens, visual assets, and UI contracts
- * for Aftergraph / ABDE Intelligence.
+ * for Aftergraph.
  */
 
 export const BRAND_METADATA = Object.freeze({
   name: 'Aftergraph',
-  altName: 'ABDE Intelligence',
-  tagline: 'Infrastructure for governed autonomous intelligence',
+  tagline: 'Infrastructure for verifiable intelligent systems',
   grammar: 'graphs → boundaries → authority → execution → evidence → verified outcomes',
-  version: '1.0.0',
+  version: '1.1.0',
   status: 'provisional-not-trademark-cleared',
   license: 'Apache-2.0',
 });
@@ -143,6 +142,11 @@ export const BRAND_THEMES = Object.freeze({
   }),
 });
 
+export const BRAND_STATES = Object.freeze({
+  dark: Object.freeze({ canonical:'#42C7E8', observed:'#4C8BD8', proposed:'#7759E8', verified:'#24C4AD', unverified:'#8993A4', indeterminate:'#8993A4', stale:'#F0A64A', revoked:'#FF6B7A', conflict:'#F0A64A', unknown:'#8993A4', withheld:'#7759E8', unavailable:'#8993A4', superseded:'#4C8BD8' }),
+  light: Object.freeze({ canonical:'#0C52EF', observed:'#2367FF', proposed:'#6346D8', verified:'#087B49', unverified:'#4F5868', indeterminate:'#4F5868', stale:'#8A5700', revoked:'#B52D3C', conflict:'#8A5700', unknown:'#4F5868', withheld:'#6346D8', unavailable:'#4F5868', superseded:'#205CA8' }),
+});
+
 export const BRAND_ASSETS = Object.freeze({
   svg: Object.freeze({
     monogram: './svg/aftergraph-monogram.svg',
@@ -155,6 +159,7 @@ export const BRAND_ASSETS = Object.freeze({
     lockupStacked: './svg/aftergraph-lockup-stacked.svg',
     appIcon: './svg/aftergraph-app-icon.svg',
     socialBanner: './svg/aftergraph-social-banner.svg',
+    microMark: './identity/aftergraph-micro-mark.svg',
     teams: Object.freeze({
       platform: './svg/team-platform.svg',
       research: './svg/team-research.svg',
@@ -176,6 +181,7 @@ export const BRAND_TOKENS = Object.freeze({
   motion: BRAND_MOTION,
   grammar: BRAND_GRAMMAR,
   theme: BRAND_THEMES,
+  states: BRAND_STATES,
   assets: BRAND_ASSETS,
 });
 

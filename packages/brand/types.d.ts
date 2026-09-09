@@ -4,7 +4,6 @@
 
 export interface BrandMetadata {
   name: string;
-  altName: string;
   tagline: string;
   grammar: string;
   version: string;
@@ -70,6 +69,7 @@ export declare const BRAND_ELEVATION: Record<string, number>;
 export declare const BRAND_MOTION: Record<string, unknown>;
 export declare const BRAND_GRAMMAR: readonly string[];
 export declare const BRAND_THEMES: BrandThemes;
+export declare const BRAND_STATES: Record<'dark' | 'light', Record<string, string>>;
 export declare const BRAND_ASSETS: Record<string, unknown>;
 export declare const BRAND_TOKENS: BrandTokens;
 
