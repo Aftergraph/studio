@@ -60,10 +60,10 @@ export function createBillingDraft(billing, {
   if (!String(number || '').trim()) throw codedError('invoice_number_required');
   assertDateOnly(issueDate, 'issueDate');
 
-  if (next.invoices.some((invoice) => invoice.status !== 'void' && String(invoice.number) === String(number))) {
-    throw codedError('invoice_number_conflict', 'invoice number already reserved', 409);
-  }
-
+  // Visit eligibility is the primary invariant. Check readiness before invoice
+  // number reservation so an already-bound visit consistently fails closed as
+  // billing_not_ready, while a genuinely unrelated number collision still
+  // reports invoice_number_conflict below.
   const readiness = evaluateBilling({ ...next, now: `${issueDate}T23:59:59Z` });
   const ready = readiness.items.find((item) =>
     item.status === 'ready'
@@ -71,6 +71,10 @@ export function createBillingDraft(billing, {
     && sameIds(item.visitIds, visitIds),
   );
   if (!ready) throw codedError('billing_not_ready');
+
+  if (next.invoices.some((invoice) => invoice.status !== 'void' && String(invoice.number) === String(number))) {
+    throw codedError('invoice_number_conflict', 'invoice number already reserved', 409);
+  }
 
   const customer = next.customers.find((entry) => entry.id === customerId);
   if (!customer) throw codedError('customer_not_found', 'customer not found', 404);
