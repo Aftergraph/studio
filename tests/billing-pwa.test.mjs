@@ -51,6 +51,21 @@ test('billing compatibility route redirects to canonical standalone app preservi
   assert.doesNotMatch(html, /id="billing-app"/);
 });
 
+test('billing reconnect queues a refresh instead of dropping it while another refresh is busy', async () => {
+  const source = await text('src/billing/billing-app.mjs');
+  assert.match(source, /refreshPending/);
+  assert.match(source, /if \(state\.busy\) \{ state\.refreshPending = true; return; \}/);
+  assert.match(source, /if \(state\.refreshPending\)/);
+});
+
+test('billing cached fallback schedules a bounded live resync retry', async () => {
+  const source = await text('src/billing/billing-app.mjs');
+  assert.match(source, /retryTimer/);
+  assert.match(source, /scheduleRetry/);
+  assert.match(source, /clearRetry/);
+  assert.match(source, /if \(usedCache && state\.online\) scheduleRetry\(\)/);
+});
+
 test('billing app source has stale-cache copy and no offline mutation replay API', async () => {
   const source = await text('src/billing/billing-app.mjs');
   assert.match(source, /aftergraph\.billing\.read-cache\.v2/);

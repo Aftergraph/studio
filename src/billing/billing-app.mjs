@@ -226,6 +226,8 @@ function createApp() {
     cacheIdentity: null,
     view: 'inbox',
     busy: false,
+    refreshPending: false,
+    retryTimer: null,
     cached: false,
     cachedAt: null,
     lastSyncedAt: null,
@@ -271,6 +273,20 @@ function createApp() {
   function connection(text, kind = '') {
     els.connection.textContent = text;
     els.connection.className = `billing-connection${kind ? ` is-${kind}` : ''}`;
+  }
+
+  function clearRetry() {
+    if (!state.retryTimer) return;
+    clearTimeout(state.retryTimer);
+    state.retryTimer = null;
+  }
+
+  function scheduleRetry(delay = 1500) {
+    if (state.retryTimer) return;
+    state.retryTimer = setTimeout(() => {
+      state.retryTimer = null;
+      void refresh();
+    }, delay);
   }
 
   function renderConnection() {
@@ -398,7 +414,7 @@ function createApp() {
   }
 
   async function refresh() {
-    if (state.busy) return;
+    if (state.busy) { state.refreshPending = true; return; }
     state.busy = true;
     els.refresh.disabled = true;
     state.online = typeof navigator === 'undefined' ? true : navigator.onLine !== false;
@@ -434,6 +450,7 @@ function createApp() {
       state.cachedAt = null;
       state.lastSyncedAt = syncedAt;
       writeReadCache(body.billing, state.cacheIdentity, syncedAt);
+      clearRetry();
       render();
     } catch (error) {
       const authenticationFailed = error?.status === 401 || error?.status === 403 || error?.code === 'authentication_required';
@@ -450,11 +467,16 @@ function createApp() {
           : '<div class="billing-error"><strong>Fakturering er utilgængelig.</strong><br>Der findes ingen verificeret lokal kopi.</div>';
         connection(authenticationFailed ? 'Session udløbet' : 'Kan ikke hente data', 'degraded');
       }
-      console.error('billing load failed', error);
+      if (usedCache && state.online) scheduleRetry();
+      if (!usedCache) console.error('billing load failed', error);
       toast(usedCache ? 'Viser senest synkroniserede data' : authenticationFailed ? 'Log ind igen' : 'Kunne ikke opdatere fakturering');
     } finally {
       state.busy = false;
       els.refresh.disabled = false;
+      if (state.refreshPending) {
+        state.refreshPending = false;
+        queueMicrotask(() => void refresh());
+      }
     }
   }
 
