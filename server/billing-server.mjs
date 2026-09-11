@@ -17,6 +17,13 @@ function isBillingPath(pathname) {
     || /^\/api\/v1\/billing\/invoices\/[^/]+\/issue$/.test(pathname);
 }
 
+function projectBillingState(billing) {
+  return {
+    ...billing,
+    projection: evaluateBilling({ ...billing, now: new Date().toISOString() }),
+  };
+}
+
 function ensureDemoBillingCapability() {
   const demo = getUser('demo-user');
   if (!demo || demo.capabilities.includes('billing.manage')) return;
@@ -81,9 +88,10 @@ export function decorateBillingServer(server, {
   const handle = async (req, res, url) => {
     if (url.pathname === '/api/v1/billing' && req.method === 'GET') {
       const { store } = await resolveScope(req, url);
-      const billing = store.snapshot().billing;
-      const projection = evaluateBilling({ ...billing, now: new Date().toISOString() });
-      sendJson(res, 200, { version: API_VERSION, billing: { ...billing, projection } });
+      sendJson(res, 200, {
+        version: API_VERSION,
+        billing: projectBillingState(store.snapshot().billing),
+      });
       return;
     }
 
@@ -102,7 +110,11 @@ export function decorateBillingServer(server, {
           return draft;
         });
         actionGuard.complete(actionKey, { status: 'accepted', visitId: visit.id });
-        sendJson(res, 200, { version: API_VERSION, visit, billing: next.billing });
+        sendJson(res, 200, {
+          version: API_VERSION,
+          visit,
+          billing: projectBillingState(next.billing),
+        });
         return;
       }
 
@@ -121,7 +133,11 @@ export function decorateBillingServer(server, {
           return draft;
         });
         actionGuard.complete(actionKey, { status: 'accepted', invoiceId: invoice.id });
-        sendJson(res, 201, { version: API_VERSION, invoice, billing: next.billing });
+        sendJson(res, 201, {
+          version: API_VERSION,
+          invoice,
+          billing: projectBillingState(next.billing),
+        });
         return;
       }
 
@@ -136,7 +152,11 @@ export function decorateBillingServer(server, {
           return draft;
         });
         actionGuard.complete(actionKey, { status: 'accepted', invoiceId: invoice.id });
-        sendJson(res, 200, { version: API_VERSION, invoice, billing: next.billing });
+        sendJson(res, 200, {
+          version: API_VERSION,
+          invoice,
+          billing: projectBillingState(next.billing),
+        });
         return;
       }
 
