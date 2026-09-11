@@ -12,31 +12,40 @@ function requestKey(prefix = 'billing') {
 }
 
 export function createBillingClient({
-  actor = 'demo-user',
+  actor = null,
   token = null,
   fetchFn = globalThis.fetch?.bind(globalThis),
 } = {}) {
   if (typeof fetchFn !== 'function') throw new TypeError('fetch implementation required');
 
+  let currentActor = actor || null;
+  let currentToken = token || null;
+
+  const authHeaders = () => (currentToken ? { authorization: `Bearer ${currentToken}` } : {});
   const headers = (extra = {}) => ({
     'content-type': 'application/json',
-    ...(token ? { authorization: `Bearer ${token}` } : {}),
+    ...authHeaders(),
     ...extra,
   });
 
   const read = async (path) => {
-    const response = await fetchFn(path, { headers: token ? { authorization: `Bearer ${token}` } : {} });
+    const response = await fetchFn(path, { headers: authHeaders() });
     const body = await response.json();
     if (!response.ok) throw normalizeError(response, body);
     return body;
   };
 
   const write = async (path, payload, prefix) => {
+    if (!currentActor) {
+      const error = new Error('billing session actor required');
+      error.code = 'authentication_required';
+      throw error;
+    }
     const key = requestKey(prefix);
     const response = await fetchFn(path, {
       method: 'POST',
       headers: headers({ 'idempotency-key': key }),
-      body: JSON.stringify({ actor, idempotencyKey: key, ...payload }),
+      body: JSON.stringify({ actor: currentActor, idempotencyKey: key, ...payload }),
     });
     const body = await response.json();
     if (!response.ok) throw normalizeError(response, body);
@@ -44,8 +53,16 @@ export function createBillingClient({
   };
 
   return Object.freeze({
+    setSession({ actor: nextActor = currentActor, token: nextToken = currentToken } = {}) {
+      currentActor = nextActor || null;
+      currentToken = nextToken || null;
+      return Object.freeze({ actor: currentActor, authenticated: Boolean(currentToken) });
+    },
+    authMe() {
+      return read('/api/v1/auth/me');
+    },
     load() {
-      const suffix = actor ? `?actor=${encodeURIComponent(actor)}` : '';
+      const suffix = currentActor ? `?actor=${encodeURIComponent(currentActor)}` : '';
       return read(`/api/v1/billing${suffix}`);
     },
     recordActuals({ visitId, actual }) {

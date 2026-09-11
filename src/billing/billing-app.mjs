@@ -4,7 +4,9 @@ import { canFinanciallyMutate, itemsForBillingView } from './app-state.mjs';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
-const READ_CACHE_KEY = 'aftergraph.billing.read-cache.v1';
+const AUTH_TOKEN_KEY = 'aftergraph.auth.token';
+const READ_CACHE_PREFIX = 'aftergraph.billing.read-cache.v2';
+const IDENTITY_BINDING_PREFIX = 'aftergraph.billing.identity.v1';
 
 const VIEWS = Object.freeze({
   inbox: ['Indbakke', 'Mangler oplysninger først, derefter det der er klar til fakturering.'],
@@ -70,6 +72,82 @@ function getActor() {
   return new URLSearchParams(location.search).get('actor')?.trim() || 'demo-user';
 }
 
+function readStoredToken() {
+  try { return localStorage.getItem(AUTH_TOKEN_KEY) || null; }
+  catch { return null; }
+}
+
+async function tokenFingerprint(token) {
+  if (!token || !globalThis.crypto?.subtle) return null;
+  const bytes = new TextEncoder().encode(token);
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function identityBindingKey(fingerprint) {
+  return fingerprint ? `${IDENTITY_BINDING_PREFIX}:${fingerprint}` : null;
+}
+
+function cacheKeyForIdentity(identity) {
+  return identity ? `${READ_CACHE_PREFIX}:${encodeURIComponent(identity)}` : null;
+}
+
+function rememberIdentity(actor, fingerprint) {
+  const key = identityBindingKey(fingerprint);
+  if (!actor || !key) return false;
+  try { localStorage.setItem(key, actor); return true; }
+  catch { return false; }
+}
+
+function actorForFingerprint(fingerprint) {
+  const key = identityBindingKey(fingerprint);
+  if (!key) return null;
+  try { return localStorage.getItem(key) || null; }
+  catch { return null; }
+}
+
+async function resolveBillingSession(client, { online = true } = {}) {
+  const token = readStoredToken();
+  if (!token) {
+    const actor = getActor();
+    client.setSession({ actor, token: null });
+    return { actor, cacheIdentity: `${actor}:anonymous`, authenticated: false };
+  }
+
+  const fingerprint = await tokenFingerprint(token);
+  if (!fingerprint) {
+    const error = new Error('secure session identity unavailable');
+    error.code = 'session_identity_unavailable';
+    throw error;
+  }
+
+  const boundActor = actorForFingerprint(fingerprint);
+  client.setSession({ actor: null, token });
+  if (!online) {
+    if (!boundActor) return { actor: null, cacheIdentity: null, authenticated: true };
+    client.setSession({ actor: boundActor, token });
+    return { actor: boundActor, cacheIdentity: `${boundActor}:${fingerprint}`, authenticated: true };
+  }
+
+  try {
+    const me = await client.authMe();
+    if (!me?.userId) {
+      const error = new Error('authenticated subject missing');
+      error.code = 'authentication_required';
+      error.status = 401;
+      throw error;
+    }
+    rememberIdentity(me.userId, fingerprint);
+    client.setSession({ actor: me.userId, token });
+    return { actor: me.userId, cacheIdentity: `${me.userId}:${fingerprint}`, authenticated: true };
+  } catch (error) {
+    if (error?.status === 401 || error?.status === 403) throw error;
+    if (!boundActor) throw error;
+    client.setSession({ actor: boundActor, token });
+    return { actor: boundActor, cacheIdentity: `${boundActor}:${fingerprint}`, authenticated: true, degraded: true };
+  }
+}
+
 function sanitizeBillingForCache(billing) {
   if (!billing || typeof billing !== 'object') return null;
   return {
@@ -114,20 +192,23 @@ function sanitizeBillingForCache(billing) {
   };
 }
 
-function writeReadCache(billing, syncedAt = new Date().toISOString()) {
+function writeReadCache(billing, identity, syncedAt = new Date().toISOString()) {
   try {
+    const key = cacheKeyForIdentity(identity);
     const safe = sanitizeBillingForCache(billing);
-    if (!safe) return null;
-    localStorage.setItem(READ_CACHE_KEY, JSON.stringify({ syncedAt, billing: safe }));
+    if (!key || !safe) return null;
+    localStorage.setItem(key, JSON.stringify({ syncedAt, billing: safe }));
     return syncedAt;
   } catch {
     return null;
   }
 }
 
-function readReadCache() {
+function readReadCache(identity) {
   try {
-    const raw = localStorage.getItem(READ_CACHE_KEY);
+    const key = cacheKeyForIdentity(identity);
+    if (!key) return null;
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed?.syncedAt || !parsed?.billing?.projection) return null;
@@ -138,9 +219,11 @@ function readReadCache() {
 }
 
 function createApp() {
-  const client = createBillingClient({ actor: getActor() });
+  const client = createBillingClient();
   const state = {
     billing: null,
+    actor: null,
+    cacheIdentity: null,
     view: 'inbox',
     busy: false,
     cached: false,
@@ -287,8 +370,24 @@ function createApp() {
     renderConnection();
   }
 
+  function clearSensitiveState() {
+    state.billing = null;
+    state.cached = false;
+    state.cachedAt = null;
+    state.lastSyncedAt = null;
+    state.activeItem = null;
+    state.activeInvoice = null;
+  }
+
+  function applyIdentity(session) {
+    const nextIdentity = session?.cacheIdentity || null;
+    if (state.cacheIdentity && state.cacheIdentity !== nextIdentity) clearSensitiveState();
+    state.actor = session?.actor || null;
+    state.cacheIdentity = nextIdentity;
+  }
+
   function adoptCache() {
-    const cached = readReadCache();
+    const cached = readReadCache(state.cacheIdentity);
     if (!cached) return false;
     state.billing = cached.billing;
     state.cached = true;
@@ -303,38 +402,56 @@ function createApp() {
     state.busy = true;
     els.refresh.disabled = true;
     state.online = typeof navigator === 'undefined' ? true : navigator.onLine !== false;
-    if (!state.online) {
-      if (!adoptCache() && !state.billing) {
-        els.summary.innerHTML = '';
-        els.list.innerHTML = '<div class="billing-error"><strong>Fakturering er offline.</strong><br>Der findes ingen tidligere synkroniseret visning på denne enhed.</div>';
-      } else if (!state.cached && state.billing) {
-        state.cached = true;
-        state.cachedAt = state.lastSyncedAt;
-      }
-      renderConnection();
-      state.busy = false;
-      els.refresh.disabled = false;
-      return;
-    }
-    connection('Synkroniserer…');
     try {
+      const session = await resolveBillingSession(client, { online: state.online });
+      applyIdentity(session);
+
+      if (!state.actor || !state.cacheIdentity) {
+        clearSensitiveState();
+        els.summary.innerHTML = '';
+        els.list.innerHTML = '<div class="billing-error"><strong>Fakturering er låst offline.</strong><br>Der findes ingen verificeret session til denne lokale kopi.</div>';
+        connection('Ingen verificeret session', 'degraded');
+        return;
+      }
+
+      if (!state.online || session.degraded) {
+        if (!adoptCache() && !state.billing) {
+          els.summary.innerHTML = '';
+          els.list.innerHTML = '<div class="billing-error"><strong>Fakturering er offline.</strong><br>Der findes ingen tidligere synkroniseret visning for denne session.</div>';
+        } else if (!state.cached && state.billing) {
+          state.cached = true;
+          state.cachedAt = state.lastSyncedAt;
+        }
+        renderConnection();
+        return;
+      }
+
+      connection('Synkroniserer…');
       const body = await client.load();
       const syncedAt = new Date().toISOString();
       state.billing = body.billing;
       state.cached = false;
       state.cachedAt = null;
       state.lastSyncedAt = syncedAt;
-      writeReadCache(body.billing, syncedAt);
+      writeReadCache(body.billing, state.cacheIdentity, syncedAt);
       render();
     } catch (error) {
-      const usedCache = adoptCache();
+      const authenticationFailed = error?.status === 401 || error?.status === 403 || error?.code === 'authentication_required';
+      if (authenticationFailed) {
+        clearSensitiveState();
+        state.actor = null;
+        state.cacheIdentity = null;
+      }
+      const usedCache = authenticationFailed ? false : adoptCache();
       if (!usedCache && !state.billing) {
         els.summary.innerHTML = '';
-        els.list.innerHTML = '<div class="billing-error"><strong>Fakturering er utilgængelig.</strong><br>Der findes ingen verificeret lokal kopi.</div>';
-        connection('Kan ikke hente data', 'degraded');
+        els.list.innerHTML = authenticationFailed
+          ? '<div class="billing-error"><strong>Sessionen er udløbet.</strong><br>Log ind i Aftergraph igen for at åbne fakturering.</div>'
+          : '<div class="billing-error"><strong>Fakturering er utilgængelig.</strong><br>Der findes ingen verificeret lokal kopi.</div>';
+        connection(authenticationFailed ? 'Session udløbet' : 'Kan ikke hente data', 'degraded');
       }
       console.error('billing load failed', error);
-      toast(usedCache ? 'Viser senest synkroniserede data' : 'Kunne ikke opdatere fakturering');
+      toast(usedCache ? 'Viser senest synkroniserede data' : authenticationFailed ? 'Log ind igen' : 'Kunne ikke opdatere fakturering');
     } finally {
       state.busy = false;
       els.refresh.disabled = false;
@@ -422,7 +539,7 @@ function createApp() {
       state.billing = body.billing;
       state.cached = false;
       state.activeInvoice = body.invoice;
-      state.lastSyncedAt = writeReadCache(body.billing) || state.lastSyncedAt;
+      state.lastSyncedAt = writeReadCache(body.billing, state.cacheIdentity) || state.lastSyncedAt;
       render();
       renderReview();
       toast(`Fakturakladde ${body.invoice.number} oprettet`);
@@ -443,7 +560,7 @@ function createApp() {
       state.billing = body.billing;
       state.cached = false;
       state.activeInvoice = body.invoice;
-      state.lastSyncedAt = writeReadCache(body.billing) || state.lastSyncedAt;
+      state.lastSyncedAt = writeReadCache(body.billing, state.cacheIdentity) || state.lastSyncedAt;
       render();
       renderReview();
       toast(`Faktura ${body.invoice.number} er udstedt`);
@@ -465,7 +582,7 @@ function createApp() {
       const body = await client.recordActuals({ visitId: state.activeItem.visitId, actual: { workMinutes: Math.round(hours * 60) } });
       state.billing = body.billing;
       state.cached = false;
-      state.lastSyncedAt = writeReadCache(body.billing) || state.lastSyncedAt;
+      state.lastSyncedAt = writeReadCache(body.billing, state.cacheIdentity) || state.lastSyncedAt;
       closeDialog();
       state.view = 'inbox';
       render();
@@ -514,24 +631,16 @@ function createApp() {
   window.addEventListener('billing-connectivity', (event) => {
     const wasOnline = state.online;
     state.online = event.detail?.online !== false;
-    if (state.online && !wasOnline) {
-      state.cached = true;
-      void refresh();
-      return;
-    }
-    if (!state.online) {
-      const cached = readReadCache();
-      if (cached) {
-        state.billing = cached.billing;
-        state.cached = true;
-        state.cachedAt = cached.syncedAt;
-        state.lastSyncedAt = cached.syncedAt;
-      } else if (state.billing) {
-        state.cached = true;
-        state.cachedAt = state.lastSyncedAt;
-      }
-    }
-    render();
+    if (state.online !== wasOnline) void refresh();
+  });
+
+  window.addEventListener('storage', (event) => {
+    if (event.key !== AUTH_TOKEN_KEY) return;
+    clearSensitiveState();
+    state.actor = null;
+    state.cacheIdentity = null;
+    client.setSession({ actor: null, token: event.newValue || null });
+    void refresh();
   });
 
   els.refresh.addEventListener('click', refresh);
@@ -542,4 +651,4 @@ function createApp() {
 
 if (typeof document !== 'undefined') createApp();
 
-export { createApp, formatMoney, formatWorkMinutes, sanitizeBillingForCache };
+export { cacheKeyForIdentity, createApp, formatMoney, formatWorkMinutes, resolveBillingSession, sanitizeBillingForCache };

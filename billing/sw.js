@@ -1,4 +1,4 @@
-const CACHE = 'aftergraph-billing-shell-v1';
+const CACHE = 'aftergraph-billing-shell-v2';
 const SHELL = [
   '/billing/',
   '/billing/manifest.webmanifest',
@@ -10,6 +10,7 @@ const SHELL = [
   '/src/billing/pwa.mjs',
   '/src/billing/billing-app.mjs',
   '/src/billing/browser-client.mjs',
+  '/src/billing/app-state.mjs',
   '/src/billing/money.mjs'
 ];
 

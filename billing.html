@@ -8,9 +8,6 @@
 </head>
 <body>
   <p>Åbner Aftergraph Billing…</p>
-  <script>
-    const target = `/billing/${location.search}${location.hash}`;
-    location.replace(target);
-  </script>
+  <script type="module" src="/src/billing/legacy-redirect.mjs"></script>
 </body>
 </html>

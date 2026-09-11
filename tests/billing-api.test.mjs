@@ -4,11 +4,12 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { createAppServer } from '../server.mjs';
+import { issueMagicToken } from '../src/auth/magic-link.mjs';
 
-async function withServer(fn) {
+async function withServer(fn, options = {}) {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'aftergraph-billing-api-'));
   const stateFile = path.join(dir, 'state.json');
-  const server = createAppServer({ root: new URL('../', import.meta.url), stateFile, runtimeIntervalMs: 20, fixtures: true });
+  const server = createAppServer({ root: new URL('../', import.meta.url), stateFile, runtimeIntervalMs: 20, fixtures: true, ...options });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
   try { await fn(base); }
@@ -35,6 +36,7 @@ test('GET /api/v1/billing returns canonical billing state and queue projection',
   await withServer(async (base) => {
     const { response, body } = await json(`${base}/api/v1/billing`);
     assert.equal(response.status, 200);
+    assert.match(response.headers.get('cache-control') || '', /no-store/i);
     assert.equal(body.version, 'aftergraph.workspace.v5');
     assert.ok(Array.isArray(body.billing.customers));
     const statuses = new Map(body.billing.projection.items.map((item) => [item.customerName, item.status]));
@@ -134,4 +136,23 @@ test('consequential billing writes require actor and idempotency key', async () 
     });
     assert.equal(missingKey.response.status, 422);
   });
+});
+
+
+test('production auth mode rejects anonymous billing reads and accepts the canonical Studio bearer', async () => {
+  const secret = 'billing-auth-test-secret';
+  await withServer(async (base) => {
+    const anonymous = await json(`${base}/api/v1/billing`);
+    assert.equal(anonymous.response.status, 401);
+    assert.equal(anonymous.body.error, 'authentication_required');
+    assert.match(anonymous.response.headers.get('cache-control') || '', /no-store/i);
+
+    const token = issueMagicToken({ userId: 'demo-user', secret });
+    const authenticated = await json(`${base}/api/v1/billing?actor=demo-user`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.equal(authenticated.response.status, 200);
+    assert.ok(Array.isArray(authenticated.body.billing.customers));
+    assert.match(authenticated.response.headers.get('cache-control') || '', /no-store/i);
+  }, { requireAuth: true, authSecret: secret });
 });

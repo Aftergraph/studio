@@ -44,14 +44,16 @@ test('static server resolves trailing slash app routes to index files', async ()
 test('billing compatibility route redirects to canonical standalone app preserving location suffixes', async () => {
   const html = await text('billing.html');
   assert.match(html, /\/billing\//);
-  assert.match(html, /location\.search/);
-  assert.match(html, /location\.hash/);
+  assert.match(html, /legacy-redirect\.mjs/);
+  const redirect = await text('src/billing/legacy-redirect.mjs');
+  assert.match(redirect, /location\.search/);
+  assert.match(redirect, /location\.hash/);
   assert.doesNotMatch(html, /id="billing-app"/);
 });
 
 test('billing app source has stale-cache copy and no offline mutation replay API', async () => {
   const source = await text('src/billing/billing-app.mjs');
-  assert.match(source, /aftergraph\.billing\.read-cache\.v1/);
+  assert.match(source, /aftergraph\.billing\.read-cache\.v2/);
   assert.match(source, /Offline/);
   assert.match(source, /senest synkroniseret/);
   assert.doesNotMatch(source, /replayMutation|flushMutation|mutationQueue|writeQueue/i);

@@ -11,8 +11,10 @@ test('billing shell precaches every first-party module required for first offlin
 
 test('service worker never persists user-specific billing API responses', () => {
   const sw = read('billing/sw.js');
-  const apiBranch = sw.slice(sw.indexOf("pathname.startsWith('/api/v1/billing')"));
-  assert.ok(apiBranch.length > 0, 'billing API branch must exist');
+  const start = sw.indexOf("pathname.startsWith('/api/v1/billing')");
+  const end = sw.indexOf("request.mode === 'navigate'", start);
+  const apiBranch = sw.slice(start, end);
+  assert.ok(start >= 0 && end > start, 'billing API branch must exist');
   assert.doesNotMatch(apiBranch, /cache\.put\s*\(/, 'authenticated billing responses must not enter shared Cache Storage');
 });
 
@@ -34,7 +36,7 @@ test('offline billing read cache is namespaced by non-secret identity', () => {
 });
 
 test('billing API responses are explicitly non-cacheable by browsers and intermediaries', () => {
-  const server = read('server/billing-server.mjs');
-  assert.match(server, /cache-control/i);
-  assert.match(server, /no-store/i);
+  const http = read('server/http-utils.mjs');
+  assert.match(http, /cache-control/i);
+  assert.match(http, /no-store/i);
 });
