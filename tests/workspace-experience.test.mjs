@@ -8,6 +8,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as experience from '../src/workspace/workspace-experience.mjs';
+import { createInteractionSurfaceProjection } from '../src/interaction/interaction-projection.mjs';
 
 const {
   freezeTenantBinding,
@@ -247,4 +248,26 @@ test('governed import requires a new binding plus new identity', () => {
   // Source snapshot and source experience are unchanged (no in-place mutation).
   assert.equal(snap.tenantId, 'tenant:acme');
   assert.equal(wx.tenantBinding.tenantId, 'tenant:acme');
+});
+
+test('workspace accepts same-tenant interaction projection without taking ownership',()=>{
+  const interaction=createInteractionSurfaceProjection({tenantId:'tenant:acme',surfaceRef:'studio:surface:chat:1',threadRef:'runtime:thread:1',turnRefs:[],presenceRefs:[],assistantProfile:{id:'friday',label:'Friday'},freshness:'current'});
+  const wx=createWorkspaceExperience({tenantBinding:binding('tenant:acme'),interaction});
+  assert.equal(wx.interaction.threadRef,'runtime:thread:1');
+  assert.equal(wx.interaction.authoritative,false);
+});
+
+test('workspace rejects cross-tenant interaction projection',()=>{
+  const interaction=createInteractionSurfaceProjection({tenantId:'tenant:globex',surfaceRef:'studio:surface:chat:1',threadRef:'runtime:thread:1',turnRefs:[],presenceRefs:[],assistantProfile:{id:'friday',label:'Friday'},freshness:'current'});
+  assert.throws(()=>createWorkspaceExperience({tenantBinding:binding('tenant:acme'),interaction}),/tenant/i);
+});
+
+test('governed export and import never transport runtime interaction refs',()=>{
+  const interaction=createInteractionSurfaceProjection({tenantId:'tenant:acme',surfaceRef:'studio:surface:chat:1',threadRef:'runtime:thread:1',turnRefs:['runtime:turn:1'],presenceRefs:[],assistantProfile:{id:'friday',label:'Friday'},freshness:'current'});
+  const wx=createWorkspaceExperience({tenantBinding:binding('tenant:acme'),interaction});
+  const snap=exportWorkspaceSnapshot(wx,{filter:()=>true,exportedBy:'human:alice'});
+  assert.equal('interaction' in snap,false);
+  const imported=importWorkspaceSnapshot(snap,{tenantBinding:binding('tenant:globex'),newIdPrefix:'gx_'});
+  assert.equal('interaction' in imported,false);
+  assert.equal(JSON.stringify(imported).includes('runtime:thread:1'),false);
 });

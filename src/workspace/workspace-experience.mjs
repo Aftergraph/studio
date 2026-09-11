@@ -63,6 +63,16 @@ function deriveScopedPresence({ user, agents, followedAgentId }, tenantId) {
   return scopePresence(derived, tenantId);
 }
 
+function validateInteractionProjection(interaction, tenantId) {
+  if (interaction === null || interaction === undefined) return null;
+  if (!interaction || typeof interaction !== 'object') throw new Error('interaction projection must be an object');
+  if (interaction.schema !== 'aftergraph.interaction-surface-projection/1.0') throw new Error('invalid interaction projection schema');
+  if (interaction.tenantId !== tenantId) throw new Error('cross-tenant interaction projection rejected');
+  if (interaction.canonicalOwner !== 'studio' || interaction.authoritative !== false) throw new Error('interaction projection ownership invalid');
+  if (!Object.isFrozen(interaction)) throw new Error('interaction projection must be immutable');
+  return interaction;
+}
+
 export function createWorkspaceExperience({
   tenantBinding,
   layout = {},
@@ -70,6 +80,7 @@ export function createWorkspaceExperience({
   agents = [],
   followedAgentId = null,
   surfaces = [],
+  interaction = null,
 } = {}) {
   if (!tenantBinding || typeof tenantBinding !== 'object') {
     throw new Error('tenant binding required: pass the trust-gateway tenant binding');
@@ -79,11 +90,13 @@ export function createWorkspaceExperience({
   const scopedLayout = deriveScopedLayout(layout, tenantId);
   const scopedPresence = deriveScopedPresence({ user, agents, followedAgentId }, tenantId);
   const scopedSurfaces = scopeSurfaces(surfaces, tenantId);
+  const scopedInteraction = validateInteractionProjection(interaction, tenantId);
   return Object.freeze({
     tenantBinding: binding,
     layout: scopedLayout,
     presence: scopedPresence,
     surfaces: scopedSurfaces,
+    interaction: scopedInteraction,
   });
 }
 
@@ -101,6 +114,7 @@ function assertExperience(experience) {
   for (const surface of experience.surfaces ?? []) {
     if (surface?.tenantId !== tenantId) throw new Error('cross-tenant surface rejected');
   }
+  validateInteractionProjection(experience.interaction ?? null, tenantId);
   return tenantId;
 }
 
@@ -111,6 +125,7 @@ export function renderWorkspaceExperience(experience) {
     layout: experience.layout,
     presence: experience.presence,
     surfaces: experience.surfaces,
+    interaction: experience.interaction ?? null,
   });
 }
 
@@ -123,6 +138,7 @@ export function updateWorkspaceExperience(experience, patch = {}) {
   let layout = experience.layout;
   let presence = experience.presence;
   let surfaces = experience.surfaces;
+  let interaction = experience.interaction ?? null;
   if (patch.layout !== undefined) {
     layout = deriveScopedLayout(patch.layout ?? {}, tenantId);
   }
@@ -145,11 +161,15 @@ export function updateWorkspaceExperience(experience, patch = {}) {
   if (patch.surfaces !== undefined) {
     surfaces = scopeSurfaces(patch.surfaces, tenantId);
   }
+  if (patch.interaction !== undefined) {
+    interaction = validateInteractionProjection(patch.interaction, tenantId);
+  }
   return Object.freeze({
     tenantBinding: experience.tenantBinding,
     layout,
     presence,
     surfaces,
+    interaction,
   });
 }
 
