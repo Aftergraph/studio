@@ -71,3 +71,16 @@ test('billing app loads only first-party modules and token/reset/billing styles'
   assert.match(html, /manifest\.webmanifest/);
   assert.doesNotMatch(html, /<script(?![^>]*type="module")[^>]*src=/i);
 });
+
+test('Studio Work launches Billing as a product without adding a fourth primary mode', async () => {
+  const work = await text('src/views/work-view.mjs');
+  const shell = await text('src/workspace-shell.mjs');
+  const index = await text('index.html');
+  assert.match(work, /href="\/billing\/"/);
+  assert.match(work, /Aftergraph Billing/);
+  assert.match(index, /styles\/billing-launcher\.css/);
+  assert.match(shell, /id:'chat'/);
+  assert.match(shell, /id:'work'/);
+  assert.match(shell, /id:'space'/);
+  assert.doesNotMatch(shell, /id:'billing'/);
+});
