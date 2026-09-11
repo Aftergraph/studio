@@ -1,1 +1,0 @@
-Offline Billing remains read-only; financial mutations must fail closed unless the app has a valid online authenticated session.
