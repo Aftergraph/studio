@@ -35,6 +35,12 @@ test('billing service worker never queues or caches consequential mutations', as
   assert.doesNotMatch(source, /sync\.register|SyncManager|backgroundSync|mutationQueue|writeQueue/i);
 });
 
+test('static server resolves trailing slash app routes to index files', async () => {
+  const source = await text('server/static-handler.mjs');
+  assert.match(source, /endsWith\(['"]\/['"]\)/);
+  assert.match(source, /index\.html/);
+});
+
 test('billing compatibility route redirects to canonical standalone app preserving location suffixes', async () => {
   const html = await text('billing.html');
   assert.match(html, /\/billing\//);
