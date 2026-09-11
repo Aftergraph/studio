@@ -1,82 +1,16 @@
 <!doctype html>
-<html lang="da" data-theme="light">
+<html lang="da">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" content="#f5f7fa">
-  <title>Fakturering · Aftergraph</title>
-  <link rel="stylesheet" href="/styles/tokens.css">
-  <link rel="stylesheet" href="/styles/reset.css">
-  <link rel="stylesheet" href="/styles/billing.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Aftergraph Billing</title>
 </head>
 <body>
-  <header class="billing-header">
-    <a class="billing-back" href="/" aria-label="Tilbage til Aftergraph Studio">
-      <span aria-hidden="true">←</span>
-      <span>Studio</span>
-    </a>
-    <div class="billing-brand" aria-label="Aftergraph Billing">
-      <span class="billing-mark" aria-hidden="true"></span>
-      <span>Aftergraph</span>
-      <span class="billing-brand-separator" aria-hidden="true">/</span>
-      <strong>Fakturering</strong>
-    </div>
-    <button class="billing-quiet-button" id="billing-refresh" type="button">Opdater</button>
-  </header>
-
-  <main id="billing-app" class="billing-shell">
-    <section class="billing-intro" aria-labelledby="billing-title">
-      <div>
-        <h1 id="billing-title">Fakturering</h1>
-        <p>Se hvad der kan faktureres nu, hvad der venter, og hvad der mangler.</p>
-      </div>
-      <div id="billing-connection" class="billing-connection" aria-live="polite">Indlæser…</div>
-    </section>
-
-    <section id="billing-summary" class="billing-summary" aria-label="Faktureringsoversigt" aria-live="polite"></section>
-
-    <nav class="billing-queue-nav" aria-label="Faktureringskø">
-      <div class="billing-tabs" role="tablist" aria-label="Faktureringsstatus">
-        <button class="billing-tab is-active" type="button" role="tab" aria-selected="true" data-queue="ready">
-          Klar <span data-count="ready">0</span>
-        </button>
-        <button class="billing-tab" type="button" role="tab" aria-selected="false" data-queue="waiting">
-          Venter <span data-count="waiting">0</span>
-        </button>
-        <button class="billing-tab" type="button" role="tab" aria-selected="false" data-queue="needs_info">
-          Mangler <span data-count="needs_info">0</span>
-        </button>
-        <button class="billing-tab" type="button" role="tab" aria-selected="false" data-queue="invoiced">
-          Faktureret <span data-count="invoiced">0</span>
-        </button>
-      </div>
-    </nav>
-
-    <section class="billing-worklist" aria-labelledby="billing-list-title">
-      <div class="billing-list-heading">
-        <h2 id="billing-list-title">Klar til fakturering</h2>
-        <p id="billing-list-context">Kun arbejde med registrerede actuals vises som klar.</p>
-      </div>
-      <div id="billing-list" class="billing-list" aria-live="polite"></div>
-    </section>
-  </main>
-
-  <div id="billing-toast" class="billing-toast" role="status" aria-live="polite" aria-atomic="true"></div>
-
-  <dialog id="billing-review" class="billing-review" aria-labelledby="billing-review-title">
-    <div class="billing-review-frame">
-      <header class="billing-review-header">
-        <div>
-          <p class="billing-review-kicker" id="billing-review-kicker">Fakturakladde</p>
-          <h2 id="billing-review-title">Gennemgå faktura</h2>
-        </div>
-        <button type="button" class="billing-icon-button" data-action="close-review" aria-label="Luk">×</button>
-      </header>
-      <div id="billing-review-body" class="billing-review-body"></div>
-    </div>
-  </dialog>
-
-  <script type="module" src="/src/billing/billing-app.mjs"></script>
+  <p>Åbner Aftergraph Billing…</p>
+  <script>
+    const target = `/billing/${location.search}${location.hash}`;
+    location.replace(target);
+  </script>
 </body>
 </html>
