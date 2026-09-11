@@ -14,6 +14,7 @@ const ALLOWLIST = Object.freeze([
   'user.manage',
   'auth.issue',
   'goal.manage',
+  'billing.manage',
 ]);
 
 const PREFIXES = Object.freeze(['autonomy.']);
