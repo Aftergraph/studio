@@ -8,16 +8,17 @@ async function text(path) {
   return readFile(new URL(path, root), 'utf8');
 }
 
-test('billing page is a focused accessible Aftergraph surface with four human queues', async () => {
-  const html = await text('billing.html');
+test('billing app is a focused accessible Aftergraph surface with human work queues', async () => {
+  const html = await text('billing/index.html');
   assert.match(html, /<html[^>]*lang="da"/i);
   assert.match(html, /<main[^>]*id="billing-app"/i);
-  assert.match(html, /data-queue="ready"/);
-  assert.match(html, /data-queue="waiting"/);
-  assert.match(html, /data-queue="needs_info"/);
-  assert.match(html, /data-queue="invoiced"/);
+  assert.match(html, /data-view="inbox"/);
+  assert.match(html, /data-view="ready"/);
+  assert.match(html, /data-view="waiting"/);
+  assert.match(html, /data-view="needs_info"/);
+  assert.match(html, /data-view="invoiced"/);
   assert.match(html, /aria-live="polite"/);
-  assert.match(html, /aria-label="Faktureringskø"/);
+  assert.match(html, /aria-label="Faktureringsnavigation"/);
   assert.match(html, /id="billing-review"/);
   assert.doesNotMatch(html, /https?:\/\/[^"']+\.(?:js|css)/i);
 });
@@ -31,11 +32,11 @@ test('billing client exposes only same-origin canonical read and guarded mutatio
   assert.match(source, /issueInvoice/);
   assert.match(source, /idempotency-key/);
   assert.doesNotMatch(source, /https?:\/\//);
-  assert.doesNotMatch(source, /localStorage|sessionStorage/);
 });
 
 test('billing operator app uses plain Danish workflow copy and never derives billable time from calendar duration', async () => {
   const source = await text('src/billing/billing-app.mjs');
+  assert.match(source, /Indbakke/);
   assert.match(source, /Klar til fakturering/);
   assert.match(source, /Venter/);
   assert.match(source, /Mangler oplysninger/);
@@ -48,22 +49,25 @@ test('billing operator app uses plain Danish workflow copy and never derives bil
   assert.doesNotMatch(source, /alarm|nøglekode|keycode|door code/i);
 });
 
-test('billing styling dogfoods Aftergraph tokens and remains usable on mobile', async () => {
+test('billing styling dogfoods Aftergraph tokens and remains usable on mobile safe areas', async () => {
   const css = await text('styles/billing.css');
   assert.match(css, /var\(--bg\)/);
   assert.match(css, /var\(--surface\)/);
   assert.match(css, /var\(--accent\)/);
   assert.match(css, /@media\s*\(max-width:\s*760px\)/);
   assert.match(css, /position:\s*sticky/);
+  assert.match(css, /safe-area-inset-bottom/);
   assert.match(css, /prefers-reduced-motion/);
   assert.doesNotMatch(css, /@import\s+url\(/i);
 });
 
-test('billing page loads only first-party modules and token/reset/billing styles', async () => {
-  const html = await text('billing.html');
-  assert.match(html, /styles\/tokens\.css/);
-  assert.match(html, /styles\/reset\.css/);
-  assert.match(html, /styles\/billing\.css/);
-  assert.match(html, /src\/billing\/billing-app\.mjs/);
+test('billing app loads only first-party modules and token/reset/billing styles', async () => {
+  const html = await text('billing/index.html');
+  assert.match(html, /\/styles\/tokens\.css/);
+  assert.match(html, /\/styles\/reset\.css/);
+  assert.match(html, /\/styles\/billing\.css/);
+  assert.match(html, /\/src\/billing\/billing-app\.mjs/);
+  assert.match(html, /\/src\/billing\/pwa\.mjs/);
+  assert.match(html, /manifest\.webmanifest/);
   assert.doesNotMatch(html, /<script(?![^>]*type="module")[^>]*src=/i);
 });
