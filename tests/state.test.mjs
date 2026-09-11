@@ -49,3 +49,13 @@ test('conversation mission identity is independent from globally selected work',
   assert.equal(conversationMissionId(state, 'conv_q4'), 'mission_q4');
   assert.equal(conversationMissionId(state, 'conv_deploy'), 'mission_release');
 });
+
+test('production state labels local interaction path non-authoritative',()=>{
+  const state=createInitialState({fixtures:false});
+  assert.deepEqual(state.interactionSource,{
+    mode:'reference-local',
+    authoritative:false,
+    threadOwner:'runtime',
+    turnOwner:'runtime',
+  });
+});

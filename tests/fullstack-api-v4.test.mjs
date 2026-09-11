@@ -40,6 +40,12 @@ test('chat writes persist across API reads', async () => {
     });
     assert.equal(write.response.status, 201);
     assert.equal(write.body.state.conversations.find(c=>c.id==='conv_q4').messages.at(-1).text, payload.text);
+    assert.equal(write.body.state.interactionSource.authoritative,false);
+    const localConv=write.body.state.conversations.find(c=>c.id==='conv_q4');
+    assert.equal('runtimeThread' in localConv,false);
+    assert.equal('runtimeTurn' in localConv,false);
+    assert.equal('admission' in localConv,false);
+    assert.equal('verification' in localConv,false);
 
     const read = await json(`${base}/api/v1/state`);
     assert.equal(read.body.state.conversations.find(c=>c.id==='conv_q4').messages.at(-1).text, payload.text);
@@ -153,6 +159,7 @@ test('durable state survives a server restart', async()=>{
   port=second.address().port;
   const read=await json(`http://127.0.0.1:${port}/api/v1/state`);
   assert.equal(read.body.state.conversations.find(c=>c.id==='conv_q4').messages.at(-1).text,'persist me');
+  assert.equal(read.body.state.interactionSource.authoritative,false);
   await new Promise(resolve=>second.close(resolve));
   await rm(dir,{recursive:true,force:true});
 });

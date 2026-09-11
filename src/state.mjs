@@ -85,6 +85,7 @@ export function createInitialState({ fixtures = true } = {}) {
       { id:'ev4', type:'evidence.sealed', text:'Staging verification evidence sealed', time:'10:27' },
     ],
     telemetry:{ online:true, runtime:'healthy', chain:'verified', cost:8.49, activeRuns:3, queued:1, evidence:64, latency:148 },
+    interactionSource:{ mode:'reference-local', authoritative:false, threadOwner:'runtime', turnOwner:'runtime' },
     fixtureMode: Boolean(fixtures),
     source: fixtures ? 'demo-fixture' : 'runtime-empty',
   };
