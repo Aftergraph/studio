@@ -3,8 +3,10 @@ import { projectInvoice } from './money.mjs';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+const READ_CACHE_KEY = 'aftergraph.billing.read-cache.v1';
 
-const QUEUES = Object.freeze({
+const VIEWS = Object.freeze({
+  inbox: ['Indbakke', 'Mangler oplysninger først, derefter det der er klar til fakturering.'],
   ready: ['Klar til fakturering', 'Alt nødvendigt er registreret. Gennemgå beløb og opret fakturakladden.'],
   waiting: ['Venter', 'Arbejdet er registreret, men faktureringsperioden er ikke afsluttet endnu.'],
   needs_info: ['Mangler oplysninger', 'Ret den manglende oplysning her, så posten kan gå videre.'],
@@ -42,6 +44,12 @@ function formatDate(value, locale = 'da-DK') {
   return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
 }
 
+function formatSyncTime(value, locale = 'da-DK') {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'ukendt tidspunkt';
+  return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(date);
+}
+
 function formatMoney(minor, currency = 'DKK', locale = 'da-DK') {
   return new Intl.NumberFormat(locale, {
     style: 'currency',
@@ -64,12 +72,81 @@ function getActor() {
   return new URLSearchParams(location.search).get('actor')?.trim() || 'demo-user';
 }
 
+function sanitizeBillingForCache(billing) {
+  if (!billing || typeof billing !== 'object') return null;
+  return {
+    settings: {
+      taxRateBps: Number.isInteger(billing.settings?.taxRateBps) ? billing.settings.taxRateBps : 0,
+      locale: billing.settings?.locale || 'da-DK',
+    },
+    customers: (billing.customers || []).map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      status: entry.status,
+      billing: entry.billing ? {
+        mode: entry.billing.mode,
+        paymentTermsDays: entry.billing.paymentTermsDays,
+        rateMinor: entry.billing.rateMinor,
+        currency: entry.billing.currency,
+        discountPercent: entry.billing.discountPercent,
+      } : null,
+    })),
+    visits: (billing.visits || []).map((entry) => ({
+      id: entry.id,
+      customerId: entry.customerId,
+      scheduledStart: entry.scheduledStart,
+      status: entry.status,
+      actual: entry.actual ? {
+        workMinutes: entry.actual.workMinutes,
+        discountPercent: entry.actual.discountPercent,
+      } : null,
+    })),
+    invoices: (billing.invoices || []).map((entry) => ({
+      id: entry.id,
+      number: entry.number,
+      customerId: entry.customerId,
+      visitIds: entry.visitIds,
+      issueDate: entry.issueDate,
+      dueDate: entry.dueDate,
+      status: entry.status,
+      currency: entry.currency,
+      totalGrossMinor: entry.totalGrossMinor,
+    })),
+    projection: billing.projection ? structuredClone(billing.projection) : { items: [], summary: {} },
+  };
+}
+
+function writeReadCache(billing) {
+  try {
+    const safe = sanitizeBillingForCache(billing);
+    if (!safe) return;
+    localStorage.setItem(READ_CACHE_KEY, JSON.stringify({ syncedAt: new Date().toISOString(), billing: safe }));
+  } catch {
+    // Storage is an optional resilience layer. Canonical state remains server-side.
+  }
+}
+
+function readReadCache() {
+  try {
+    const raw = localStorage.getItem(READ_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.syncedAt || !parsed?.billing?.projection) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 function createApp() {
   const client = createBillingClient({ actor: getActor() });
   const state = {
     billing: null,
-    queue: 'ready',
+    view: 'inbox',
     busy: false,
+    cached: false,
+    cachedAt: null,
+    online: typeof navigator === 'undefined' ? true : navigator.onLine !== false,
     activeItem: null,
     activeInvoice: null,
     toastTimer: null,
@@ -95,19 +172,16 @@ function createApp() {
   const visit = (id) => state.billing?.visits?.find((entry) => entry.id === id) || null;
   const invoice = (id) => state.billing?.invoices?.find((entry) => entry.id === id) || null;
   const visitsFor = (item) => (item.visitIds || []).map(visit).filter(Boolean);
+  const canMutate = () => state.online && !state.cached && !state.busy;
 
   function preview(item) {
     const account = customer(item.customerId);
     const visits = visitsFor(item);
     if (!account || visits.length === 0 || visits.some((entry) => !Number.isInteger(entry.actual?.workMinutes))) return null;
     try {
-      return projectInvoice({ account, visits, taxRateBps: state.billing?.settings?.taxRateBps ?? 0 });
+      return projectInvoice({ customer: account, visits, taxRateBps: state.billing?.settings?.taxRateBps ?? 0 });
     } catch {
-      try {
-        return projectInvoice({ customer: account, visits, taxRateBps: state.billing?.settings?.taxRateBps ?? 0 });
-      } catch {
-        return null;
-      }
+      return null;
     }
   }
 
@@ -121,6 +195,18 @@ function createApp() {
   function connection(text, kind = '') {
     els.connection.textContent = text;
     els.connection.className = `billing-connection${kind ? ` is-${kind}` : ''}`;
+  }
+
+  function renderConnection() {
+    if (state.cached) {
+      connection(`Offline · senest synkroniseret ${formatSyncTime(state.cachedAt, locale())}`, 'degraded');
+      return;
+    }
+    if (!state.online) {
+      connection('Offline · ingen lokal kopi', 'degraded');
+      return;
+    }
+    connection('Aktuel', 'current');
   }
 
   function amountFor(item) {
@@ -149,13 +235,24 @@ function createApp() {
   }
 
   function actionFor(item) {
+    const blocked = !state.online || state.cached;
+    const disabled = blocked ? ' disabled aria-disabled="true" title="Kræver online og aktuelle data"' : '';
     if (item.status === 'ready') {
-      return `<button type="button" class="billing-primary-button" data-action="review" data-key="${esc(itemKey(item))}">Gennemgå faktura</button>`;
+      return `<button type="button" class="billing-primary-button" data-action="review" data-key="${esc(itemKey(item))}"${disabled}>Gennemgå faktura</button>`;
     }
     if (item.status === 'needs_info' && item.reasonCode === 'missing_actuals' && item.visitId) {
-      return `<button type="button" class="billing-secondary-button" data-action="actuals" data-key="${esc(itemKey(item))}">Tilføj arbejdstid</button>`;
+      return `<button type="button" class="billing-secondary-button" data-action="actuals" data-key="${esc(itemKey(item))}"${disabled}>Tilføj arbejdstid</button>`;
     }
     return '';
+  }
+
+  function itemsForView() {
+    const items = projection().items || [];
+    if (state.view !== 'inbox') return items.filter((item) => item.status === state.view);
+    const rank = { needs_info: 0, ready: 1, waiting: 2 };
+    return items
+      .filter((item) => item.status in rank)
+      .sort((a, b) => rank[a.status] - rank[b.status]);
   }
 
   function renderSummary() {
@@ -171,26 +268,32 @@ function createApp() {
   }
 
   function renderList() {
-    const [label, contextText] = QUEUES[state.queue];
+    const [label, contextText] = VIEWS[state.view];
     els.title.textContent = label;
     els.context.textContent = contextText;
 
     $$('.billing-tab').forEach((tab) => {
-      const selected = tab.dataset.queue === state.queue;
+      const selected = tab.dataset.view === state.view;
       tab.classList.toggle('is-active', selected);
       tab.setAttribute('aria-selected', String(selected));
     });
 
     const summary = projection().summary || {};
-    const counts = { ready: summary.ready || 0, waiting: summary.waiting || 0, needs_info: summary.needsInfo || 0, invoiced: summary.invoiced || 0 };
+    const counts = {
+      inbox: (summary.needsInfo || 0) + (summary.ready || 0) + (summary.waiting || 0),
+      ready: summary.ready || 0,
+      waiting: summary.waiting || 0,
+      needs_info: summary.needsInfo || 0,
+      invoiced: summary.invoiced || 0,
+    };
     Object.entries(counts).forEach(([key, value]) => {
       const node = $(`[data-count="${key}"]`);
       if (node) node.textContent = String(value);
     });
 
-    const items = projection().items.filter((item) => item.status === state.queue);
+    const items = itemsForView();
     if (!items.length) {
-      els.list.innerHTML = '<div class="billing-empty">Ingen poster i denne kø.</div>';
+      els.list.innerHTML = '<div class="billing-empty">Ingen poster i denne visning.</div>';
       return;
     }
 
@@ -207,26 +310,55 @@ function createApp() {
     if (!state.billing) return;
     renderSummary();
     renderList();
+    renderConnection();
+  }
+
+  function adoptCache() {
+    const cached = readReadCache();
+    if (!cached) return false;
+    state.billing = cached.billing;
+    state.cached = true;
+    state.cachedAt = cached.syncedAt;
+    render();
+    return true;
   }
 
   async function refresh() {
     if (state.busy) return;
     state.busy = true;
     els.refresh.disabled = true;
+    state.online = typeof navigator === 'undefined' ? true : navigator.onLine !== false;
+
+    if (!state.online) {
+      if (!state.billing || !state.cached) adoptCache();
+      if (!state.billing) {
+        els.summary.innerHTML = '';
+        els.list.innerHTML = '<div class="billing-error"><strong>Fakturering er offline.</strong><br>Der findes ingen tidligere synkroniseret visning på denne enhed.</div>';
+      }
+      state.cached = Boolean(state.billing);
+      renderConnection();
+      state.busy = false;
+      els.refresh.disabled = false;
+      return;
+    }
+
     connection('Synkroniserer…');
     try {
       const body = await client.load();
       state.billing = body.billing;
-      connection('Aktuel', 'current');
+      state.cached = false;
+      state.cachedAt = null;
+      writeReadCache(body.billing);
       render();
     } catch (error) {
-      connection('Kan ikke hente data', 'degraded');
-      if (!state.billing) {
+      const usedCache = adoptCache();
+      if (!usedCache && !state.billing) {
         els.summary.innerHTML = '';
-        els.list.innerHTML = '<div class="billing-error"><strong>Fakturering er utilgængelig.</strong><br>Der vises ikke demo- eller cachedata i stedet for den aktuelle backend.</div>';
+        els.list.innerHTML = '<div class="billing-error"><strong>Fakturering er utilgængelig.</strong><br>Der findes ingen verificeret lokal kopi.</div>';
+        connection('Kan ikke hente data', 'degraded');
       }
       console.error('billing load failed', error);
-      toast('Kunne ikke opdatere fakturering');
+      toast(usedCache ? 'Viser senest synkroniserede data' : 'Kunne ikke opdatere fakturering');
     } finally {
       state.busy = false;
       els.refresh.disabled = false;
@@ -261,11 +393,12 @@ function createApp() {
   }
 
   function controlsHtml() {
+    const disabled = canMutate() ? '' : ' disabled aria-disabled="true" title="Kræver online og aktuelle data"';
     if (state.activeInvoice) {
       const final = ['issued', 'emailed'].includes(state.activeInvoice.status);
-      return `<div class="billing-draft-status"><strong>${final ? 'Faktura udstedt' : 'Kladde oprettet'}</strong><p>Nr. ${esc(state.activeInvoice.number)} · forfalder ${esc(formatDate(state.activeInvoice.dueDate, locale()))}</p></div><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Luk</button>${final ? '' : `<button type="button" class="billing-primary-button" data-action="issue" data-invoice-id="${esc(state.activeInvoice.id)}">Udsted faktura</button>`}</div>`;
+      return `<div class="billing-draft-status"><strong>${final ? 'Faktura udstedt' : 'Kladde oprettet'}</strong><p>Nr. ${esc(state.activeInvoice.number)} · forfalder ${esc(formatDate(state.activeInvoice.dueDate, locale()))}</p></div><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Luk</button>${final ? '' : `<button type="button" class="billing-primary-button" data-action="issue" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>Udsted faktura</button>`}</div>`;
     }
-    return `<form id="billing-draft-form" class="billing-form"><div class="billing-form-row"><div class="billing-field"><label for="billing-number">Fakturanummer</label><input id="billing-number" name="number" inputmode="numeric" autocomplete="off" placeholder="fx 1370" required></div><div class="billing-field"><label for="billing-issue-date">Fakturadato</label><input id="billing-issue-date" name="issueDate" type="date" value="${today()}" required></div></div><p class="billing-form-help">Nummeret reserveres først, når kladden oprettes. V1 sender ikke fakturaen automatisk.</p><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Annuller</button><button type="submit" class="billing-primary-button">Opret kladde</button></div></form>`;
+    return `<form id="billing-draft-form" class="billing-form"><div class="billing-form-row"><div class="billing-field"><label for="billing-number">Fakturanummer</label><input id="billing-number" name="number" inputmode="numeric" autocomplete="off" placeholder="fx 1370" required${disabled}></div><div class="billing-field"><label for="billing-issue-date">Fakturadato</label><input id="billing-issue-date" name="issueDate" type="date" value="${today()}" required${disabled}></div></div><p class="billing-form-help">Nummeret reserveres først, når kladden oprettes. Finansielle handlinger kræver online og aktuelle data.</p><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Annuller</button><button type="submit" class="billing-primary-button"${disabled}>Opret kladde</button></div></form>`;
   }
 
   function renderReview() {
@@ -278,10 +411,12 @@ function createApp() {
     }
     els.reviewKicker.textContent = state.activeInvoice ? 'Faktura' : 'Fakturakladde';
     els.reviewTitle.textContent = state.activeInvoice?.status === 'issued' ? 'Faktura udstedt' : 'Gennemgå faktura';
-    els.reviewBody.innerHTML = `<section class="billing-review-customer"><h3>${esc(account.name)}</h3><p>${esc(account.email)} · ${item.visitIds.length} besøg</p></section><section class="billing-review-lines" aria-label="Fakturalinjer">${lineHtml(item, projected)}</section><section class="billing-totals" aria-label="Fakturatotaler">${projected.discountMinor ? `<div class="billing-total-row"><span>Rabat</span><span>−${esc(formatMoney(projected.discountMinor, projected.currency, locale()))}</span></div>` : ''}<div class="billing-total-row"><span>Ekskl. moms</span><span>${esc(formatMoney(projected.totalNetMinor, projected.currency, locale()))}</span></div><div class="billing-total-row"><span>Moms</span><span>${esc(formatMoney(projected.taxMinor, projected.currency, locale()))}</span></div><div class="billing-total-row is-total"><span>I alt</span><span>${esc(formatMoney(projected.totalGrossMinor, projected.currency, locale()))}</span></div></section>${controlsHtml()}`;
+    const contact = account.email ? `${esc(account.email)} · ` : '';
+    els.reviewBody.innerHTML = `<section class="billing-review-customer"><h3>${esc(account.name)}</h3><p>${contact}${item.visitIds.length} besøg</p></section><section class="billing-review-lines" aria-label="Fakturalinjer">${lineHtml(item, projected)}</section><section class="billing-totals" aria-label="Fakturatotaler">${projected.discountMinor ? `<div class="billing-total-row"><span>Rabat</span><span>−${esc(formatMoney(projected.discountMinor, projected.currency, locale()))}</span></div>` : ''}<div class="billing-total-row"><span>Ekskl. moms</span><span>${esc(formatMoney(projected.totalNetMinor, projected.currency, locale()))}</span></div><div class="billing-total-row"><span>Moms</span><span>${esc(formatMoney(projected.taxMinor, projected.currency, locale()))}</span></div><div class="billing-total-row is-total"><span>I alt</span><span>${esc(formatMoney(projected.totalGrossMinor, projected.currency, locale()))}</span></div></section>${controlsHtml()}`;
   }
 
   function openReview(item) {
+    if (!canMutate()) return toast('Kræver online og aktuelle data');
     state.activeItem = structuredClone(item);
     state.activeInvoice = null;
     renderReview();
@@ -290,6 +425,7 @@ function createApp() {
   }
 
   function openActuals(item) {
+    if (!canMutate()) return toast('Kræver online og aktuelle data');
     state.activeItem = structuredClone(item);
     state.activeInvoice = null;
     els.reviewKicker.textContent = 'Manglende oplysninger';
@@ -300,7 +436,7 @@ function createApp() {
   }
 
   async function createDraft(form) {
-    if (!state.activeItem || state.busy) return;
+    if (!state.activeItem || !canMutate()) return;
     const data = new FormData(form);
     const number = String(data.get('number') || '').trim();
     const issueDate = String(data.get('issueDate') || '').trim();
@@ -310,7 +446,9 @@ function createApp() {
     try {
       const body = await client.createDraft({ customerId: state.activeItem.customerId, visitIds: state.activeItem.visitIds, number, issueDate });
       state.billing = body.billing;
+      state.cached = false;
       state.activeInvoice = body.invoice;
+      writeReadCache(body.billing);
       render();
       renderReview();
       toast(`Fakturakladde ${body.invoice.number} oprettet`);
@@ -323,13 +461,15 @@ function createApp() {
   }
 
   async function issueInvoice(id, button) {
-    if (!id || state.busy) return;
+    if (!id || !canMutate()) return;
     state.busy = true;
     button.disabled = true;
     try {
       const body = await client.issueInvoice(id);
       state.billing = body.billing;
+      state.cached = false;
       state.activeInvoice = body.invoice;
+      writeReadCache(body.billing);
       render();
       renderReview();
       toast(`Faktura ${body.invoice.number} er udstedt`);
@@ -342,17 +482,18 @@ function createApp() {
   }
 
   async function saveActuals(form) {
-    if (!state.activeItem?.visitId || state.busy) return;
+    if (!state.activeItem?.visitId || !canMutate()) return;
     const hours = Number(String(new FormData(form).get('workHours') || '').replace(',', '.'));
     if (!Number.isFinite(hours) || hours < 0) return;
     state.busy = true;
     form.querySelectorAll('button,input').forEach((node) => { node.disabled = true; });
     try {
       const body = await client.recordActuals({ visitId: state.activeItem.visitId, actual: { workMinutes: Math.round(hours * 60) } });
-      const customerId = state.activeItem.customerId;
       state.billing = body.billing;
+      state.cached = false;
+      writeReadCache(body.billing);
       closeDialog();
-      state.queue = projection().items.some((item) => item.customerId === customerId && item.status === 'ready') ? 'ready' : 'needs_info';
+      state.view = 'inbox';
       render();
       toast('Arbejdstiden er gemt');
     } catch {
@@ -364,9 +505,9 @@ function createApp() {
   }
 
   document.addEventListener('click', (event) => {
-    const tab = event.target.closest('[data-queue]');
+    const tab = event.target.closest('[data-view]');
     if (tab) {
-      state.queue = tab.dataset.queue;
+      state.view = tab.dataset.view;
       renderList();
       return;
     }
@@ -396,6 +537,18 @@ function createApp() {
     }
   });
 
+  window.addEventListener('billing-connectivity', (event) => {
+    const wasOnline = state.online;
+    state.online = event.detail?.online !== false;
+    if (state.online && !wasOnline) {
+      state.cached = true;
+      refresh();
+    } else {
+      if (!state.online) state.cached = Boolean(state.billing);
+      render();
+    }
+  });
+
   els.refresh.addEventListener('click', refresh);
   els.review.addEventListener('click', (event) => { if (event.target === els.review) closeDialog(); });
 
@@ -405,4 +558,4 @@ function createApp() {
 
 if (typeof document !== 'undefined') createApp();
 
-export { createApp, formatMoney, formatWorkMinutes };
+export { createApp, formatMoney, formatWorkMinutes, sanitizeBillingForCache };
