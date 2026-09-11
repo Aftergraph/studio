@@ -55,3 +55,19 @@ How to host a single-tenant Aftergraph Studio instance with auth enforcement on.
   43+ release gates, browser QA, viewport sweep, axe a11y, CodeQL, Scorecard.
 - Release Drafter maintains the draft; publish it from the releases page.
 - Verify a release: `npm test` then `node scripts/v6_release_verify.mjs`.
+
+## 6. Billing production configuration
+
+Billing is inert with respect to outbound delivery unless a provider is explicitly configured.
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `AFTERGRAPH_BILLING_DELIVERY_WEBHOOK_URL` | only for outbound delivery | HTTPS endpoint that accepts the versioned Billing delivery payload. |
+| `AFTERGRAPH_BILLING_DELIVERY_WEBHOOK_TOKEN` | provider-dependent | Optional bearer credential sent only in the Authorization header. Never commit or log it. |
+| `AFTERGRAPH_BILLING_DELIVERY_TIMEOUT_MS` | no (8000) | Timeout for the outbound delivery request. |
+
+The webhook receives the immutable invoice recipient, invoice metadata and the generated PDF as a base64 attachment. It must return JSON containing a non-empty `messageId` and an ISO `deliveredAt` timestamp. Billing records `pending` before the call and records delivered/email state only after that receipt validates.
+
+The webhook URL must use HTTPS. With no webhook configured, `POST /api/v1/billing/invoices/:id/deliver` fails closed with provider unavailable and the issued invoice remains retryable.
+
+Provider credentials belong in the deployment secret store, not tenant Billing settings. Tenant settings contain business identity, invoice sequence, payment copy and optional Peppol/Nemhandel identifiers, but never delivery-provider secrets.

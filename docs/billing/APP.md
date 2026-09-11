@@ -1,72 +1,66 @@
 # Aftergraph Billing App
 
-Aftergraph Billing turns verified operational work into a small, review-first invoicing queue. It is incubated in Aftergraph Studio, but the product experience is standalone at `/billing/`.
+Aftergraph Billing turns verified operational work into a review-first invoicing product. It is currently incubated in Aftergraph Studio, while the installable product surface is standalone at `/billing/`.
+
+Rendetalje is the first pilot tenant. Company identity, payment data, invoice sequence and electronic invoicing settings are tenant configuration, not product rules.
 
 ## Use
 
 Open `/billing/` directly or launch **Aftergraph Billing** from Studio Work.
 
-The app starts in **Indbakke** and prioritizes work in this order:
+The inbox prioritizes:
 
-1. **Mangler oplysninger** — required actuals or billing/customer data are missing.
-2. **Klar** — the billing window is closed and the item can be reviewed for an invoice.
-3. **Venter** — work is valid but another visit or the current billing window must finish first.
-
-**Faktureret** shows work already bound to an invoice and protected against duplicate invoicing.
+1. **Mangler oplysninger** — actuals or required customer/company data are missing.
+2. **Klar** — the billing window is closed and the work can be reviewed.
+3. **Venter** — valid work remains inside an open billing window.
+4. **Faktureret** — work is already bound to an invoice and duplicate-protected.
 
 ## Source of truth
 
-Calendar duration is planning data, never invoice evidence. Billing uses verified actual work minutes from the canonical Billing state.
+Calendar duration is planning data, never billing evidence. Verified actual work minutes are authoritative. Money remains integer minor units and financial rules live in the Billing domain/API, not the browser.
 
-The browser UI does not implement independent financial rules. Readiness, money projection, duplicate protection and issue transitions remain in the Billing domain/API.
+Invoice creation snapshots issuer, customer and service identity so an issued document cannot silently change when account data changes later.
+## Virksomhedsprofil
 
-## Review workflow
+The **Virksomhed** surface manages tenant-specific billing configuration:
 
-A normal ready item follows:
+- business name and address;
+- country and registration identity;
+- contact and payment information;
+- default service label;
+- next invoice number;
+- optional Peppol/Nemhandel endpoint identity.
 
-`Ready → Review → Draft → Issue`
+CVR is the Danish pilot scheme, not a core product requirement. Invoice numbers are reserved atomically by the server.
+## Review and document workflow
+
+A normal item follows:
+
+`Ready → Review → Draft → Issue → PDF / UBL → Delivery status`
 
 For missing actuals:
 
 `Needs info → Add actual work time → Re-evaluate → Ready/Waiting`
 
-Draft and issue operations use the existing actor and idempotency guards. Repeated UI interaction must not create duplicate financial mutations.
+Issued invoices can be downloaded as deterministic A4 PDF documents. Long invoices paginate across multiple pages. The same immutable semantic invoice can also be exported as canonical JSON or, when preflight passes, Peppol BIS Billing 3.0 UBL.
+## Delivery
 
-## Installable app
+Delivery is provider-neutral. Billing persists `pending` before the provider side effect and marks an invoice delivered only after a provider receipt supplies a message id and delivery timestamp. Provider failure leaves the invoice issued with a retryable failure state.
 
-Billing includes a Web App Manifest and service worker and can be installed as a standalone PWA in supported browsers.
+The production server can opt into an HTTPS webhook delivery adapter. With no adapter configured, delivery fails closed and no external side effect occurs.
 
-Canonical app URL: `/billing/`
+## Installable and offline app
 
-The legacy `/billing.html` URL redirects to the canonical app and preserves query/hash information.
+Billing includes a Web App Manifest and service worker. Canonical app URL: `/billing/`; `/billing.html` redirects to it.
 
-## Offline behavior
+Offline mode is deliberately read-only. The app may display a sanitized, identity-scoped last-synced projection, but actuals, drafts, issue, delivery and other financial writes are never queued or replayed offline.
 
-Offline mode is deliberately conservative.
-
-The app may show the last successfully synchronized, sanitized Billing projection. Cached state is labelled `Offline · senest synkroniseret …` and is never presented as current.
-
-While offline or showing cached data:
-
-- actuals cannot be recorded;
-- invoice drafts cannot be created;
-- invoices cannot be issued;
-- no financial mutation is queued for later replay.
-
-When connectivity returns, the app refreshes canonical state before financial controls become available again.
-
-The read cache excludes operational access/key/alarm information and credentials.
+When live connectivity returns, Billing re-synchronizes canonical state before financial controls become available again.
 
 ## Mobile behavior
 
-The UI is mobile-first and respects safe-area insets. The common phone path is intentionally short:
+The app is mobile-first, respects safe-area insets and keeps the common operator path short: inbox, actuals/review, issue, document/download, then updated queue.
 
-1. Open Inbox.
-2. Open the first actionable item.
-3. Add missing actuals or review the invoice.
-4. Draft/issue when current online state allows it.
-5. Return to the updated queue.
+## Current product boundary
 
-## Current incubation boundary
-
-Studio currently provides the static host, durable state/API composition, CI, tokens and Work launcher. The Billing domain and app remain isolated so they can move to a dedicated repository without changing the financial workflow or HTTP contract.
+Studio currently supplies hosting composition, authentication, durable state, CI and the Work launcher. Billing remains isolated so extraction to a dedicated Aftergraph Billing deployment is a packaging move rather than a financial-workflow redesign.

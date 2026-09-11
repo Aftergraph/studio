@@ -2,9 +2,13 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createAppServer as createWorkspaceAppServer, upstreamConfigFromEnv } from './server/app-server.mjs';
 import { decorateBillingServer } from './server/billing-server.mjs';
+import { billingDeliveryAdapterFromEnv } from './server/billing-delivery.mjs';
 
 export function createAppServer(options = {}) {
-  return decorateBillingServer(createWorkspaceAppServer(options), options);
+  const billingOptions = Object.prototype.hasOwnProperty.call(options, 'billingDeliveryAdapter')
+    ? options
+    : { ...options, billingDeliveryAdapter: billingDeliveryAdapterFromEnv() };
+  return decorateBillingServer(createWorkspaceAppServer(options), billingOptions);
 }
 
 export { upstreamConfigFromEnv };
