@@ -3,7 +3,7 @@ export function emptyBillingState() {
     customers: [],
     visits: [],
     invoices: [],
-    settings: { taxRateBps: 2500, locale: 'da-DK' },
+    settings: { taxRateBps: 2500, locale: 'da-DK', issuer: null, invoiceSequence: { nextNumber: 1 }, defaultServiceLabel: 'Service' },
   };
 }
 
@@ -24,12 +24,23 @@ function actual({ startedAt, endedAt, workers, workMinutes, discountPercent = un
  */
 export function billingFixtureState() {
   return {
-    settings: { taxRateBps: 2500, locale: 'da-DK' },
+    settings: {
+      taxRateBps: 2500, locale: 'da-DK', defaultServiceLabel: 'Rengøring',
+      invoiceSequence: { nextNumber: 1370 },
+      issuer: {
+        name: 'Rendetalje', address: 'Gammel Viborgvej 40, 8381 Tilst', cvr: '45564096',
+        countryCode: 'DK', registrationId: '45564096', registrationSchemeId: '0184',
+        endpoint: { schemeId: '0184', value: '45564096' },
+        email: 'info@rendetalje.dk', phone: '+45 22 65 02 26',
+        paymentText: 'Betal digitalt via MobilePay eller bankoverførsel.',
+      },
+    },
     invoices: [],
     customers: [
       {
         id: 'customer-katrine',
         name: 'Katrine Rindom Andersen',
+        address: 'Eksempelvej 3A, 8883 Testby',
         email: 'katrine@example.test',
         status: 'active',
         billing: { mode: 'per_visit', paymentTermsDays: 8, rateMinor: 34900, currency: 'DKK', discountPercent: 0 },
@@ -37,6 +48,7 @@ export function billingFixtureState() {
       {
         id: 'customer-anton',
         name: 'Anton Horsbøl Skjeldmoes',
+        address: 'Eksempelvej 29, 8210 Testby',
         email: 'anton@example.test',
         status: 'active',
         billing: { mode: 'monthly_batch', paymentTermsDays: 8, rateMinor: 34900, currency: 'DKK', discountPercent: 10 },
@@ -44,6 +56,7 @@ export function billingFixtureState() {
       {
         id: 'customer-heidi',
         name: 'Heidi',
+        address: 'Eksempelvej 24, 8930 Testby',
         email: 'heidi@example.test',
         status: 'active',
         billing: { mode: 'monthly_batch', paymentTermsDays: 8, rateMinor: 34900, currency: 'DKK', discountPercent: 0 },
@@ -51,6 +64,7 @@ export function billingFixtureState() {
       {
         id: 'customer-casper-nora',
         name: 'Casper & Nora',
+        address: 'Eksempelvej 8, 8000 Testby',
         email: 'casper-nora@example.test',
         status: 'active',
         billing: { mode: 'monthly_batch', paymentTermsDays: 8, rateMinor: 34900, currency: 'DKK', discountPercent: 0 },
@@ -58,6 +72,7 @@ export function billingFixtureState() {
       {
         id: 'customer-peder',
         name: 'Peder Kjær',
+        address: 'Eksempelvej 2, 8000 Testby',
         email: 'peder@example.test',
         status: 'active',
         billing: { mode: 'per_visit', paymentTermsDays: 8, rateMinor: 34900, currency: 'DKK', discountPercent: 0 },

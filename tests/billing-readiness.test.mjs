@@ -7,7 +7,7 @@ const DKK = 'DKK';
 
 function customer(overrides={}) {
   return {
-    id:'c1', name:'Katrine', email:'k@example.test', status:'active',
+    id:'c1', name:'Katrine', address:'Customer Street 1', email:'k@example.test', status:'active',
     billing:{ mode:'per_visit', paymentTermsDays:8, rateMinor:34900, currency:DKK, discountPercent:0 },
     ...overrides,
   };
@@ -75,4 +75,19 @@ test('invoice projection uses actual minutes, inclusive VAT and deterministic di
   assert.equal(invoice.totalNetMinor,75384);
   assert.equal(invoice.taxMinor,18846);
   assert.equal(invoice.currency,DKK);
+});
+
+test('missing customer address fails closed before invoice readiness',()=>{
+  const c=customer({address:''});
+  const result=evaluateBilling({
+    customers:[c], visits:[completedVisit()], invoices:[],
+    settings:{issuer:{name:'Seller',address:'Street 1',cvr:'12345678'}},
+  });
+  assert.equal(queueFor(result,'needs_info')[0].reasonCode,'missing_customer_address');
+});
+
+test('missing issuer profile fails closed before invoice readiness',()=>{
+  const c=customer({address:'Customer Street 1'});
+  const result=evaluateBilling({customers:[c],visits:[completedVisit()],invoices:[],settings:{}});
+  assert.equal(queueFor(result,'needs_info')[0].reasonCode,'missing_issuer_profile');
 });

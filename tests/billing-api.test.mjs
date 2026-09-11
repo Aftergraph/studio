@@ -12,7 +12,7 @@ async function withServer(fn, options = {}) {
   const server = createAppServer({ root: new URL('../', import.meta.url), stateFile, runtimeIntervalMs: 20, fixtures: true, ...options });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
-  try { await fn(base); }
+  try { await fn(base, server); }
   finally {
     await new Promise((resolve) => server.close(resolve));
     await rm(dir, { recursive: true, force: true });
@@ -155,4 +155,151 @@ test('production auth mode rejects anonymous billing reads and accepts the canon
     assert.ok(Array.isArray(authenticated.body.billing.customers));
     assert.match(authenticated.response.headers.get('cache-control') || '', /no-store/i);
   }, { requireAuth: true, authSecret: secret });
+});
+
+
+test('issued invoice artifact endpoint returns a PDF and rejects drafts', async () => {
+  await withServer(async (base) => {
+    const draft = await json(`${base}/api/v1/billing/invoices/draft`, post({
+      customerId: 'customer-katrine',
+      visitIds: ['katrine-2026-09-07'],
+      number: '1370',
+      issueDate: '2026-09-11',
+    }, 'artifact-draft'));
+    const id = draft.body.invoice.id;
+
+    const before = await fetch(`${base}/api/v1/billing/invoices/${encodeURIComponent(id)}/artifact`);
+    assert.equal(before.status, 422);
+
+    await json(`${base}/api/v1/billing/invoices/${encodeURIComponent(id)}/issue`, post({}, 'artifact-issue'));
+    const artifact = await fetch(`${base}/api/v1/billing/invoices/${encodeURIComponent(id)}/artifact`);
+    const bytes = Buffer.from(await artifact.arrayBuffer());
+    assert.equal(artifact.status, 200);
+    assert.equal(artifact.headers.get('content-type'), 'application/pdf');
+    assert.match(artifact.headers.get('content-disposition') || '', /invoice-1370\.pdf/);
+    assert.equal(bytes.subarray(0, 5).toString('ascii'), '%PDF-');
+  });
+});
+
+test('delivery endpoint records a provider receipt', async () => {
+  const seen = [];
+  const adapter = {
+    name: 'test-mail',
+    async deliver(context) {
+      seen.push({ invoice: context.invoice.id, customer: context.customer.id });
+      return { messageId: 'provider-msg-42', deliveredAt: '2026-09-11T15:00:00.000Z' };
+    },
+  };
+  await withServer(async (base) => {
+    const draft = await json(`${base}/api/v1/billing/invoices/draft`, post({
+      customerId: 'customer-katrine',
+      visitIds: ['katrine-2026-09-07'],
+      number: '1370',
+      issueDate: '2026-09-11',
+    }, 'delivery-draft'));
+    const id = draft.body.invoice.id;
+    await json(`${base}/api/v1/billing/invoices/${encodeURIComponent(id)}/issue`, post({}, 'delivery-issue'));
+
+    const delivered = await json(`${base}/api/v1/billing/invoices/${encodeURIComponent(id)}/deliver`, post({}, 'delivery-send'));
+    assert.equal(delivered.response.status, 200);
+    assert.equal(delivered.body.invoice.status, 'emailed');
+    assert.equal(delivered.body.invoice.delivery.provider, 'test-mail');
+    assert.equal(delivered.body.invoice.delivery.messageId, 'provider-msg-42');
+    assert.deepEqual(seen, [{ invoice: id, customer: 'customer-katrine' }]);
+  }, { billingDeliveryAdapter: adapter });
+});
+
+test('delivery endpoint fails closed when no provider is configured', async () => {
+  await withServer(async (base) => {
+    const draft = await json(`${base}/api/v1/billing/invoices/draft`, post({
+      customerId: 'customer-katrine', visitIds: ['katrine-2026-09-07'],
+      number: '1370', issueDate: '2026-09-11',
+    }, 'delivery-none-draft'));
+    const id = draft.body.invoice.id;
+    await json(`${base}/api/v1/billing/invoices/${encodeURIComponent(id)}/issue`, post({}, 'delivery-none-issue'));
+    const result = await json(`${base}/api/v1/billing/invoices/${encodeURIComponent(id)}/deliver`, post({}, 'delivery-none-send'));
+    assert.equal(result.response.status, 503);
+    assert.equal(result.body.error, 'delivery_provider_unavailable');
+  });
+});
+
+test('issued invoice exposes canonical semantic document as no-store JSON', async () => {
+  await withServer(async (base) => {
+    const draft = await json(`${base}/api/v1/billing/invoices/draft`, post({
+      customerId: 'customer-katrine', visitIds: ['katrine-2026-09-07'], issueDate: '2026-09-11',
+    }, 'document-canonical-draft'));
+    const id = draft.body.invoice.id;
+    await json(`${base}/api/v1/billing/invoices/${encodeURIComponent(id)}/issue`, post({}, 'document-canonical-issue'));
+    const result = await json(`${base}/api/v1/billing/invoices/${encodeURIComponent(id)}/document`);
+    assert.equal(result.response.status, 200);
+    assert.equal(result.body.document.schema, 'aftergraph.invoice.semantic.v1');
+    assert.equal(result.body.document.number, '1370');
+    assert.match(result.response.headers.get('cache-control') || '', /no-store/i);
+  });
+});
+
+test('Peppol export returns preflight errors instead of invalid UBL', async () => {
+  await withServer(async (base) => {
+    const draft = await json(`${base}/api/v1/billing/invoices/draft`, post({
+      customerId: 'customer-katrine', visitIds: ['katrine-2026-09-07'], issueDate: '2026-09-11',
+    }, 'document-peppol-invalid-draft'));
+    const id = draft.body.invoice.id;
+    await json(`${base}/api/v1/billing/invoices/${encodeURIComponent(id)}/issue`, post({}, 'document-peppol-invalid-issue'));
+    const result = await json(`${base}/api/v1/billing/invoices/${encodeURIComponent(id)}/peppol-bis3`);
+    assert.equal(result.response.status, 422);
+    assert.equal(result.body.error, 'document_profile_validation_failed');
+    assert.ok(result.body.errors.includes('buyer_endpoint_required'));
+  });
+});
+
+test('Peppol export emits UBL only after internal and external validation pass', async () => {
+  const validations = [];
+  await withServer(async (base, server) => {
+    await server.workspace.store.mutate((draft) => {
+      const customer = draft.billing.customers.find((entry) => entry.id === 'customer-katrine');
+      customer.countryCode = 'DK';
+      customer.registrationId = '12345678';
+      customer.registrationSchemeId = '0184';
+      customer.endpoint = { schemeId: '0184', value: '12345678' };
+      return draft;
+    });
+    const draft = await json(`${base}/api/v1/billing/invoices/draft`, post({
+      customerId: 'customer-katrine', visitIds: ['katrine-2026-09-07'], issueDate: '2026-09-11',
+    }, 'document-peppol-valid-draft'));
+    const id = draft.body.invoice.id;
+    await json(`${base}/api/v1/billing/invoices/${encodeURIComponent(id)}/issue`, post({}, 'document-peppol-valid-issue'));
+    const response = await fetch(`${base}/api/v1/billing/invoices/${encodeURIComponent(id)}/peppol-bis3`);
+    const xml = await response.text();
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), 'application/xml; charset=utf-8');
+    assert.match(xml, /peppol\.eu:2017:poacc:billing:3\.0/);
+    assert.equal(validations.length, 1);
+    assert.equal(validations[0].profile, 'peppol-bis-3.0-2026-05');
+  }, {
+    billingDocumentValidator: async ({ profile, xml }) => {
+      validations.push({ profile, xml });
+      return { ok: true, source: 'test-validator' };
+    },
+  });
+});
+
+test('company settings update persists per billing workspace and protects invoice sequence', async () => {
+  await withServer(async (base) => {
+    const update = await json(`${base}/api/v1/billing/settings`, post({
+      issuer: {
+        name: 'Pilot ApS', address: 'Pilotvej 1, 8000 Aarhus', countryCode: 'DK',
+        registrationId: '12345678', registrationSchemeId: '0184',
+        endpoint: { schemeId: '0184', value: '12345678' },
+        email: 'billing@pilot.example', paymentText: 'Bank transfer',
+      },
+      defaultServiceLabel: 'Rengøring og service',
+      invoiceSequence: { nextNumber: 2000 },
+    }, 'billing-settings-1'));
+    assert.equal(update.response.status, 200);
+    assert.equal(update.body.billing.settings.issuer.name, 'Pilot ApS');
+    assert.equal(update.body.billing.settings.invoiceSequence.nextNumber, 2000);
+
+    const read = await json(`${base}/api/v1/billing`);
+    assert.equal(read.body.billing.settings.defaultServiceLabel, 'Rengøring og service');
+  });
 });

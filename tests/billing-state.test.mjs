@@ -39,3 +39,14 @@ test('non-fixture Studio state starts with an empty billing ledger', () => {
   assert.deepEqual(state.billing.invoices, []);
   assert.equal(state.billing.settings.taxRateBps, 2500);
 });
+
+test('Rendetalje pilot issuer exposes structured tenant identity without making it a core default', () => {
+  const billing = billingFixtureState();
+  assert.equal(billing.settings.issuer.countryCode, 'DK');
+  assert.equal(billing.settings.issuer.registrationId, '45564096');
+  assert.equal(billing.settings.issuer.registrationSchemeId, '0184');
+  assert.deepEqual(billing.settings.issuer.endpoint, { schemeId: '0184', value: '45564096' });
+
+  const empty = createInitialState({ fixtures: false }).billing;
+  assert.equal(empty.settings.issuer, null);
+});

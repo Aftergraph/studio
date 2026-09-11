@@ -84,3 +84,35 @@ test('Studio Work launches Billing as a product without adding a fourth primary 
   assert.match(shell, /id:'space'/);
   assert.doesNotMatch(shell, /id:'billing'/);
 });
+
+test('issued invoice review exposes artifact download, delivery action and delivery status', async () => {
+  const source = await text('src/billing/billing-app.mjs');
+  assert.match(source, /Download faktura/);
+  assert.match(source, /Send faktura/);
+  assert.match(source, /Leveret|Sendt|Levering/);
+  assert.match(source, /data-action="download"/);
+  assert.match(source, /data-action="deliver"/);
+  assert.match(source, /downloadArtifact/);
+  assert.match(source, /deliverInvoice/);
+});
+
+test('billing app exposes tenant company settings and uses automatic invoice numbering', async () => {
+  const html = await text('billing/index.html');
+  const source = await text('src/billing/billing-app.mjs');
+  assert.match(html, /data-action="company-settings"/);
+  assert.match(html, />Virksomhed</);
+  assert.match(source, /Virksomhedsprofil/);
+  assert.match(source, /updateSettings/);
+  assert.match(source, /invoiceSequence/);
+  assert.match(source, /Peppol|Nemhandel/);
+  assert.doesNotMatch(source, /id="billing-number"/);
+  assert.doesNotMatch(source, /Fakturanummer<\/label>/);
+});
+
+test('issued invoice review exposes structured e-invoice export without replacing PDF default', async () => {
+  const source = await text('src/billing/billing-app.mjs');
+  assert.match(source, /Download UBL/);
+  assert.match(source, /downloadPeppol/);
+  assert.match(source, /dataset\.action = 'peppol'/);
+  assert.match(source, /Peppol/);
+});

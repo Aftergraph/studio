@@ -800,3 +800,27 @@ button {
     animation-iteration-count: 1 !important;
   }
 }
+
+.billing-header-actions {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.billing-company-form { gap: 18px; }
+
+.billing-advanced {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: var(--surface);
+}
+
+.billing-advanced summary {
+  cursor: pointer;
+  font-weight: 680;
+  color: var(--text-2);
+}
+
+.billing-advanced[open] summary { margin-bottom: 16px; }

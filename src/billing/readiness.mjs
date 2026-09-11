@@ -19,6 +19,7 @@ function activeInvoiceBindings(invoices = []) {
 }
 
 function missingCustomerField(customer) {
+  if (!customer?.address) return 'missing_customer_address';
   if (!customer?.email) return 'missing_customer_email';
   if (!Number.isInteger(customer?.billing?.rateMinor) || customer.billing.rateMinor < 0) return 'missing_rate';
   if (!customer?.billing?.currency) return 'missing_currency';
@@ -45,8 +46,12 @@ function itemBase(customer, visits) {
  * Deterministically classify invoice readiness from canonical customer, visit
  * and invoice state. Calendar duration is never treated as billing evidence.
  */
-export function evaluateBilling({ customers = [], visits = [], invoices = [], now = null } = {}) {
+export function evaluateBilling(input = {}) {
+  const { customers = [], visits = [], invoices = [], settings = {}, now = null } = input;
   void now;
+  const enforceIssuer = Object.prototype.hasOwnProperty.call(input, 'settings');
+  const issuer = settings?.issuer;
+  const issuerMissing = enforceIssuer && (!issuer?.name || !issuer?.address || !(issuer?.registrationId || issuer?.cvr));
   const items = [];
   const invoiceByVisit = activeInvoiceBindings(invoices);
   const customersById = new Map(customers.map((customer) => [customer.id, customer]));
@@ -98,6 +103,10 @@ export function evaluateBilling({ customers = [], visits = [], invoices = [], no
     for (const group of groups) {
       const groupedVisits = group.visits.sort(sortByScheduledStart);
       const base = itemBase(customer, groupedVisits);
+      if (issuerMissing) {
+        items.push({ ...base, status: 'needs_info', reasonCode: 'missing_issuer_profile' });
+        continue;
+      }
       const missingField = missingCustomerField(customer);
       if (missingField) {
         items.push({ ...base, status: 'needs_info', reasonCode: missingField });

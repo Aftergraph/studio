@@ -57,8 +57,14 @@ export function createBillingDraft(billing, {
   const next = clone(billing);
   if (!customerId) throw codedError('customer_required');
   if (!Array.isArray(visitIds) || visitIds.length === 0) throw codedError('visit_ids_required');
-  if (!String(number || '').trim()) throw codedError('invoice_number_required');
   assertDateOnly(issueDate, 'issueDate');
+  const suppliedNumber = String(number || '').trim();
+  const sequence = next.settings?.invoiceSequence;
+  let resolvedNumber = suppliedNumber;
+  if (!resolvedNumber) {
+    if (!Number.isInteger(sequence?.nextNumber) || sequence.nextNumber < 1) throw codedError('invoice_number_sequence_required');
+    resolvedNumber = String(sequence.nextNumber);
+  }
 
   // Visit eligibility is the primary invariant. Check readiness before invoice
   // number reservation so an already-bound visit consistently fails closed as
@@ -72,7 +78,7 @@ export function createBillingDraft(billing, {
   );
   if (!ready) throw codedError('billing_not_ready');
 
-  if (next.invoices.some((invoice) => invoice.status !== 'void' && String(invoice.number) === String(number))) {
+  if (next.invoices.some((invoice) => invoice.status !== 'void' && String(invoice.number) === resolvedNumber)) {
     throw codedError('invoice_number_conflict', 'invoice number already reserved', 409);
   }
 
@@ -89,19 +95,30 @@ export function createBillingDraft(billing, {
   const terms = Number.isInteger(customer.billing?.paymentTermsDays)
     ? customer.billing.paymentTermsDays
     : 0;
-  const id = `invoice-${String(number).trim()}`;
+  const id = `invoice-${resolvedNumber}`;
   const invoice = {
     id,
-    number: String(number).trim(),
+    number: resolvedNumber,
     customerId,
     visitIds: [...visitIds],
     issueDate,
     dueDate: addDays(issueDate, terms),
     status: 'draft',
     createdBy: actor ?? null,
+    issuerSnapshot: clone(next.settings?.issuer),
+    customerSnapshot: {
+      name: customer.name, address: customer.address, email: customer.email || null,
+      countryCode: customer.countryCode || null,
+      registrationId: customer.registrationId || customer.cvr || null,
+      registrationScheme: customer.registrationScheme || null,
+      endpoint: customer.endpoint ? clone(customer.endpoint) : null,
+    },
+    serviceLabel: String(next.settings?.defaultServiceLabel || 'Service'),
     ...money,
   };
   next.invoices.push(invoice);
+  if (!suppliedNumber && sequence) sequence.nextNumber += 1;
+  else if (sequence && /^\d+$/.test(resolvedNumber) && Number(resolvedNumber) >= sequence.nextNumber) sequence.nextNumber = Number(resolvedNumber) + 1;
   return { billing: next, invoice: clone(invoice) };
 }
 
@@ -117,4 +134,98 @@ export function issueBillingInvoice(billing, { invoiceId, actor } = {}) {
   invoice.issuedBy = actor ?? null;
   invoice.issuedAt = new Date().toISOString();
   return { billing: next, invoice: clone(invoice) };
+}
+
+export function deliverBillingInvoice(billing, { invoiceId, actor, delivery } = {}) {
+  const next = clone(billing);
+  const invoice = next.invoices.find((entry) => entry.id === invoiceId);
+  if (!invoice) throw codedError('invoice_not_found', 'invoice not found', 404);
+  if (invoice.status === 'emailed') return { billing: next, invoice: clone(invoice) };
+  if (invoice.status !== 'issued') throw codedError('invoice_not_deliverable');
+  if (!delivery?.provider || !delivery?.messageId || !delivery?.deliveredAt) {
+    throw codedError('delivery_confirmation_required');
+  }
+  const deliveredAt = new Date(delivery.deliveredAt);
+  if (Number.isNaN(deliveredAt.getTime())) throw codedError('invalid_delivery_confirmation');
+  invoice.status = 'emailed';
+  invoice.delivery = {
+    provider: String(delivery.provider),
+    messageId: String(delivery.messageId),
+    deliveredAt: deliveredAt.toISOString(),
+    deliveredBy: actor ?? null,
+  };
+  return { billing: next, invoice: clone(invoice) };
+}
+
+
+export function beginBillingDelivery(billing, { invoiceId, actor, provider, requestedAt } = {}) {
+  const next = clone(billing);
+  const invoice = next.invoices.find((entry) => entry.id === invoiceId);
+  if (!invoice) throw codedError('invoice_not_found', 'invoice not found', 404);
+  if (invoice.status === 'emailed') return { billing: next, invoice: clone(invoice) };
+  if (invoice.status !== 'issued') throw codedError('invoice_not_deliverable');
+  if (!String(provider || '').trim()) throw codedError('delivery_provider_required');
+  const at = new Date(requestedAt || new Date().toISOString());
+  if (Number.isNaN(at.getTime())) throw codedError('invalid_delivery_request');
+  invoice.delivery = {
+    state: 'pending',
+    provider: String(provider).trim(),
+    requestedAt: at.toISOString(),
+    requestedBy: actor ?? null,
+  };
+  return { billing: next, invoice: clone(invoice) };
+}
+
+export function failBillingDelivery(billing, { invoiceId, errorCode, failedAt } = {}) {
+  const next = clone(billing);
+  const invoice = next.invoices.find((entry) => entry.id === invoiceId);
+  if (!invoice) throw codedError('invoice_not_found', 'invoice not found', 404);
+  if (invoice.status === 'emailed') return { billing: next, invoice: clone(invoice) };
+  if (invoice.status !== 'issued' || invoice.delivery?.state !== 'pending') {
+    throw codedError('delivery_not_pending');
+  }
+  const at = new Date(failedAt || new Date().toISOString());
+  if (Number.isNaN(at.getTime())) throw codedError('invalid_delivery_failure');
+  invoice.delivery = {
+    ...invoice.delivery,
+    state: 'failed',
+    errorCode: String(errorCode || 'delivery_failed'),
+    failedAt: at.toISOString(),
+  };
+  return { billing: next, invoice: clone(invoice) };
+}
+
+export function updateBillingSettings(billing, {
+  issuer = undefined,
+  defaultServiceLabel = undefined,
+  invoiceSequence = undefined,
+} = {}) {
+  const next = clone(billing);
+  next.settings ||= {};
+
+  if (issuer !== undefined) {
+    if (!issuer?.name || !issuer?.address || !issuer?.countryCode) throw codedError('issuer_profile_incomplete');
+    const registrationId = issuer.registrationId || issuer.cvr;
+    if (!registrationId) throw codedError('issuer_registration_required');
+    if (issuer.endpoint && (!issuer.endpoint.schemeId || !issuer.endpoint.value)) throw codedError('issuer_endpoint_incomplete');
+    next.settings.issuer = clone({ ...issuer, registrationId });
+  }
+
+  if (defaultServiceLabel !== undefined) {
+    const label = String(defaultServiceLabel || '').trim();
+    if (!label) throw codedError('default_service_label_required');
+    next.settings.defaultServiceLabel = label;
+  }
+
+  if (invoiceSequence !== undefined) {
+    const nextNumber = invoiceSequence?.nextNumber;
+    if (!Number.isInteger(nextNumber) || nextNumber < 1) throw codedError('invalid_invoice_sequence');
+    const maxReserved = (next.invoices || [])
+      .filter((entry) => entry?.status !== 'void' && /^\d+$/.test(String(entry?.number || '')))
+      .reduce((max, entry) => Math.max(max, Number(entry.number)), 0);
+    if (nextNumber <= maxReserved) throw codedError('invoice_sequence_conflict', 'invoice sequence would reuse a reserved number', 409);
+    next.settings.invoiceSequence = { nextNumber };
+  }
+
+  return { billing: next, settings: clone(next.settings) };
 }

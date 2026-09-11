@@ -1,9 +1,21 @@
 import { API_VERSION, readJson, sendJson } from './http-utils.mjs';
+import { handleBillingDelivery } from './billing-delivery.mjs';
 import { createActionGuard, assertActorCapability } from '../src/action-guard.mjs';
 import { subjectFromAuthHeader, authSecretFromEnv } from '../src/auth/magic-link.mjs';
 import { getUser, updateCapabilities } from '../src/user/user-store.mjs';
 import { evaluateBilling } from '../src/billing/readiness.mjs';
-import { recordBillingActual, createBillingDraft, issueBillingInvoice } from '../src/billing/mutations.mjs';
+import { renderInvoicePdf } from '../src/billing/artifact.mjs';
+import { buildInvoiceDocument, validateInvoiceDocument } from '../src/billing/document-profile.mjs';
+import { renderPeppolBis3Ubl } from '../src/billing/peppol-bis3.mjs';
+import {
+  recordBillingActual,
+  createBillingDraft,
+  issueBillingInvoice,
+  beginBillingDelivery,
+  deliverBillingInvoice,
+  failBillingDelivery,
+  updateBillingSettings,
+} from '../src/billing/mutations.mjs';
 
 function apiError(res, error) {
   const status = Number.isInteger(error?.status) ? error.status : 422;
@@ -12,9 +24,10 @@ function apiError(res, error) {
 
 function isBillingPath(pathname) {
   return pathname === '/api/v1/billing'
+    || pathname === '/api/v1/billing/settings'
     || pathname === '/api/v1/billing/actuals'
     || pathname === '/api/v1/billing/invoices/draft'
-    || /^\/api\/v1\/billing\/invoices\/[^/]+\/issue$/.test(pathname);
+    || /^\/api\/v1\/billing\/invoices\/[^/]+\/(issue|artifact|document|peppol-bis3|deliver)$/.test(pathname);
 }
 
 function projectBillingState(billing) {
@@ -45,6 +58,8 @@ function actorError(code, status, message = code) {
 export function decorateBillingServer(server, {
   authSecret = null,
   requireAuth = process.env.AFTERGRAPH_REQUIRE_AUTH === 'true',
+  billingDeliveryAdapter = null,
+  billingDocumentValidator = null,
 } = {}) {
   const originals = server.listeners('request');
   if (originals.length === 0) throw new Error('billing decorator requires a request listener');
@@ -95,12 +110,79 @@ export function decorateBillingServer(server, {
       return;
     }
 
+    const artifactMatch = url.pathname.match(/^\/api\/v1\/billing\/invoices\/([^/]+)\/artifact$/);
+    if (artifactMatch && req.method === 'GET') {
+      const { store } = await resolveScope(req, url);
+      const artifact = renderInvoicePdf({ billing: store.snapshot().billing, invoiceId: decodeURIComponent(artifactMatch[1]) });
+      res.statusCode = 200;
+      res.setHeader('content-type', artifact.contentType);
+      res.setHeader('content-disposition', `attachment; filename=\"${artifact.filename}\"`);
+      res.setHeader('content-length', artifact.body.length);
+      res.setHeader('cache-control', 'no-store');
+      res.end(artifact.body);
+      return;
+    }
+
+    const documentMatch = url.pathname.match(/^\/api\/v1\/billing\/invoices\/([^/]+)\/document$/);
+    if (documentMatch && req.method === 'GET') {
+      const { store } = await resolveScope(req, url);
+      const document = buildInvoiceDocument({ billing: store.snapshot().billing, invoiceId: decodeURIComponent(documentMatch[1]) });
+      sendJson(res, 200, { version: API_VERSION, document });
+      return;
+    }
+
+    const peppolMatch = url.pathname.match(/^\/api\/v1\/billing\/invoices\/([^/]+)\/peppol-bis3$/);
+    if (peppolMatch && req.method === 'GET') {
+      const { store } = await resolveScope(req, url);
+      const document = buildInvoiceDocument({ billing: store.snapshot().billing, invoiceId: decodeURIComponent(peppolMatch[1]) });
+      const profile = 'peppol-bis-3.0-2026-05';
+      const preflight = validateInvoiceDocument(document, { profile });
+      if (!preflight.ok) {
+        sendJson(res, 422, { error: 'document_profile_validation_failed', profile, errors: preflight.errors });
+        return;
+      }
+      const xml = renderPeppolBis3Ubl(document);
+      if (typeof billingDocumentValidator === 'function') {
+        const external = await billingDocumentValidator({ profile, document, xml });
+        if (!external?.ok) {
+          sendJson(res, 422, {
+            error: 'document_external_validation_failed',
+            profile,
+            errors: external?.errors || ['external_validation_failed'],
+          });
+          return;
+        }
+      }
+      res.statusCode = 200;
+      res.setHeader('content-type', 'application/xml; charset=utf-8');
+      res.setHeader('cache-control', 'no-store');
+      res.end(xml);
+      return;
+    }
+
     const body = await readJson(req);
     if (!body?.actor) throw actorError('actor_required', 422);
     const { actor, store } = await resolveScope(req, url, body.actor);
     const actionKey = begin(req, body, actor, store, url.pathname);
 
     try {
+      if (url.pathname === '/api/v1/billing/settings' && req.method === 'POST') {
+        let settings;
+        const next = await store.mutate((draft) => {
+          const result = updateBillingSettings(draft.billing, {
+            issuer: body.issuer,
+            defaultServiceLabel: body.defaultServiceLabel,
+            invoiceSequence: body.invoiceSequence,
+          });
+          draft.billing = result.billing;
+          settings = result.settings;
+          return draft;
+        });
+        actionGuard.complete(actionKey, { status: 'accepted', settingsUpdated: true });
+        sendJson(res, 200, { version: API_VERSION, settings, billing: projectBillingState(next.billing) });
+        return;
+      }
+
       if (url.pathname === '/api/v1/billing/actuals' && req.method === 'POST') {
         let visit;
         const next = await store.mutate((draft) => {
@@ -156,6 +238,24 @@ export function decorateBillingServer(server, {
           version: API_VERSION,
           invoice,
           billing: projectBillingState(next.billing),
+        });
+        return;
+      }
+
+      const deliverMatch = url.pathname.match(/^\/api\/v1\/billing\/invoices\/([^/]+)\/deliver$/);
+      if (deliverMatch && req.method === 'POST') {
+        if (!billingDeliveryAdapter?.name || typeof billingDeliveryAdapter.deliver !== 'function') {
+          throw actorError('delivery_provider_unavailable', 503);
+        }
+        const invoiceId = decodeURIComponent(deliverMatch[1]);
+        await handleBillingDelivery({
+          store,
+          invoiceId,
+          actor,
+          adapter: billingDeliveryAdapter,
+          actionKey,
+          actionGuard,
+          res,
         });
         return;
       }

@@ -20,6 +20,8 @@ const REASONS = Object.freeze({
   billing_window_closed: 'Klar til gennemgang',
   future_visit_same_window: 'Samles med næste besøg',
   missing_actuals: 'Faktiske arbejdstimer mangler',
+  missing_customer_address: 'Kundens adresse mangler',
+  missing_issuer_profile: 'Virksomhedsprofilen mangler oplysninger',
   missing_customer_email: 'Kundens e-mail mangler',
   missing_rate: 'Timepris mangler',
   missing_currency: 'Valuta mangler',
@@ -187,6 +189,7 @@ function sanitizeBillingForCache(billing) {
       status: entry.status,
       currency: entry.currency,
       totalGrossMinor: entry.totalGrossMinor,
+      delivery: entry.delivery ? structuredClone(entry.delivery) : null,
     })),
     projection: billing.projection ? structuredClone(billing.projection) : { items: [], summary: {} },
   };
@@ -509,10 +512,20 @@ function createApp() {
   function controlsHtml() {
     const disabled = canMutate() ? '' : ' disabled aria-disabled="true" title="Kræver online og aktuelle data"';
     if (state.activeInvoice) {
-      const final = ['issued', 'emailed'].includes(state.activeInvoice.status);
-      return `<div class="billing-draft-status"><strong>${final ? 'Faktura udstedt' : 'Kladde oprettet'}</strong><p>Nr. ${esc(state.activeInvoice.number)} · forfalder ${esc(formatDate(state.activeInvoice.dueDate, locale()))}</p></div><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Luk</button>${final ? '' : `<button type="button" class="billing-primary-button" data-action="issue" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>Udsted faktura</button>`}</div>`;
+      const issued = ['issued', 'emailed'].includes(state.activeInvoice.status);
+      const emailed = state.activeInvoice.status === 'emailed';
+      const deliveryFailed = state.activeInvoice.delivery?.state === 'failed';
+      const status = emailed ? 'Sendt til kunde' : deliveryFailed ? 'Levering fejlede' : issued ? 'Faktura udstedt' : 'Kladde oprettet';
+      const deliveryDetail = emailed
+        ? `<p>Leveret ${esc(formatDate(state.activeInvoice.delivery?.deliveredAt, locale()))} via ${esc(state.activeInvoice.delivery?.provider || 'provider')}.</p>`
+        : deliveryFailed ? '<p>Fakturaen er stadig udstedt. Du kan prøve leveringen igen.</p>' : '';
+      const artifact = issued ? `<button type="button" class="billing-secondary-button" data-action="download" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>Download faktura</button>` : '';
+      const deliver = issued && !emailed ? `<button type="button" class="billing-primary-button" data-action="deliver" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>${deliveryFailed ? 'Prøv levering igen' : 'Send faktura'}</button>` : '';
+      const issue = issued ? '' : `<button type="button" class="billing-primary-button" data-action="issue" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>Udsted faktura</button>`;
+      return `<div class="billing-draft-status"><strong>${status}</strong><p>Nr. ${esc(state.activeInvoice.number)} · forfalder ${esc(formatDate(state.activeInvoice.dueDate, locale()))}</p>${deliveryDetail}</div><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Luk</button>${artifact}${issue}${deliver}</div>`;
     }
-    return `<form id="billing-draft-form" class="billing-form"><div class="billing-form-row"><div class="billing-field"><label for="billing-number">Fakturanummer</label><input id="billing-number" name="number" inputmode="numeric" autocomplete="off" placeholder="fx 1370" required${disabled}></div><div class="billing-field"><label for="billing-issue-date">Fakturadato</label><input id="billing-issue-date" name="issueDate" type="date" value="${today()}" required${disabled}></div></div><p class="billing-form-help">Nummeret reserveres først, når kladden oprettes. Finansielle handlinger kræver online og aktuelle data.</p><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Annuller</button><button type="submit" class="billing-primary-button"${disabled}>Opret kladde</button></div></form>`;
+    const nextNumber = state.billing?.settings?.invoiceSequence?.nextNumber ?? '—';
+    return `<form id="billing-draft-form" class="billing-form"><div class="billing-field"><label for="billing-issue-date">Fakturadato</label><input id="billing-issue-date" name="issueDate" type="date" value="${today()}" required${disabled}></div><p class="billing-form-help">Næste fakturanummer: <strong>${esc(nextNumber)}</strong>. Nummeret reserveres automatisk og atomisk, når kladden oprettes.</p><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Annuller</button><button type="submit" class="billing-primary-button"${disabled}>Opret kladde</button></div></form>`;
   }
 
   function renderReview() {
@@ -524,8 +537,25 @@ function createApp() {
       return;
     }
     els.reviewKicker.textContent = state.activeInvoice ? 'Faktura' : 'Fakturakladde';
-    els.reviewTitle.textContent = state.activeInvoice?.status === 'issued' ? 'Faktura udstedt' : 'Gennemgå faktura';
+    els.reviewTitle.textContent = state.activeInvoice?.status === 'emailed' ? 'Faktura sendt' : state.activeInvoice?.status === 'issued' ? 'Faktura udstedt' : 'Gennemgå faktura';
     els.reviewBody.innerHTML = `<section class="billing-review-customer"><h3>${esc(account.name)}</h3><p>${item.visitIds.length} besøg</p></section><section class="billing-review-lines" aria-label="Fakturalinjer">${lineHtml(item, projected)}</section><section class="billing-totals" aria-label="Fakturatotaler">${projected.discountMinor ? `<div class="billing-total-row"><span>Rabat</span><span>−${esc(formatMoney(projected.discountMinor, projected.currency, locale()))}</span></div>` : ''}<div class="billing-total-row"><span>Ekskl. moms</span><span>${esc(formatMoney(projected.totalNetMinor, projected.currency, locale()))}</span></div><div class="billing-total-row"><span>Moms</span><span>${esc(formatMoney(projected.taxMinor, projected.currency, locale()))}</span></div><div class="billing-total-row is-total"><span>I alt</span><span>${esc(formatMoney(projected.totalGrossMinor, projected.currency, locale()))}</span></div></section>${controlsHtml()}`;
+    appendPeppolControl();
+  }
+
+  function appendPeppolControl() {
+    if (!state.activeInvoice || !['issued', 'emailed'].includes(state.activeInvoice.status)) return;
+    const actions = $('.billing-form-actions', els.reviewBody);
+    if (!actions) return;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'billing-secondary-button';
+    button.dataset.action = 'peppol';
+    button.dataset.invoiceId = state.activeInvoice.id;
+    button.textContent = 'Download UBL';
+    button.disabled = !canMutate();
+    button.title = 'Peppol BIS Billing 3.0 / UBL';
+    const primary = $('.billing-primary-button', actions);
+    actions.insertBefore(button, primary || null);
   }
 
   function openReview(item) {
@@ -534,7 +564,33 @@ function createApp() {
     state.activeInvoice = null;
     renderReview();
     openDialog();
-    setTimeout(() => $('#billing-number', els.review)?.focus(), 0);
+    setTimeout(() => $('#billing-issue-date', els.review)?.focus(), 0);
+  }
+
+  function openCompanySettings() {
+    if (state.busy || !canMutate()) return toast('Kræver online og aktuelle data');
+    const settings = state.billing?.settings || {};
+    const issuer = settings.issuer || {};
+    const endpoint = issuer.endpoint || {};
+    state.activeItem = null;
+    state.activeInvoice = null;
+    els.reviewKicker.textContent = 'Indstillinger';
+    els.reviewTitle.textContent = 'Virksomhedsprofil';
+    els.reviewBody.innerHTML = `<form id="billing-company-form" class="billing-form billing-company-form">
+      <div class="billing-form-row"><div class="billing-field"><label for="company-name">Virksomhedsnavn</label><input id="company-name" name="name" value="${esc(issuer.name || '')}" required></div><div class="billing-field"><label for="company-country">Landekode</label><input id="company-country" name="countryCode" value="${esc(issuer.countryCode || '')}" maxlength="2" placeholder="DK" required></div></div>
+      <div class="billing-field"><label for="company-address">Adresse</label><input id="company-address" name="address" value="${esc(issuer.address || '')}" required></div>
+      <div class="billing-form-row"><div class="billing-field"><label for="company-registration">Registrerings-ID / CVR</label><input id="company-registration" name="registrationId" value="${esc(issuer.registrationId || issuer.cvr || '')}" required></div><div class="billing-field"><label for="company-registration-scheme">ID-scheme</label><input id="company-registration-scheme" name="registrationScheme" value="${esc(issuer.registrationScheme || '')}" placeholder="0184"></div></div>
+      <div class="billing-form-row"><div class="billing-field"><label for="company-email">E-mail</label><input id="company-email" name="email" type="email" value="${esc(issuer.email || '')}"></div><div class="billing-field"><label for="company-phone">Telefon</label><input id="company-phone" name="phone" value="${esc(issuer.phone || '')}"></div></div>
+      <div class="billing-field"><label for="company-payment">Betalingsoplysninger</label><input id="company-payment" name="paymentText" value="${esc(issuer.paymentText || '')}" placeholder="Bank, MobilePay eller anden digital betaling"></div>
+      <div class="billing-form-row"><div class="billing-field"><label for="company-service">Standardydelse</label><input id="company-service" name="defaultServiceLabel" value="${esc(settings.defaultServiceLabel || 'Service')}" required></div><div class="billing-field"><label for="company-sequence">Næste fakturanummer</label><input id="company-sequence" name="nextNumber" type="number" min="1" step="1" value="${esc(settings.invoiceSequence?.nextNumber || 1)}" required></div></div>
+      <details class="billing-advanced"><summary>Peppol / Nemhandel</summary>
+        <div class="billing-form-row"><div class="billing-field"><label for="company-endpoint-scheme">Endpoint scheme</label><input id="company-endpoint-scheme" name="endpointScheme" value="${esc(endpoint.schemeId || '')}" placeholder="0184"></div><div class="billing-field"><label for="company-endpoint-value">Elektronisk endpoint</label><input id="company-endpoint-value" name="endpointValue" value="${esc(endpoint.value || '')}"></div></div>
+        <p class="billing-form-help">Kun nødvendigt for struktureret e-faktura. PDF og e-mail kræver ikke Peppol.</p>
+      </details>
+      <div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Annuller</button><button type="submit" class="billing-primary-button">Gem virksomhed</button></div>
+    </form>`;
+    openDialog();
+    setTimeout(() => $('#company-name', els.review)?.focus(), 0);
   }
 
   function openActuals(item) {
@@ -551,13 +607,12 @@ function createApp() {
   async function createDraft(form) {
     if (!state.activeItem || state.busy || !canMutate()) return;
     const data = new FormData(form);
-    const number = String(data.get('number') || '').trim();
     const issueDate = String(data.get('issueDate') || '').trim();
-    if (!number || !issueDate) return;
+    if (!issueDate) return;
     state.busy = true;
     form.querySelectorAll('button,input').forEach((node) => { node.disabled = true; });
     try {
-      const body = await client.createDraft({ customerId: state.activeItem.customerId, visitIds: state.activeItem.visitIds, number, issueDate });
+      const body = await client.createDraft({ customerId: state.activeItem.customerId, visitIds: state.activeItem.visitIds, issueDate });
       state.billing = body.billing;
       state.cached = false;
       state.activeInvoice = body.invoice;
@@ -589,6 +644,112 @@ function createApp() {
     } catch {
       button.disabled = false;
       toast('Kunne ikke udstede faktura');
+    } finally {
+      state.busy = false;
+    }
+  }
+
+  async function downloadInvoice(id, button) {
+    if (!id || state.busy || !canMutate()) return;
+    state.busy = true;
+    button.disabled = true;
+    try {
+      const artifact = await client.downloadArtifact(id);
+      const url = URL.createObjectURL(artifact.blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = artifact.filename;
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+      toast('Fakturaen er klar til download');
+    } catch {
+      toast('Kunne ikke hente fakturaen');
+    } finally {
+      state.busy = false;
+      button.disabled = false;
+    }
+  }
+
+  async function downloadPeppolInvoice(id, button) {
+    if (!id || state.busy || !canMutate()) return;
+    state.busy = true;
+    button.disabled = true;
+    try {
+      const artifact = await client.downloadPeppol(id);
+      const url = URL.createObjectURL(artifact.blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = artifact.filename || `invoice-${id}.xml`;
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+      toast('UBL-fakturaen er klar til download');
+    } catch (error) {
+      const profileError = error?.code === 'document_profile_validation_failed'
+        || error?.code === 'document_external_validation_failed';
+      toast(profileError
+        ? 'Peppol-oplysninger mangler eller kunne ikke valideres'
+        : 'Kunne ikke hente UBL-fakturaen');
+    } finally {
+      state.busy = false;
+      button.disabled = false;
+    }
+  }
+
+  async function deliverInvoice(id, button) {
+    if (!id || state.busy || !canMutate()) return;
+    state.busy = true;
+    button.disabled = true;
+    try {
+      const body = await client.deliverInvoice(id);
+      state.billing = body.billing;
+      state.cached = false;
+      state.activeInvoice = body.invoice;
+      state.lastSyncedAt = writeReadCache(body.billing, state.cacheIdentity) || state.lastSyncedAt;
+      render();
+      renderReview();
+      toast(`Faktura ${body.invoice.number} er sendt`);
+    } catch (error) {
+      toast(error.code === 'delivery_provider_unavailable' ? 'Ingen leveringsprovider er konfigureret' : 'Levering fejlede. Fakturaen er ikke markeret som sendt.');
+      await refresh();
+      const latest = invoice(id);
+      if (latest) state.activeInvoice = structuredClone(latest);
+      renderReview();
+    } finally {
+      state.busy = false;
+    }
+  }
+
+  async function saveCompanySettings(form) {
+    if (state.busy || !canMutate()) return;
+    const data = new FormData(form);
+    const endpointScheme = String(data.get('endpointScheme') || '').trim();
+    const endpointValue = String(data.get('endpointValue') || '').trim();
+    const issuer = {
+      name: String(data.get('name') || '').trim(),
+      address: String(data.get('address') || '').trim(),
+      countryCode: String(data.get('countryCode') || '').trim().toUpperCase(),
+      registrationId: String(data.get('registrationId') || '').trim(),
+      registrationScheme: String(data.get('registrationScheme') || '').trim() || null,
+      email: String(data.get('email') || '').trim() || null,
+      phone: String(data.get('phone') || '').trim() || null,
+      paymentText: String(data.get('paymentText') || '').trim() || null,
+      endpoint: endpointScheme || endpointValue ? { schemeId: endpointScheme, value: endpointValue } : null,
+    };
+    const nextNumber = Number(data.get('nextNumber'));
+    const defaultServiceLabel = String(data.get('defaultServiceLabel') || '').trim();
+    state.busy = true;
+    form.querySelectorAll('button,input').forEach((node) => { node.disabled = true; });
+    try {
+      const body = await client.updateSettings({ issuer, defaultServiceLabel, invoiceSequence: { nextNumber } });
+      state.billing = body.billing;
+      state.cached = false;
+      state.lastSyncedAt = writeReadCache(body.billing, state.cacheIdentity) || state.lastSyncedAt;
+      closeDialog();
+      render();
+      toast('Virksomhedsprofilen er gemt');
+    } catch (error) {
+      form.querySelectorAll('button,input').forEach((node) => { node.disabled = false; });
+      toast(error.code === 'invoice_sequence_conflict' ? 'Næste fakturanummer kolliderer med en eksisterende faktura' : 'Kunne ikke gemme virksomhedsprofilen');
     } finally {
       state.busy = false;
     }
@@ -627,6 +788,7 @@ function createApp() {
     const action = event.target.closest('[data-action]');
     if (!action) return;
     if (action.dataset.action === 'close-review') return closeDialog();
+    if (action.dataset.action === 'company-settings') return openCompanySettings();
     if (action.dataset.action === 'review') {
       const item = findItem(action.dataset.key);
       if (item) openReview(item);
@@ -637,7 +799,10 @@ function createApp() {
       if (item) openActuals(item);
       return;
     }
-    if (action.dataset.action === 'issue') issueInvoice(action.dataset.invoiceId, action);
+    if (action.dataset.action === 'issue') return issueInvoice(action.dataset.invoiceId, action);
+    if (action.dataset.action === 'download') return downloadInvoice(action.dataset.invoiceId, action);
+    if (action.dataset.action === 'peppol') return downloadPeppolInvoice(action.dataset.invoiceId, action);
+    if (action.dataset.action === 'deliver') return deliverInvoice(action.dataset.invoiceId, action);
   });
 
   document.addEventListener('submit', (event) => {
@@ -647,6 +812,9 @@ function createApp() {
     } else if (event.target.id === 'billing-actuals-form') {
       event.preventDefault();
       saveActuals(event.target);
+    } else if (event.target.id === 'billing-company-form') {
+      event.preventDefault();
+      saveCompanySettings(event.target);
     }
   });
 

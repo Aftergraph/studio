@@ -35,6 +35,18 @@ export function createBillingClient({
     return body;
   };
 
+  const readBlob = async (path) => {
+    const response = await fetchFn(path, { headers: authHeaders() });
+    if (!response.ok) {
+      let body = null;
+      try { body = await response.json(); } catch {}
+      throw normalizeError(response, body);
+    }
+    const disposition = response.headers.get('content-disposition') || '';
+    const filename = disposition.match(/filename=\"?([^\";]+)\"?/i)?.[1] || 'invoice.pdf';
+    return { blob: await response.blob(), contentType: response.headers.get('content-type') || 'application/octet-stream', filename };
+  };
+
   const write = async (path, payload, prefix) => {
     if (!currentActor) {
       const error = new Error('billing session actor required');
@@ -78,6 +90,24 @@ export function createBillingClient({
     },
     issueInvoice(invoiceId) {
       return write(`/api/v1/billing/invoices/${encodeURIComponent(invoiceId)}/issue`, {}, 'billing-issue');
+    },
+    downloadArtifact(invoiceId) {
+      const suffix = currentActor ? `?actor=${encodeURIComponent(currentActor)}` : '';
+      return readBlob(`/api/v1/billing/invoices/${encodeURIComponent(invoiceId)}/artifact${suffix}`);
+    },
+    deliverInvoice(invoiceId) {
+      return write(`/api/v1/billing/invoices/${encodeURIComponent(invoiceId)}/deliver`, {}, 'billing-deliver');
+    },
+    updateSettings(settings) {
+      return write('/api/v1/billing/settings', settings, 'billing-settings');
+    },
+    getDocument(invoiceId) {
+      const suffix = currentActor ? `?actor=${encodeURIComponent(currentActor)}` : '';
+      return read(`/api/v1/billing/invoices/${encodeURIComponent(invoiceId)}/document${suffix}`);
+    },
+    downloadPeppol(invoiceId) {
+      const suffix = currentActor ? `?actor=${encodeURIComponent(currentActor)}` : '';
+      return readBlob(`/api/v1/billing/invoices/${encodeURIComponent(invoiceId)}/peppol-bis3${suffix}`);
     },
   });
 }
