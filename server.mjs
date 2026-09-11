@@ -1,8 +1,13 @@
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { createAppServer, upstreamConfigFromEnv } from './server/app-server.mjs';
+import { createAppServer as createWorkspaceAppServer, upstreamConfigFromEnv } from './server/app-server.mjs';
+import { decorateBillingServer } from './server/billing-server.mjs';
 
-export { createAppServer, upstreamConfigFromEnv };
+export function createAppServer(options = {}) {
+  return decorateBillingServer(createWorkspaceAppServer(options), options);
+}
+
+export { upstreamConfigFromEnv };
 
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
   const root=path.dirname(fileURLToPath(import.meta.url));
