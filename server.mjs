@@ -1,8 +1,35 @@
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { createAppServer, upstreamConfigFromEnv } from './server/app-server.mjs';
+import { createAppServer as createWorkspaceAppServer, upstreamConfigFromEnv } from './server/app-server.mjs';
+import { createIntentCompileHandler } from './server/intent-routes.mjs';
+import { createHermesIntentProvider } from './server/intent-provider.mjs';
+import { authSecretFromEnv, subjectFromAuthHeader } from './src/auth/magic-link.mjs';
+import { sendJson } from './server/http-utils.mjs';
 
-export { createAppServer, upstreamConfigFromEnv };
+export { upstreamConfigFromEnv };
+
+export function createAppServer(options={}) {
+  const { intentProvider=null, ...workspaceOptions }=options;
+  const server=createWorkspaceAppServer(workspaceOptions);
+  const baseHandlers=server.listeners('request');
+  const compileHandler=createIntentCompileHandler({provider:intentProvider || createHermesIntentProvider()});
+  const requireAuth=workspaceOptions.requireAuth ?? process.env.AFTERGRAPH_REQUIRE_AUTH === 'true';
+  const secret=workspaceOptions.authSecret || authSecretFromEnv();
+
+  server.removeAllListeners('request');
+  server.on('request',async(req,res)=>{
+    const url=new URL(req.url || '/', 'http://127.0.0.1');
+    if(url.pathname==='/api/v1/intent/compile'){
+      if(requireAuth && !subjectFromAuthHeader(req,{secret})){
+        sendJson(res,401,{error:'authentication_required'});
+        return;
+      }
+      if(await compileHandler(req,res,url))return;
+    }
+    for(const handler of baseHandlers)handler(req,res);
+  });
+  return server;
+}
 
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
   const root=path.dirname(fileURLToPath(import.meta.url));
