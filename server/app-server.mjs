@@ -17,7 +17,7 @@ import { listGrantableCapabilities } from '../src/user/capability-set.mjs';
 import { createGoal } from '../src/goal/goal-schema.mjs';
 import { createLesson } from '../src/goal/goal-lesson.mjs';
 import { assessGoalDrift } from '../src/goal/goal-drift.mjs';
-import { issueMagicToken, subjectFromAuthHeader, authSecretFromEnv } from '../src/auth/magic-link.mjs';
+import { issueMagicToken, subjectFromAuthHeader, authSecretFromEnv, isDevSecret } from '../src/auth/magic-link.mjs';
 import { createRateLimiter } from '../src/auth/rate-limit.mjs';
 import { createKillSwitch, engageKill, releaseKill, assertAutonomyAllowed } from '../src/autonomy/bounds.mjs';
 import { CostLedger } from '../src/economy/outcome-economy.mjs';
@@ -58,9 +58,12 @@ export function upstreamConfigFromEnv(env=process.env) {
   };
 }
 
-export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, upstreamConfig = null, federation = null, fixtures = true, authSecret = null, requireAuth = process.env.AFTERGRAPH_REQUIRE_AUTH === 'true', maxUserStores = 100 } = {}) {
+export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, upstreamConfig = null, federation = null, fixtures = true, authSecret = null, requireAuth = process.env.AFTERGRAPH_REQUIRE_AUTH === 'true', maxUserStores = 100, releaseSha = process.env.AFTERGRAPH_RELEASE_SHA || 'unknown' } = {}) {
   const rootDir = resolveRoot(root);
-  const secret = authSecret || authSecretFromEnv();
+  const secret = authSecret || authSecretFromEnv(process.env, { requireProduction: requireAuth });
+  if (requireAuth && isDevSecret(secret)) {
+    throw new Error('AFTERGRAPH_AUTH_SECRET required for production authentication');
+  }
   // ponytail: requireAuth turns Bearer binding into enforcement. The operator
   // bootstraps with the boot token (valid 24h); email challenge is the
   // documented follow-up before multi-operator production.
@@ -196,7 +199,24 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
       await store.readyP;
     };
     if (url.pathname === '/healthz') {
-      sendJson(res, 200, { status:'ok', app:'aftergraph-workspace-v5-reference', api:API_VERSION });
+      sendJson(res, 200, { status:'ok', app:'aftergraph-workspace-v5-reference', api:API_VERSION, releaseSha });
+      return;
+    }
+    if (url.pathname === '/readyz') {
+      try {
+        await store.readyP;
+        const persistence = Boolean(store.stateFile);
+        const configuredAuth = !isDevSecret(secret);
+        const ready = persistence && configuredAuth && releaseSha !== 'unknown';
+        sendJson(res, ready ? 200 : 503, {
+          status: ready ? 'ready' : 'not_ready',
+          releaseSha,
+          persistence,
+          auth: { required: requireAuth, configured: configuredAuth },
+        });
+      } catch (error) {
+        sendJson(res, 503, { status:'not_ready', releaseSha, error:'persistence_unavailable' });
+      }
       return;
     }
     if (url.pathname === '/api/v1/events' && req.method === 'GET') {

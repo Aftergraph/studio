@@ -1,0 +1,18 @@
+[Unit]
+Description=Aftergraph Studio backend
+After=network.target
+
+[Service]
+Type=simple
+User=aftergraph
+WorkingDirectory=/opt/aftergraph-studio/current
+EnvironmentFile=/etc/aftergraph/studio-backend.env
+ExecStart=/usr/bin/node /opt/aftergraph-studio/current/server.mjs
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=90
+KillSignal=SIGTERM
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
