@@ -62,3 +62,29 @@ test('result route can override all supported targets',async()=>{
   }
   assert.match(screen,/compileIntent/);
 });
+test('Compose persists drafts and bounded recents locally',async()=>{
+  const history=await text('src/compose/history.ts');
+  const draft=await text('src/compose/draft.ts');
+  assert.match(history,/expo-sqlite\/kv-store/);
+  assert.match(history,/aftergraph\.compose\.recents\.v1/);
+  assert.match(history,/slice\(0,\s*50\)/);
+  assert.match(draft,/expo-sqlite\/kv-store/);
+  assert.match(draft,/aftergraph\.compose\.draft\.v1/);
+});
+
+test('capture restores and preserves draft while result saves successful compile',async()=>{
+  const capture=await text('app/compose.tsx');
+  const result=await text('app/compose-result.tsx');
+  assert.match(capture,/loadDraft/);
+  assert.match(capture,/saveDraft/);
+  assert.match(result,/saveComposition/);
+});
+
+test('Recents route can reopen and delete local compositions',async()=>{
+  const screen=await text('app/compose-recents.tsx');
+  assert.match(screen,/FlatList/);
+  assert.match(screen,/listRecentCompositions/);
+  assert.match(screen,/deleteComposition/);
+  assert.match(screen,/router\.push/);
+  assert.match(screen,/Delete/);
+});

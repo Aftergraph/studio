@@ -21,6 +21,7 @@ export default function RootLayout(){
       <Tabs.Screen name="space" options={{title:'Space',tabBarIcon:({color}:any)=>icon('rectangle.split.3x1',color)}} />
       <Tabs.Screen name="compose" options={{href:null,title:'Compose'}} />
       <Tabs.Screen name="compose-result" options={{href:null,title:'Result'}} />
+      <Tabs.Screen name="compose-recents" options={{href:null,title:'Recents'}} />
       <Tabs.Screen name="chat" options={{href:null}} />
       <Tabs.Screen name="library" options={{href:null}} />
     </Tabs>

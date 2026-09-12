@@ -1,15 +1,27 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, Pressable, Text, TextInput, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { theme } from '../src/theme';
 import { compileIntent } from '../src/compose/api';
+import { loadDraft, saveDraft } from '../src/compose/draft';
 
 export default function ComposeScreen(){
   const [roughThought,setRoughThought]=useState('');
   const [status,setStatus]=useState<'idle'|'working'|'error'>('idle');
   const [error,setError]=useState('');
+
+  useEffect(()=>{
+    let active=true;
+    loadDraft().then(value=>{if(active&&value)setRoughThought(value);});
+    return ()=>{active=false;};
+  },[]);
+
+  const updateThought=(value:string)=>{
+    setRoughThought(value);
+    void saveDraft(value);
+  };
 
   const improve=async()=>{
     const source=roughThought.trim();
@@ -20,7 +32,15 @@ export default function ComposeScreen(){
       const compiled=await compileIntent(source,'auto');
       setStatus('idle');
       Haptics.selectionAsync();
-      router.push({pathname:'/compose-result',params:{source,payload:JSON.stringify(compiled),target:'auto'}});
+      router.push({
+        pathname:'/compose-result',
+        params:{
+          source,
+          payload:JSON.stringify(compiled),
+          target:'auto',
+          recordId:`cmp_${Date.now().toString(36)}`,
+        },
+      });
     }catch(err){
       setStatus('error');
       setError(err instanceof Error?err.message:'compile_failed');
@@ -34,12 +54,15 @@ export default function ComposeScreen(){
           <Text selectable style={{fontSize:13,fontWeight:'700',color:theme.accent,letterSpacing:.4}}>AFTERGRAPH COMPOSE</Text>
           <Text selectable style={{fontSize:30,fontWeight:'760',color:theme.text,letterSpacing:-1}}>Write like you think.</Text>
           <Text selectable style={{fontSize:15,lineHeight:22,color:theme.text2}}>Turn an unfinished thought into a clear instruction for the right AI agent.</Text>
+          <Pressable onPress={()=>router.push('/compose-recents')} accessibilityRole="button">
+            <Text style={{fontSize:13,fontWeight:'650',color:theme.accent}}>Recents</Text>
+          </Pressable>
         </View>
 
         <View style={{borderWidth:1,borderColor:theme.border,borderRadius:20,borderCurve:'continuous',backgroundColor:theme.surface,padding:16,gap:12}}>
           <TextInput
             value={roughThought}
-            onChangeText={setRoughThought}
+            onChangeText={updateThought}
             placeholder="Dump the rough thought here…"
             placeholderTextColor={theme.text3}
             multiline
@@ -62,8 +85,7 @@ export default function ComposeScreen(){
           <Text style={{fontSize:16,fontWeight:'720',color:roughThought.trim()?theme.canvas:theme.text3}}>{status==='working'?'Improving…':'Improve'}</Text>
         </Pressable>
 
-        {status==='error'?<View style={{padding:14,borderRadius:14,backgroundColor:theme.surface}}><Text selectable style={{color:theme.danger}}>Couldn’t improve this thought. {error}</Text></View>:null}
-
+        {status==='error'?<View style={{padding:14,borderRadius:14,backgroundColor:theme.surface}}><Text selectable accessibilityLabel="Compose error" style={{color:theme.danger}}>Couldn’t improve this thought. {error}</Text></View>:null}
       </ScrollView>
     </View>
   );

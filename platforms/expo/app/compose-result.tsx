@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, Pressable, Share, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { theme } from '../src/theme';
 import { compileIntent } from '../src/compose/api';
+import { saveComposition } from '../src/compose/history';
 import type { CompileResponse, ComposeTarget } from '../src/compose/types';
 
 const targets:{id:ComposeTarget;label:string}[]=[
@@ -21,20 +22,31 @@ const refinements=[
 ] as const;
 
 export default function ComposeResultScreen(){
-  const params=useLocalSearchParams<{source?:string;payload?:string;target?:string}>();
+  const params=useLocalSearchParams<{source?:string;payload?:string;target?:string;recordId?:string}>();
   const source=String(params.source||'');
+  const recordId=String(params.recordId||'');
   const initial=(()=>{try{return JSON.parse(String(params.payload||'')) as CompileResponse}catch{return null}})();
   const [result,setResult]=useState<CompileResponse|null>(initial);
   const [target,setTarget]=useState<ComposeTarget>((params.target as ComposeTarget)||'auto');
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
+  const [refinement,setRefinement]=useState<string|null>(null);
+
+  useEffect(()=>{
+    if(!result||!source||!recordId)return;
+    void saveComposition({
+      id:recordId,createdAt:new Date().toISOString(),source,target,
+      interpretedGoal:result.ir.goal.statement,output:result.artifact.content,
+      refinement,result,
+    });
+  },[recordId,refinement,result,source,target]);
 
   const recompile=async(nextTarget:ComposeTarget,refinement?:string)=>{
     if(!source||busy)return;
     setBusy(true);setError('');
     try{
       const next=await compileIntent(source,nextTarget,refinement);
-      setResult(next);setTarget(nextTarget);
+      setResult(next);setTarget(nextTarget);setRefinement(refinement||null);
       Haptics.selectionAsync();
     }catch(err){setError(err instanceof Error?err.message:'compile_failed')}
     finally{setBusy(false)}
