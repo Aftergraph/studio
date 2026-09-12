@@ -46,9 +46,11 @@ test('billing API responses are explicitly non-cacheable and JSON output is HTML
   const http = read('server/http-utils.mjs');
   assert.match(http, /cache-control/i);
   assert.match(http, /no-store/i);
-  const payload = { error: '<img src=x onerror=alert(1)>&problem' };
+  const payload = { error: `<img src=x onerror=alert(1)>&problem${String.fromCharCode(0x2028, 0x2029)}` };
   const serialized = serializeJson(payload);
   assert.doesNotMatch(serialized, /[<>&]/);
+  assert.equal(serialized.includes(String.fromCharCode(0x2028)), false);
+  assert.equal(serialized.includes(String.fromCharCode(0x2029)), false);
   assert.deepEqual(JSON.parse(serialized), payload);
 });
 
