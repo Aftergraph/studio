@@ -1,5 +1,6 @@
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { createAppServer as createWorkspaceAppServer, upstreamConfigFromEnv } from './server/app-server.mjs';
 import { decorateBillingServer } from './server/billing-server.mjs';
 import { billingDeliveryAdapterFromEnv } from './server/billing-delivery.mjs';
@@ -13,7 +14,16 @@ export function createAppServer(options = {}) {
 
 export { upstreamConfigFromEnv };
 
-if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
+export function isMainModule(moduleUrl, argvPath = process.argv[1]) {
+  if (!argvPath) return false;
+  try {
+    return realpathSync(fileURLToPath(moduleUrl)) === realpathSync(argvPath);
+  } catch {
+    return false;
+  }
+}
+
+if (isMainModule(import.meta.url)) {
   const root=path.dirname(fileURLToPath(import.meta.url));
   const port=Number(process.env.PORT||8000);
   const host=process.env.HOST||'127.0.0.1';

@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAppServer } from '../server.mjs';
+import { mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createAppServer, isMainModule } from '../server.mjs';
 
 test('server exposes health and deep-link shell fallback', async (t) => {
   const server = createAppServer({ root: new URL('../', import.meta.url) });
@@ -14,4 +17,17 @@ test('server exposes health and deep-link shell fallback', async (t) => {
   assert.equal(deep.status, 200);
   assert.match(await deep.text(), /Aftergraph Workspace v5/);
   assert.match(deep.headers.get('content-security-policy') || '', /default-src 'self'/);
+});
+
+test('server entrypoint detection follows versioned release symlinks', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'aftergraph-entrypoint-'));
+  const target = new URL('../server.mjs', import.meta.url);
+  const alias = join(dir, 'current', 'server.mjs');
+  try {
+    await mkdir(join(dir, 'current'));
+    await symlink(target, alias);
+    assert.equal(isMainModule(target.href, alias), true);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
