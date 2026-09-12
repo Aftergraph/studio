@@ -5,7 +5,6 @@ import { canFinanciallyMutate, itemsForBillingView } from './app-state.mjs';
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const AUTH_TOKEN_KEY = 'aftergraph.auth.token';
-const READ_CACHE_PREFIX = 'aftergraph.billing.read-cache.v2';
 const IDENTITY_BINDING_PREFIX = 'aftergraph.billing.identity.v1';
 
 const VIEWS = Object.freeze({
@@ -90,10 +89,6 @@ function identityBindingKey(fingerprint) {
   return fingerprint ? `${IDENTITY_BINDING_PREFIX}:${fingerprint}` : null;
 }
 
-function cacheKeyForIdentity(identity) {
-  return identity ? `${READ_CACHE_PREFIX}:${encodeURIComponent(identity)}` : null;
-}
-
 function rememberIdentity(actor, fingerprint) {
   const key = identityBindingKey(fingerprint);
   if (!actor || !key) return false;
@@ -150,77 +145,6 @@ async function resolveBillingSession(client, { online = true } = {}) {
   }
 }
 
-function sanitizeBillingForCache(billing) {
-  if (!billing || typeof billing !== 'object') return null;
-  return {
-    settings: {
-      taxRateBps: Number.isInteger(billing.settings?.taxRateBps) ? billing.settings.taxRateBps : 0,
-      locale: billing.settings?.locale || 'da-DK',
-    },
-    customers: (billing.customers || []).map((entry) => ({
-      id: entry.id,
-      name: entry.name,
-      status: entry.status,
-      billing: entry.billing ? {
-        mode: entry.billing.mode,
-        paymentTermsDays: entry.billing.paymentTermsDays,
-        rateMinor: entry.billing.rateMinor,
-        currency: entry.billing.currency,
-        discountPercent: entry.billing.discountPercent,
-      } : null,
-    })),
-    visits: (billing.visits || []).map((entry) => ({
-      id: entry.id,
-      customerId: entry.customerId,
-      scheduledStart: entry.scheduledStart,
-      status: entry.status,
-      actual: entry.actual ? {
-        workMinutes: entry.actual.workMinutes,
-        discountPercent: entry.actual.discountPercent,
-      } : null,
-    })),
-    invoices: (billing.invoices || []).map((entry) => ({
-      id: entry.id,
-      number: entry.number,
-      customerId: entry.customerId,
-      visitIds: entry.visitIds,
-      issueDate: entry.issueDate,
-      dueDate: entry.dueDate,
-      status: entry.status,
-      currency: entry.currency,
-      totalGrossMinor: entry.totalGrossMinor,
-      delivery: entry.delivery ? structuredClone(entry.delivery) : null,
-    })),
-    projection: billing.projection ? structuredClone(billing.projection) : { items: [], summary: {} },
-  };
-}
-
-function writeReadCache(billing, identity, syncedAt = new Date().toISOString()) {
-  try {
-    const key = cacheKeyForIdentity(identity);
-    const safe = sanitizeBillingForCache(billing);
-    if (!key || !safe) return null;
-    localStorage.setItem(key, JSON.stringify({ syncedAt, billing: safe }));
-    return syncedAt;
-  } catch {
-    return null;
-  }
-}
-
-function readReadCache(identity) {
-  try {
-    const key = cacheKeyForIdentity(identity);
-    if (!key) return null;
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed?.syncedAt || !parsed?.billing?.projection) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
 function createApp() {
   const client = createBillingClient();
   const state = {
@@ -245,6 +169,7 @@ function createApp() {
     context: $('#billing-list-context'), connection: $('#billing-connection'), refresh: $('#billing-refresh'),
     review: $('#billing-review'), reviewTitle: $('#billing-review-title'), reviewKicker: $('#billing-review-kicker'),
     reviewBody: $('#billing-review-body'), toast: $('#billing-toast'),
+    companySettings: $('[data-action="company-settings"]'),
   };
 
   const locale = () => state.billing?.settings?.locale || 'da-DK';
@@ -387,6 +312,16 @@ function createApp() {
     renderSummary();
     renderList();
     renderConnection();
+    if (els.companySettings) {
+      els.companySettings.disabled = !canMutate();
+      els.companySettings.setAttribute('aria-disabled', String(!canMutate()));
+      els.companySettings.title = canMutate() ? '' : 'Kræver online og aktuelle data';
+    }
+    const financialActions = $$('[data-action="review"],[data-action="actuals"],[data-action="issue"],[data-action="deliver"],[data-action="peppol"]');
+    financialActions.forEach((button) => {
+      button.disabled = !canMutate();
+      button.setAttribute('aria-disabled', String(!canMutate()));
+    });
   }
 
   function clearSensitiveState() {
@@ -405,13 +340,10 @@ function createApp() {
     state.cacheIdentity = nextIdentity;
   }
 
-  function adoptCache() {
-    const cached = readReadCache(state.cacheIdentity);
-    if (!cached) return false;
-    state.billing = cached.billing;
+  function adoptMemorySnapshot() {
+    if (!state.billing) return false;
     state.cached = true;
-    state.cachedAt = cached.syncedAt;
-    state.lastSyncedAt = cached.syncedAt;
+    state.cachedAt = state.lastSyncedAt;
     render();
     return true;
   }
@@ -434,7 +366,7 @@ function createApp() {
       }
 
       if (!state.online || session.degraded) {
-        if (!adoptCache() && !state.billing) {
+        if (!adoptMemorySnapshot() && !state.billing) {
           els.summary.innerHTML = '';
           els.list.innerHTML = '<div class="billing-error"><strong>Fakturering er offline.</strong><br>Der findes ingen tidligere synkroniseret visning for denne session.</div>';
         } else if (!state.cached && state.billing) {
@@ -452,7 +384,6 @@ function createApp() {
       state.cached = false;
       state.cachedAt = null;
       state.lastSyncedAt = syncedAt;
-      writeReadCache(body.billing, state.cacheIdentity, syncedAt);
       clearRetry();
       render();
     } catch (error) {
@@ -462,7 +393,7 @@ function createApp() {
         state.actor = null;
         state.cacheIdentity = null;
       }
-      const usedCache = authenticationFailed ? false : adoptCache();
+      const usedCache = authenticationFailed ? false : adoptMemorySnapshot();
       if (!usedCache && !state.billing) {
         els.summary.innerHTML = '';
         els.list.innerHTML = authenticationFailed
@@ -616,7 +547,7 @@ function createApp() {
       state.billing = body.billing;
       state.cached = false;
       state.activeInvoice = body.invoice;
-      state.lastSyncedAt = writeReadCache(body.billing, state.cacheIdentity) || state.lastSyncedAt;
+      state.lastSyncedAt = new Date().toISOString();
       render();
       renderReview();
       toast(`Fakturakladde ${body.invoice.number} oprettet`);
@@ -637,7 +568,7 @@ function createApp() {
       state.billing = body.billing;
       state.cached = false;
       state.activeInvoice = body.invoice;
-      state.lastSyncedAt = writeReadCache(body.billing, state.cacheIdentity) || state.lastSyncedAt;
+      state.lastSyncedAt = new Date().toISOString();
       render();
       renderReview();
       toast(`Faktura ${body.invoice.number} er udstedt`);
@@ -704,7 +635,7 @@ function createApp() {
       state.billing = body.billing;
       state.cached = false;
       state.activeInvoice = body.invoice;
-      state.lastSyncedAt = writeReadCache(body.billing, state.cacheIdentity) || state.lastSyncedAt;
+      state.lastSyncedAt = new Date().toISOString();
       render();
       renderReview();
       toast(`Faktura ${body.invoice.number} er sendt`);
@@ -743,7 +674,7 @@ function createApp() {
       const body = await client.updateSettings({ issuer, defaultServiceLabel, invoiceSequence: { nextNumber } });
       state.billing = body.billing;
       state.cached = false;
-      state.lastSyncedAt = writeReadCache(body.billing, state.cacheIdentity) || state.lastSyncedAt;
+      state.lastSyncedAt = new Date().toISOString();
       closeDialog();
       render();
       toast('Virksomhedsprofilen er gemt');
@@ -765,7 +696,7 @@ function createApp() {
       const body = await client.recordActuals({ visitId: state.activeItem.visitId, actual: { workMinutes: Math.round(hours * 60) } });
       state.billing = body.billing;
       state.cached = false;
-      state.lastSyncedAt = writeReadCache(body.billing, state.cacheIdentity) || state.lastSyncedAt;
+      state.lastSyncedAt = new Date().toISOString();
       closeDialog();
       state.view = 'inbox';
       render();
@@ -821,6 +752,7 @@ function createApp() {
   window.addEventListener('billing-connectivity', (event) => {
     const wasOnline = state.online;
     state.online = event.detail?.online !== false;
+    render();
     if (state.online !== wasOnline) void refresh();
   });
 
@@ -841,4 +773,4 @@ function createApp() {
 
 if (typeof document !== 'undefined') createApp();
 
-export { cacheKeyForIdentity, createApp, formatMoney, formatWorkMinutes, resolveBillingSession, sanitizeBillingForCache };
+export { createApp, formatMoney, formatWorkMinutes, resolveBillingSession };

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { serializeJson } from '../server/http-utils.mjs';
 
 const read = (path) => fs.readFileSync(path, 'utf8');
 
@@ -29,14 +30,36 @@ test('legacy billing route redirects through a self-hosted CSP-safe script', () 
   assert.match(redirect, /target\.hash\s*=\s*location\.hash/);
 });
 
-test('offline billing read cache is namespaced by non-secret identity', () => {
+test('billing never persists customer or invoice state in browser storage', () => {
   const app = read('src/billing/billing-app.mjs');
-  assert.match(app, /cacheKeyForIdentity|cacheKeyForActor|identityCacheKey/);
-  assert.doesNotMatch(app, /localStorage\.setItem\(CACHE_KEY\s*,/, 'a single global billing cache key can leak data across users');
+  assert.doesNotMatch(app, /READ_CACHE_PREFIX|writeReadCache|readReadCache|sanitizeBillingForCache/);
+  assert.doesNotMatch(app, /localStorage\.setItem\([^,]+,\s*JSON\.stringify\(/, 'billing payloads must remain memory-only');
 });
 
-test('billing API responses are explicitly non-cacheable by browsers and intermediaries', () => {
+test('offline Billing disables the company settings write surface', () => {
+  const app = read('src/billing/billing-app.mjs');
+  assert.match(app, /companySettings:\s*\$\('\[data-action="company-settings"\]'\)/);
+  assert.match(app, /els\.companySettings\.disabled\s*=\s*!canMutate\(\)/);
+});
+
+test('billing API responses are explicitly non-cacheable and JSON output is HTML-safe', () => {
   const http = read('server/http-utils.mjs');
   assert.match(http, /cache-control/i);
   assert.match(http, /no-store/i);
+  const payload = { error: '<img src=x onerror=alert(1)>&problem' };
+  const serialized = serializeJson(payload);
+  assert.doesNotMatch(serialized, /[<>&]/);
+  assert.deepEqual(JSON.parse(serialized), payload);
+});
+
+test('connectivity loss synchronously re-renders financial controls before refresh', () => {
+  const app = read('src/billing/billing-app.mjs');
+  assert.match(app, /billing-connectivity[\s\S]{0,300}state\.online\s*=\s*event\.detail\?\.online\s*!==\s*false;[\s\S]{0,120}render\(\);[\s\S]{0,120}if \(state\.online !== wasOnline\) void refresh\(\)/);
+});
+
+test('offline render disables stale financial action nodes already present in the DOM', () => {
+  const app = read('src/billing/billing-app.mjs');
+  assert.match(app, /const financialActions = \$\$\(/);
+  assert.match(app, /data-action="deliver"/);
+  assert.match(app, /financialActions[\s\S]{0,500}button\.disabled\s*=\s*!canMutate\(\)/);
 });

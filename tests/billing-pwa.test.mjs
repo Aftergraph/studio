@@ -66,9 +66,10 @@ test('billing cached fallback schedules a bounded live resync retry', async () =
   assert.match(source, /if \(usedCache && state\.online\) scheduleRetry\(\)/);
 });
 
-test('billing app source has stale-cache copy and no offline mutation replay API', async () => {
+test('billing offline fallback is memory-only and has no mutation replay API', async () => {
   const source = await text('src/billing/billing-app.mjs');
-  assert.match(source, /aftergraph\.billing\.read-cache\.v2/);
+  assert.match(source, /adoptMemorySnapshot/);
+  assert.doesNotMatch(source, /aftergraph\.billing\.read-cache|writeReadCache|readReadCache|sanitizeBillingForCache/);
   assert.match(source, /Offline/);
   assert.match(source, /senest synkroniseret/);
   assert.doesNotMatch(source, /replayMutation|flushMutation|mutationQueue|writeQueue/i);

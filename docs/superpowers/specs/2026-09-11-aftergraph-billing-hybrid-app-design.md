@@ -154,7 +154,7 @@ Required additional verification beyond the existing Billing workflow tests:
 - manifest contract and installability metadata;
 - service-worker static caching behavior;
 - no mutation endpoint is served from cache or queued offline;
-- stale cache is visibly marked;
+- stale in-memory state is visibly marked;
 - online recovery refreshes canonical state;
 - `/billing/` shell works without Studio navigation;
 - narrow mobile safe-area layout contract;

@@ -53,7 +53,7 @@ The production server can opt into an HTTPS webhook delivery adapter. With no ad
 
 Billing includes a Web App Manifest and service worker. Canonical app URL: `/billing/`; `/billing.html` redirects to it.
 
-Offline mode is deliberately read-only. The app may display a sanitized, identity-scoped last-synced projection, but actuals, drafts, issue, delivery and other financial writes are never queued or replayed offline.
+Offline mode is deliberately read-only. An already-open session may keep its last synchronized Billing projection in memory for read-only rendering, but Billing customer and invoice data is never persisted to browser storage. A cold or reloaded offline session therefore shows the installable shell without reconstructing financial data from disk. Actuals, drafts, issue, delivery and other financial writes are never queued or replayed offline.
 
 When live connectivity returns, Billing re-synchronizes canonical state before financial controls become available again.
 
