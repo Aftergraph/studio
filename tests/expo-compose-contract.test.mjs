@@ -1,0 +1,44 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+
+const root=new URL('../platforms/expo/',import.meta.url);
+const text=path=>readFile(new URL(path,root),'utf8');
+
+test('Compose Expo package is runnable on SDK 57',async()=>{
+  const pkg=JSON.parse(await text('package.json'));
+  assert.equal(pkg.main,'expo-router/entry');
+  assert.match(pkg.dependencies.expo,/57/);
+  assert.equal(pkg.dependencies.react,'19.2.3');
+  assert.match(pkg.dependencies['react-native'],/0\.86/);
+  assert.match(pkg.dependencies['expo-router'],/57/);
+});
+
+test('app metadata identifies Aftergraph Compose and Router',async()=>{
+  const app=JSON.parse(await text('app.json'));
+  assert.equal(app.expo.name,'Aftergraph Compose');
+  assert.equal(app.expo.slug,'aftergraph-compose');
+  assert.ok(app.expo.plugins.includes('expo-router'));
+});
+test('default route enters Compose while legacy Space remains registered',async()=>{
+  const index=await text('app/index.tsx');
+  const layout=await text('app/_layout.tsx');
+  assert.match(index,/compose/);
+  assert.match(layout,/name="compose"/);
+  assert.match(layout,/name="space"/);
+});
+
+test('capture screen owns rough-thought input and compile action',async()=>{
+  const screen=await text('app/compose.tsx');
+  assert.match(screen,/TextInput/);
+  assert.match(screen,/compileIntent/);
+  assert.match(screen,/Improve/);
+  assert.match(screen,/roughThought/);
+});
+
+test('mobile API uses Studio compile route without provider credentials',async()=>{
+  const api=await text('src/compose/api.ts');
+  assert.match(api,/\/api\/v1\/intent\/compile/);
+  assert.match(api,/EXPO_PUBLIC_AFTERGRAPH_API_URL/);
+  assert.doesNotMatch(api,/AFTERGRAPH_INTENT_API_KEY|apiKey|Authorization/);
+});

@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "Aftergraph Compose",
+    "slug": "aftergraph-compose",
+    "scheme": "aftergraph-compose",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "plugins": ["expo-router"],
+    "experiments": { "typedRoutes": true },
+    "ios": { "supportsTablet": true, "bundleIdentifier": "org.aftergraph.compose" },
+    "android": { "package": "org.aftergraph.compose" }
+  }
+}
