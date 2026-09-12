@@ -42,3 +42,23 @@ test('mobile API uses Studio compile route without provider credentials',async()
   assert.match(api,/EXPO_PUBLIC_AFTERGRAPH_API_URL/);
   assert.doesNotMatch(api,/AFTERGRAPH_INTENT_API_KEY|apiKey|Authorization/);
 });
+
+test('result route exposes usable output actions without direct delivery',async()=>{
+  const screen=await text('app/compose-result.tsx');
+  assert.match(screen,/Understood as/i);
+  assert.match(screen,/Clipboard\.setStringAsync/);
+  assert.match(screen,/Share\.share/);
+  assert.match(screen,/selectable/);
+  for(const label of ['Clearer','More autonomous','Safer','More detailed','Shorter','Execution-ready']){
+    assert.match(screen,new RegExp(label,'i'));
+  }
+  assert.doesNotMatch(screen,/Run now|Send directly|Execute now/i);
+});
+
+test('result route can override all supported targets',async()=>{
+  const screen=await text('app/compose-result.tsx');
+  for(const target of ['friday.chatgpt','anthropic.claude-code','openai.codex','aftergraph.hermes','generic']){
+    assert.match(screen,new RegExp(target.replace(/[.]/g,'\\.')));
+  }
+  assert.match(screen,/compileIntent/);
+});
