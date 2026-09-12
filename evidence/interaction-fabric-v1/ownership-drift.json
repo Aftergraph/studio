@@ -1,0 +1,201 @@
+{
+  "schema": "aftergraph.interaction-ownership-audit/1.0",
+  "repositories": {
+    "after-graph-governance": {
+      "owner": "canonical-contracts",
+      "plane": null,
+      "state": "drifted",
+      "currentHead": "db136c855c5ad0b4b9c9fe5c99a66cef447cb053",
+      "reviewedHead": "40226ebd03ef4c6f081229cce393b231009f0e18"
+    },
+    "aie": {
+      "owner": "normative-authority",
+      "plane": "authority",
+      "state": "drifted",
+      "currentHead": "eb0f6d794ca0890501159a0c135700bf5261a6d2",
+      "reviewedHead": "3432834afd80e60009f1252a1801f21feb551b9b"
+    },
+    "trust-gateway": {
+      "owner": "runtime-enforcement",
+      "plane": "trust",
+      "state": "drifted",
+      "currentHead": "f69e48527ab571672f2f009e0c992ad2a703f198",
+      "reviewedHead": "515f8f744ff9b0a14df7398e38693fd3ac7ab667"
+    },
+    "runtime": {
+      "owner": "agent-runtime",
+      "plane": "runtime",
+      "state": "unreviewed",
+      "currentHead": "ed375d42778b39eafb2845b69e802b6fcc6ceded",
+      "reviewedHead": null
+    },
+    "works-execution": {
+      "owner": "durable-execution",
+      "plane": "execution",
+      "state": "drifted",
+      "currentHead": "a444ce065465ea3ce59dc2efa69b5484f3b7aae2",
+      "reviewedHead": "3ea1a80494c38f3e422339db6efbf5a7935a48be"
+    },
+    "relay": {
+      "owner": "human-operator-plane",
+      "plane": "experience",
+      "state": "unreviewed",
+      "currentHead": "6b43aa1b6583d288779363451fbe149e1584c1c8",
+      "reviewedHead": null
+    },
+    "studio": {
+      "owner": "primary-experience",
+      "plane": "experience",
+      "state": "unreviewed",
+      "currentHead": "390ef650ca9a807c8f03dafbe0757a82fbccc763",
+      "reviewedHead": null
+    },
+    "wi-backend": {
+      "owner": "work-inference",
+      "plane": "intelligence",
+      "state": "unreviewed",
+      "currentHead": "cf7f26993450640951165aa6e6e0cd1481515938",
+      "reviewedHead": null
+    },
+    "wi-frontend": {
+      "owner": "work-intelligence-experience",
+      "plane": "experience",
+      "state": "unreviewed",
+      "currentHead": "16f51e364670d1e8c1348e9e211319e4191986bc",
+      "reviewedHead": null
+    },
+    "context-continuity": {
+      "owner": "continuity-contract",
+      "plane": null,
+      "state": "unreviewed",
+      "currentHead": "f9256490358e416c7e2556587042f2e250d4b032",
+      "reviewedHead": null
+    },
+    "continuum": {
+      "owner": "continuity-containment-verification",
+      "plane": null,
+      "state": "unreviewed",
+      "currentHead": "c1d6ef80b82f797604c90b6db0b8075780fc3744",
+      "reviewedHead": null
+    },
+    "sentinel": {
+      "owner": "verified-code-review",
+      "plane": "verification",
+      "state": "unreviewed",
+      "currentHead": "ac6b194d9dcfa474b9d9062cc496beac7e09e248",
+      "reviewedHead": null
+    },
+    "sentinel-firetest": {
+      "owner": "temporary-verification-fixture",
+      "plane": null,
+      "state": "unreviewed",
+      "currentHead": "47bcb00bb58d340ab93f44fbeade4d965a4adbc5",
+      "reviewedHead": null
+    },
+    "sentinel-firetest2": {
+      "owner": "temporary-verification-fixture",
+      "plane": null,
+      "state": "unreviewed",
+      "currentHead": "e59ce259306303f08fcdfed328f957e6434a1299",
+      "reviewedHead": null
+    },
+    "intelligence-systems-research": {
+      "owner": "research-assurance",
+      "plane": null,
+      "state": "drifted",
+      "currentHead": "06d906bcab0159527e76fc866bb7c74ac294f32f",
+      "reviewedHead": "d67354385ea94f45e2dad7e8362621a9dee31b2f"
+    },
+    "skills-vault": {
+      "owner": "capability-supply-chain",
+      "plane": null,
+      "state": "unreviewed",
+      "currentHead": "aecd24a33587e29ed70a986a2eaddd2925b0c1c0",
+      "reviewedHead": null
+    },
+    "llm-research-development": {
+      "owner": "model-rnd-methodology",
+      "plane": null,
+      "state": "unreviewed",
+      "currentHead": "2b168d5b2ba899d5308438f260e7093e841a4d8e",
+      "reviewedHead": null
+    },
+    "afm": {
+      "owner": "model-program",
+      "plane": null,
+      "state": "unreviewed",
+      "currentHead": "ec9a47aa3458be87b42d2f56dc57aa28f28ca21c",
+      "reviewedHead": null
+    },
+    "model-registry": {
+      "owner": "model-lifecycle-registry",
+      "plane": null,
+      "state": "unreviewed",
+      "currentHead": "74a7af6039236a59e1008ecddefd22d7f1a411e0",
+      "reviewedHead": null
+    },
+    "autonomous-venture-company": {
+      "owner": "legacy-migration-source",
+      "plane": null,
+      "state": "unreviewed",
+      "currentHead": "828348ff055c08c836d1bb0948f0acc48b7a5717",
+      "reviewedHead": null
+    },
+    "aftergraph-cron-fabric": {
+      "owner": "scheduled-observation-fabric",
+      "plane": null,
+      "state": "unreviewed",
+      "currentHead": "7c4bee3236fca24ab008574b68a6a44cc92b55d3",
+      "reviewedHead": null
+    },
+    "veranza": {
+      "owner": "assurance-incubation",
+      "plane": null,
+      "state": "unreviewed",
+      "currentHead": "18a860b54260326585f3306acc58ba4f15df7d69",
+      "reviewedHead": null
+    },
+    "docs": {
+      "owner": "knowledge-plane",
+      "plane": null,
+      "state": "unreviewed",
+      "currentHead": "a3ca2292a6926b055d54d3fc2df325a7e59814cd",
+      "reviewedHead": null
+    },
+    "aftergraph.org": {
+      "owner": "public-front-door",
+      "plane": null,
+      "state": "unreviewed",
+      "currentHead": "bf70706f968681e7bbf4134d10e3222eaac34863",
+      "reviewedHead": null
+    },
+    "brand": {
+      "owner": "brand-design-system",
+      "plane": null,
+      "state": "unreviewed",
+      "currentHead": "6abc51be903ffd1041a716d2adeec364de3d68c0",
+      "reviewedHead": null
+    },
+    ".github": {
+      "owner": "organization-community",
+      "plane": null,
+      "state": "unreviewed",
+      "currentHead": "7695d28a3fdeb347e2900b5a0dfe34c8d55739c7",
+      "reviewedHead": null
+    },
+    "skill-abi": {
+      "owner": "skill-compatibility-contract",
+      "plane": null,
+      "state": "unreviewed",
+      "currentHead": "14dc965f05efef4fc917b775e1dcc9ef29ba4474",
+      "reviewedHead": null
+    },
+    "skillport": {
+      "owner": "skill-portability-benchmark",
+      "plane": null,
+      "state": "unreviewed",
+      "currentHead": "9e4b86b95c3907dea4194fdd7abff274badc16da",
+      "reviewedHead": null
+    }
+  }
+}
