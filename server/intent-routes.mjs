@@ -9,6 +9,7 @@ import {
   validateIntentIR,
   classifyTarget,
   renderIntent,
+  refineIntent,
   TARGETS,
 } from '../packages/intent-compiler/index.mjs';
 
@@ -58,7 +59,15 @@ export function createIntentCompileHandler({ provider } = {}) {
         sendJson(res, 422, { error: 'unsupported_target' });
         return true;
       }
-      const artifact = renderIntent(ir, target.target);
+      let artifact = renderIntent(ir, target.target);
+      if (body?.refinement) {
+        const refined=refineIntent(ir,String(body.refinement),target.target);
+        if (refined.error) {
+          sendJson(res,422,{error:refined.error.toLowerCase()});
+          return true;
+        }
+        artifact=refined.artifact;
+      }
       sendJson(res, 200, {
         ir,
         target,

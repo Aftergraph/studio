@@ -2,7 +2,7 @@ import { Tabs } from 'expo-router';
 import { Image } from 'expo-image';
 import { theme } from '../src/theme';
 
-const icon = (name:string,color:string) => (
+const icon=(name:string,color:string)=>(
   <Image source={`sf:${name}`} style={{width:19,height:19,tintColor:color}} />
 );
 
@@ -20,6 +20,7 @@ export default function RootLayout(){
       <Tabs.Screen name="work" options={{title:'Work',tabBarIcon:({color}:any)=>icon('briefcase',color)}} />
       <Tabs.Screen name="space" options={{title:'Space',tabBarIcon:({color}:any)=>icon('rectangle.split.3x1',color)}} />
       <Tabs.Screen name="compose" options={{href:null,title:'Compose'}} />
+      <Tabs.Screen name="compose-result" options={{href:null,title:'Result'}} />
       <Tabs.Screen name="chat" options={{href:null}} />
       <Tabs.Screen name="library" options={{href:null}} />
     </Tabs>

@@ -2,13 +2,12 @@ import { useState } from 'react';
 import { ScrollView, Pressable, Text, TextInput, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import { theme } from '../src/theme';
 import { compileIntent } from '../src/compose/api';
-import type { CompileResponse } from '../src/compose/types';
 
 export default function ComposeScreen(){
   const [roughThought,setRoughThought]=useState('');
-  const [result,setResult]=useState<CompileResponse|null>(null);
   const [status,setStatus]=useState<'idle'|'working'|'error'>('idle');
   const [error,setError]=useState('');
 
@@ -19,11 +18,10 @@ export default function ComposeScreen(){
     setError('');
     try{
       const compiled=await compileIntent(source,'auto');
-      setResult(compiled);
       setStatus('idle');
       Haptics.selectionAsync();
+      router.push({pathname:'/compose-result',params:{source,payload:JSON.stringify(compiled),target:'auto'}});
     }catch(err){
-      setResult(null);
       setStatus('error');
       setError(err instanceof Error?err.message:'compile_failed');
     }
@@ -66,12 +64,6 @@ export default function ComposeScreen(){
 
         {status==='error'?<View style={{padding:14,borderRadius:14,backgroundColor:theme.surface}}><Text selectable style={{color:theme.danger}}>Couldn’t improve this thought. {error}</Text></View>:null}
 
-        {result?<View style={{gap:10,borderTopWidth:1,borderTopColor:theme.border,paddingTop:18}}>
-          <Text selectable style={{fontSize:12,fontWeight:'700',color:theme.text3}}>UNDERSTOOD AS</Text>
-          <Text selectable style={{fontSize:20,fontWeight:'700',color:theme.text}}>{result.ir.goal.statement}</Text>
-          <Text selectable style={{fontSize:12,color:theme.text3}}>Target · {result.target.target}</Text>
-          <Text selectable numberOfLines={7} style={{color:theme.text2,lineHeight:21}}>{result.artifact.content}</Text>
-        </View>:null}
       </ScrollView>
     </View>
   );
