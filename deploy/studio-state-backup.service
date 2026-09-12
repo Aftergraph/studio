@@ -1,0 +1,11 @@
+[Unit]
+Description=Aftergraph Studio state backup
+After=studio-backend.service
+
+[Service]
+Type=oneshot
+User=aftergraph
+WorkingDirectory=/opt/aftergraph-studio/current
+EnvironmentFile=/etc/aftergraph/studio-backend.env
+ExecStart=/usr/bin/node scripts/state_backup.mjs backup
+NoNewPrivileges=true

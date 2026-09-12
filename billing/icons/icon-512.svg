@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Aftergraph Billing">
+  <rect width="512" height="512" rx="112" fill="#0b0f16"/>
+  <circle cx="144" cy="144" r="32" fill="#59d4ff"/>
+  <path d="M144 144h155c43 0 75 32 75 75v149" fill="none" stroke="#f5f7fa" stroke-width="42" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M144 245h112c37 0 64 27 64 64v59" fill="none" stroke="#59d4ff" stroke-width="42" stroke-linecap="round"/>
+</svg>

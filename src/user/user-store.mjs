@@ -4,16 +4,28 @@
 import { normalizeCapabilities } from './capability-set.mjs';
 
 const users = new Map();
+const USER_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
-export function createUser({ id, name = id, role = 'member', capabilities }) {
-  if (!id) throw new TypeError('user requires id');
-  
+export function normalizeUserId(id) {
+  if (typeof id !== 'string') throw new TypeError('user id required');
+  const value = id.trim();
+  if (!USER_ID_PATTERN.test(value)) {
+    const error = new TypeError('invalid user id');
+    error.code = 'invalid_user_id';
+    throw error;
+  }
+  return value;
+}
+
+export function createUser({ id, name, role = 'member', workspaceId, capabilities }) {
+  const normalizedId = normalizeUserId(id);
   const normalizedCaps = normalizeCapabilities(capabilities || []);
   
   const user = Object.freeze({
-    id: String(id),
-    name: String(name),
+    id: normalizedId,
+    name: String(name ?? normalizedId),
     role: String(role),
+    workspaceId: String(workspaceId || normalizedId),
     capabilities: normalizedCaps,
   });
   

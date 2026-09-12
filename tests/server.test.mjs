@@ -9,7 +9,7 @@ test('server exposes health and deep-link shell fallback', async (t) => {
   const { port } = server.address();
   const health = await fetch(`http://127.0.0.1:${port}/healthz`);
   assert.equal(health.status, 200);
-  assert.deepEqual(await health.json(), { status:'ok', app:'aftergraph-workspace-v5-reference', api:'aftergraph.workspace.v5' });
+  assert.deepEqual(await health.json(), { status:'ok', app:'aftergraph-workspace-v5-reference', api:'aftergraph.workspace.v5', releaseSha:'unknown' });
   const deep = await fetch(`http://127.0.0.1:${port}/d/CONTROL/o/approval/apr_prod_1`);
   assert.equal(deep.status, 200);
   assert.match(await deep.text(), /Aftergraph Workspace v5/);

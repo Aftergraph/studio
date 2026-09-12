@@ -117,4 +117,14 @@ describe('user-store', () => {
     ]);
     assert.deepEqual(updated.capabilities, ['mission.execute', 'agent.assign']);
   });
+
+  it('rejects user ids that can escape per-user state file paths', () => {
+    for (const id of ['../../escape', '..\\\\escape', '/absolute', '']) {
+      assert.throws(
+        () => createUser({ id, capabilities: [] }),
+        /invalid_user_id|user id/i,
+        `unsafe user id must be rejected: ${id}`,
+      );
+    }
+  });
 });

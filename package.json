@@ -6,6 +6,9 @@
   "description": "Aftergraph Studio — V6 Unified Intelligence Operating Environment for sovereign AI intelligence, durable work, and verified outcomes.",
   "scripts": {
     "start": "node server.mjs",
+    "auth:bootstrap-token": "node scripts/issue_bootstrap_token.mjs",
+    "state:backup": "node scripts/state_backup.mjs backup",
+    "state:restore": "node scripts/state_backup.mjs restore",
     "test": "node --test tests/*.test.mjs",
     "verify": "node scripts/verify.mjs",
     "verify:platforms": "node scripts/platform_verify.mjs",

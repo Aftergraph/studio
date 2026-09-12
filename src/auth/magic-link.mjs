@@ -14,8 +14,12 @@ function b64urlDecode(text) {
   return Buffer.from(padded + '='.repeat((4 - (padded.length % 4)) % 4), 'base64');
 }
 
-export function authSecretFromEnv(env = process.env) {
-  return env.AFTERGRAPH_AUTH_SECRET || 'aftergraph-dev-secret-change-in-production';
+export function authSecretFromEnv(env = process.env, { requireProduction = false } = {}) {
+  const secret = env.AFTERGRAPH_AUTH_SECRET;
+  if (requireProduction && (!secret || isDevSecret(secret))) {
+    throw new Error('AFTERGRAPH_AUTH_SECRET required for production authentication');
+  }
+  return secret || 'aftergraph-dev-secret-change-in-production';
 }
 
 export function isDevSecret(secret) {

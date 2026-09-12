@@ -1,12 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { issueMagicToken, verifyMagicToken } from '../src/auth/magic-link.mjs';
+import { authSecretFromEnv, issueMagicToken, verifyMagicToken } from '../src/auth/magic-link.mjs';
 import { createAppServer } from '../server.mjs';
 
 const SECRET = 'test-secret-123';
+
+test('production auth configuration rejects missing or development secrets', () => {
+  assert.throws(
+    () => authSecretFromEnv({}, { requireProduction: true }),
+    /AFTERGRAPH_AUTH_SECRET required/i,
+  );
+  assert.throws(
+    () => createAppServer({ root: new URL('../', import.meta.url), requireAuth: true, authSecret: 'aftergraph-dev-secret-change-in-production' }),
+    /AFTERGRAPH_AUTH_SECRET required/i,
+  );
+});
+
+test('production server protects bootstrap credentials and drains on signals', async () => {
+  const source = await readFile(new URL('../server.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /Operator boot token.*bootToken/);
+  assert.ok(source.includes("process.once('SIGTERM'"));
+  assert.ok(source.includes("process.once('SIGINT'"));
+});
 
 test('token round-trips to the same user', () => {
   const token = issueMagicToken({ userId: 'alice', secret: SECRET });
@@ -94,4 +112,51 @@ test('auth server: token issuance is capability-gated and binding enforced', asy
     const bad = await fetch(`http://127.0.0.1:${port}/api/v1/auth/me`, { headers: { authorization: 'Bearer v1.forged.sig' } });
     assert.equal(bad.status, 403, 'forged token rejected');
   });
+});
+
+test('auth server: static Billing shell stays public while API remains bearer-gated', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'aftergraph-auth-static-'));
+  const server = createAppServer({
+    root: new URL('../', import.meta.url), stateFile: join(dir, 'ws.json'),
+    runtimeIntervalMs: 20, authSecret: SECRET, requireAuth: true, fixtures: false,
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const port = server.address().port;
+    const shell = await fetch(`http://127.0.0.1:${port}/billing/`);
+    assert.equal(shell.status, 200, 'static Billing shell must load before browser token auth');
+    assert.match(await shell.text(), /Aftergraph Billing/);
+    const api = await fetch(`http://127.0.0.1:${port}/api/v1/state`);
+    assert.equal(api.status, 401, 'API remains bearer-gated');
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('health and readiness expose exact release provenance without auth', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'aftergraph-readiness-'));
+  const server = createAppServer({
+    root: new URL('../', import.meta.url), stateFile: join(dir, 'ws.json'),
+    runtimeIntervalMs: 20, authSecret: SECRET, requireAuth: true, fixtures: false,
+    releaseSha: 'release-test-sha',
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const port = server.address().port;
+    const health = await fetch(`http://127.0.0.1:${port}/healthz`);
+    assert.equal(health.status, 200);
+    assert.equal((await health.json()).releaseSha, 'release-test-sha');
+    const ready = await fetch(`http://127.0.0.1:${port}/readyz`);
+    assert.equal(ready.status, 200);
+    assert.deepEqual(await ready.json(), {
+      status: 'ready',
+      releaseSha: 'release-test-sha',
+      persistence: true,
+      auth: { required: true, configured: true },
+    });
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+    await rm(dir, { recursive: true, force: true });
+  }
 });
