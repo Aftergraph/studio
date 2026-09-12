@@ -25,6 +25,7 @@ import { createKnowledgeEntry, promoteKnowledge, isAuthoritative } from '../src/
 import { createServerLog } from '../src/distributed/server-log.mjs';
 import { createUpstreamHub } from '../src/integrations/upstream-hub.mjs';
 import { createFederationApiHandler } from './federation-routes.mjs';
+import { createExperienceRouteHandler } from './experience-routes.mjs';
 
 
 function resolveRoot(root) {
@@ -58,7 +59,7 @@ export function upstreamConfigFromEnv(env=process.env) {
   };
 }
 
-export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, upstreamConfig = null, federation = null, fixtures = true, authSecret = null, requireAuth = process.env.AFTERGRAPH_REQUIRE_AUTH === 'true', maxUserStores = 100 } = {}) {
+export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, upstreamConfig = null, federation = null, fixtures = true, authSecret = null, requireAuth = process.env.AFTERGRAPH_REQUIRE_AUTH === 'true', maxUserStores = 100, experienceStore = null, tenantBindingProvider = null } = {}) {
   const rootDir = resolveRoot(root);
   const secret = authSecret || authSecretFromEnv();
   // ponytail: requireAuth turns Bearer binding into enforcement. The operator
@@ -127,8 +128,9 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
   const upstreamHub=createUpstreamHub(upstreamConfig || upstreamConfigFromEnv());
   const sse=createSSEBroker({version:API_VERSION});
   const federationHandler=federation?.kernel?createFederationApiHandler(federation):null;
+  const experienceHandler=createExperienceRouteHandler({experienceStore,tenantBindingProvider});
   const broadcast=payload=>sse.broadcast(payload);
-  const ready = store.init();
+  const ready = Promise.all([store.init(),experienceStore?.init?.()??Promise.resolve()]);
   const actionGuard=createActionGuard();
   // ponytail: registry is module-singleton; seed is idempotent (overwrite),
   // so repeated server instances in tests converge on the same demo-user.
@@ -208,6 +210,7 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
 
     if (isApiRequest(url)) {
       try {
+        if (await experienceHandler(req,res,url)) return;
         if (federationHandler?.(req,res,url)) return;
         if (url.pathname === '/api/v1/state' && req.method === 'GET') {
           sendJson(res, 200, { version:API_VERSION, state:store.snapshot(), runtimes:runtimeHub.snapshot() });
@@ -815,7 +818,7 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
     for (const hub of hubs.values()) { try { hub.stopAll(); } catch {} }
     sse.closeAll();
   });
-  server.workspace = { store, runtimeHub, upstreamHub, federation, ready, stores, hubs, bootToken };
+  server.workspace = { store, runtimeHub, upstreamHub, federation, experienceStore, ready, stores, hubs, bootToken };
   // ponytail: close drains per-user persists first — teardown rmdir otherwise
   // races in-flight stateFile writes (CI ENOTEMPTY flake).
   const rawClose = server.close.bind(server);

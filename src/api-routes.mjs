@@ -37,6 +37,8 @@ export const apiAutonomyKillEngage = () => '/api/v1/autonomy/kill';
 export const apiAutonomyKillRelease = () => '/api/v1/autonomy/kill/release';
 export const apiSyncEventsSubmit = () => '/api/v1/sync/events';
 export const apiSyncEventsRead = () => '/api/v1/sync/events';
+export const apiExperience = () => '/api/v1/experience';
+export const apiExperienceEvents = ({after=0,limit=100}={}) => `/api/v1/experience/events?after=${e(String(after))}&limit=${e(String(limit))}`;
 export const apiEvents = () => '/api/v1/events';
 export const apiUsers = () => '/api/v1/users';
 export const apiUser = id => `/api/v1/users/${e(id)}`;

@@ -1,4 +1,4 @@
-import { apiAgents, apiAieMessages, apiAieTaskCancel, apiApprovalDecision, apiArtifact, apiArtifacts, apiAuthoritativeMemory, apiAutonomyKillEngage, apiAutonomyKillRead, apiAutonomyKillRelease, apiConnections, apiContext, apiConversationMessages, apiConversations, apiEvents, apiHealthz, apiMemory, apiMemoryPromote, apiMissionControl, apiMissionRuntime, apiMissions, apiNeed, apiNeeds, apiReplay, apiReset, apiSpace, apiSpaces, apiState, apiSyncEventsRead, apiSyncEventsSubmit, apiSystem, apiAuthMagicLink, apiAuthMe, apiCapabilities, apiGoals, apiGoalProgress, apiLessons, apiMissionGoal, apiUser, apiUserCapabilities, apiUsers, apiUpstreamApprovalDecision, apiUpstreamWorkControl, apiUpstreams, apiUpstreamsSync, apiWorkIntelligencePromote, apiWorkIntelligenceReview } from './api-routes.mjs';
+import { apiAgents, apiAieMessages, apiAieTaskCancel, apiApprovalDecision, apiArtifact, apiArtifacts, apiAuthoritativeMemory, apiAutonomyKillEngage, apiAutonomyKillRead, apiAutonomyKillRelease, apiConnections, apiContext, apiConversationMessages, apiConversations, apiEvents, apiExperience, apiExperienceEvents, apiHealthz, apiMemory, apiMemoryPromote, apiMissionControl, apiMissionRuntime, apiMissions, apiNeed, apiNeeds, apiReplay, apiReset, apiSpace, apiSpaces, apiState, apiSyncEventsRead, apiSyncEventsSubmit, apiSystem, apiAuthMagicLink, apiAuthMe, apiCapabilities, apiGoals, apiGoalProgress, apiLessons, apiMissionGoal, apiUser, apiUserCapabilities, apiUsers, apiUpstreamApprovalDecision, apiUpstreamWorkControl, apiUpstreams, apiUpstreamsSync, apiWorkIntelligencePromote, apiWorkIntelligenceReview } from './api-routes.mjs';
 
 function normalizeBase(baseUrl='') {
   if (!baseUrl) return '';
@@ -64,6 +64,9 @@ export function createApiClient({ baseUrl='', fetchImpl=globalThis.fetch, EventS
     connections(){return request(apiConnections())},
     spaces(){return request(apiSpaces())},
     system(){return request(apiSystem())},
+    experience(){return request(apiExperience())},
+    writeExperience({expectedVersion,document,idempotencyKey}={}){return request(apiExperience(),{method:'PUT',headers:{'idempotency-key':idempotencyKey},body:JSON.stringify({expectedVersion,document})})},
+    experienceEvents({after=0,limit=100}={}){return request(apiExperienceEvents({after,limit}))},
     upstreams(){return request(apiUpstreams())},
     syncUpstreams(){return request(apiUpstreamsSync(),{method:'POST'})},
     decideUpstreamApproval(id,decision){return request(apiUpstreamApprovalDecision(id),{method:'POST',body:JSON.stringify({decision})})},
