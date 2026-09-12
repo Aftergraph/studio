@@ -10,6 +10,7 @@ function authorityLines(authority={}) {
   if (authority.network?.length) lines.push(`Network: ${authority.network.join(', ')}`);
   return lines.length ? lines.join('\n') : 'No elevated authority granted.';
 }
+
 export function renderIntent(ir, target='generic') {
   const scope=[
     ...(ir?.scope?.includes || []).map(value => `Include: ${value}`),
@@ -18,6 +19,7 @@ export function renderIntent(ir, target='generic') {
   const verification = ir?.verification?.required
     ? list(ir.verification.obligations, ir.verification.completionRule || 'Verification required')
     : 'Use the stated completion rule.';
+  const output=[ir?.output?.format || 'text',...(ir?.output?.contract || [])];
 
   const content = [
     'Objective',
@@ -28,18 +30,16 @@ export function renderIntent(ir, target='generic') {
     '',
     'Constraints',
     list(ir?.constraints || []),
-  ];
-  content.push(
     '',
     'Authority',
     authorityLines(ir?.authority),
     '',
     'Expected Output',
-    ir?.output?.format || 'text',
+    list(output),
     '',
     'Completion / Verification',
     verification,
-  );
+  ];
 
   return {
     target,
