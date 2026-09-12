@@ -34,3 +34,20 @@ test('public pilot release checklist exists and keeps merge separate from deploy
   assert.match(release, /exact-head/i);
   assert.match(release, /rollback/i);
 });
+
+test('Billing docs make governed source ingestion a public-pilot contract', async () => {
+  const app = await text('docs/billing/APP.md');
+  const production = await text('docs/PRODUCTION.md');
+  const extraction = await text('docs/billing/EXTRACTION.md');
+  const release = await text('docs/billing/RELEASE.md');
+  assert.match(app, /aftergraph\.billing\.source\.v1/);
+  assert.match(app, /billing\.sync/);
+  assert.match(production, /AFTERGRAPH_BILLING_SYNC_ACTOR/);
+  assert.match(production, /AFTERGRAPH_BILLING_SYNC_TOKEN/);
+  assert.match(production, /billing_source_push\.mjs/);
+  assert.match(extraction, /source-contract\.mjs/);
+  assert.match(extraction, /source-sync\.mjs/);
+  assert.match(extraction, /POST \/api\/v1\/billing\/sync/);
+  assert.match(release, /billing\.sync/);
+  assert.match(release, /demo fixtures are disabled/i);
+});

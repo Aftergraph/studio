@@ -5,7 +5,7 @@ import { normalizeCapabilities } from './capability-set.mjs';
 
 const users = new Map();
 
-export function createUser({ id, name = id, role = 'member', capabilities }) {
+export function createUser({ id, name = id, role = 'member', workspaceId = id, capabilities }) {
   if (!id) throw new TypeError('user requires id');
   
   const normalizedCaps = normalizeCapabilities(capabilities || []);
@@ -14,6 +14,7 @@ export function createUser({ id, name = id, role = 'member', capabilities }) {
     id: String(id),
     name: String(name),
     role: String(role),
+    workspaceId: String(workspaceId || id),
     capabilities: normalizedCaps,
   });
   

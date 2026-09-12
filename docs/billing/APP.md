@@ -64,3 +64,11 @@ The app is mobile-first, respects safe-area insets and keeps the common operator
 ## Current product boundary
 
 Studio currently supplies hosting composition, authentication, durable state, CI and the Work launcher. Billing remains isolated so extraction to a dedicated Aftergraph Billing deployment is a packaging move rather than a financial-workflow redesign.
+
+## Governed operational source ingestion
+
+Production Billing does not depend on demo fixtures. Operational systems push a versioned `aftergraph.billing.source.v1` envelope to `POST /api/v1/billing/sync` using a dedicated `billing.sync` capability.
+
+The source contract is tenant-neutral. Rendetalje/RenOS is the first producer, but Billing only receives customers, visits, source identity, revision and verified actual evidence. Source replay is idempotent; reusing a revision with different data is rejected.
+
+Source sync may upsert operational customer/visit data, but it never owns invoices, invoice numbering or immutable invoice snapshots. Existing financial actuals cannot be silently overwritten by a contradictory producer payload.

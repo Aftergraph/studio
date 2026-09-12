@@ -71,3 +71,13 @@ The webhook receives the immutable invoice recipient, invoice metadata and the g
 The webhook URL must use HTTPS. With no webhook configured, `POST /api/v1/billing/invoices/:id/deliver` fails closed with provider unavailable and the issued invoice remains retryable.
 
 Provider credentials belong in the deployment secret store, not tenant Billing settings. Tenant settings contain business identity, invoice sequence, payment copy and optional Peppol/Nemhandel identifiers, but never delivery-provider secrets.
+
+## 7. Billing operational source sync
+
+Production tenants start without demo customers or visits. A producer with only the `billing.sync` capability can push the versioned `aftergraph.billing.source.v1` envelope through `POST /api/v1/billing/sync`.
+
+For the supplied producer CLI, configure `AFTERGRAPH_BILLING_BASE_URL`, `AFTERGRAPH_BILLING_SYNC_ACTOR` and `AFTERGRAPH_BILLING_SYNC_TOKEN`, then run `node scripts/billing_source_push.mjs <envelope.json>`. Production base URLs must use HTTPS; plain HTTP is accepted only for localhost QA.
+
+Give source workers `billing.sync`, not `billing.manage`, unless they are also human Billing operators. Every push is bearer-bound and idempotency-protected. Source revisions are replay-safe, while the same revision with changed contents is rejected.
+
+The source boundary can update owned customer/visit projections and insert compatible actual evidence. It cannot mutate invoices or invoice sequence, and it rejects contradictory actuals instead of overwriting financial evidence.

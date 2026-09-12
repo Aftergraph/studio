@@ -7,6 +7,7 @@ import { evaluateBilling } from '../src/billing/readiness.mjs';
 import { renderInvoicePdf } from '../src/billing/artifact.mjs';
 import { buildInvoiceDocument, validateInvoiceDocument } from '../src/billing/document-profile.mjs';
 import { renderPeppolBis3Ubl } from '../src/billing/peppol-bis3.mjs';
+import { syncBillingSource } from '../src/billing/source-sync.mjs';
 import {
   recordBillingActual,
   createBillingDraft,
@@ -25,6 +26,7 @@ function apiError(res, error) {
 function isBillingPath(pathname) {
   return pathname === '/api/v1/billing'
     || pathname === '/api/v1/billing/settings'
+    || pathname === '/api/v1/billing/sync'
     || pathname === '/api/v1/billing/actuals'
     || pathname === '/api/v1/billing/invoices/draft'
     || /^\/api\/v1\/billing\/invoices\/[^/]+\/(issue|artifact|document|peppol-bis3|deliver)$/.test(pathname);
@@ -80,18 +82,21 @@ export function decorateBillingServer(server, {
     const claimed = claimedActor || queryActor;
     if (bearer && claimed && bearer !== claimed) throw actorError('forbidden', 403);
     const actor = bearer || claimed || 'demo-user';
-    if (!getUser(actor)) throw actorError('forbidden', 403);
+    const user = getUser(actor);
+    if (!user) throw actorError('forbidden', 403);
+    const workspaceId = user.workspaceId || actor;
 
-    const store = actor === 'demo-user'
+    const store = workspaceId === 'demo-user'
       ? server.workspace.store
-      : server.workspace.stores.get(actor);
+      : server.workspace.storeFor(workspaceId);
     if (!store) throw actorError('workspace_not_initialized', 409);
     await store.readyP;
     return { actor, store };
   };
 
-  const begin = (req, body, actor, store, path) => {
-    assertActorCapability({ state: store.snapshot(), actor, capability: 'billing.manage', users });
+  const begin = (req, body, actor, store, path, capability = 'billing.manage') => {
+    try { assertActorCapability({ state: store.snapshot(), actor, capability, users }); }
+    catch { throw actorError('forbidden', 403); }
     const supplied = req.headers['idempotency-key'] || body?.idempotencyKey;
     if (!supplied) throw actorError('idempotency_key_required', 422);
     const key = `${actor}:${req.method}:${path}:${supplied}`;
@@ -163,9 +168,23 @@ export function decorateBillingServer(server, {
     const body = await readJson(req);
     if (!body?.actor) throw actorError('actor_required', 422);
     const { actor, store } = await resolveScope(req, url, body.actor);
-    const actionKey = begin(req, body, actor, store, url.pathname);
+    const capability = url.pathname === '/api/v1/billing/sync' ? 'billing.sync' : 'billing.manage';
+    const actionKey = begin(req, body, actor, store, url.pathname, capability);
 
     try {
+      if (url.pathname === '/api/v1/billing/sync' && req.method === 'POST') {
+        let sync;
+        const next = await store.mutate((draft) => {
+          const result = syncBillingSource(draft.billing, { schema: body.schema, source: body.source, customers: body.customers, visits: body.visits });
+          draft.billing = result.billing;
+          sync = { sourceId: body.source.id, revision: body.source.revision, ...result.summary };
+          return draft;
+        });
+        actionGuard.complete(actionKey, { status: 'accepted', sourceId: sync.sourceId, revision: sync.revision });
+        sendJson(res, 200, { version: API_VERSION, sync, billing: projectBillingState(next.billing) });
+        return;
+      }
+
       if (url.pathname === '/api/v1/billing/settings' && req.method === 'POST') {
         let settings;
         const next = await store.mutate((draft) => {

@@ -52,3 +52,9 @@ Production delivery is opt-in. The configured HTTPS provider must accept the ver
 Rollback means deployment rollback plus durable-state protection. Do not restore an older state file over newer issued invoices. Preserve the current Billing state, stop outbound delivery, roll back application code, verify read-only invoice visibility, then re-enable mutations only after compatibility is confirmed.
 
 Merging the PR and deploying the public pilot are intentionally separate decisions.
+
+## Operational source gate
+
+A public pilot must prove the tenant works with demo fixtures disabled. Register the operational producer separately with `billing.sync`, push a fresh versioned source revision, and verify the synced customer/visit appears in Billing before any financial workflow is exercised.
+
+Do not grant `billing.manage` to a source worker merely to make sync work. The release rehearsal must cover idempotent replay, changed-revision conflict handling and protection of established actuals, invoices and invoice sequence.

@@ -199,14 +199,14 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
       sendJson(res, 200, { status:'ok', app:'aftergraph-workspace-v5-reference', api:API_VERSION });
       return;
     }
-    try { await rescope(); } catch (error) { sendApiError(res, error); return; }
-
     if (url.pathname === '/api/v1/events' && req.method === 'GET') {
+      try { await rescope(); } catch (error) { sendApiError(res, error); return; }
       sse.attach(req,res,{state:store.snapshot(),runtimes:runtimeHub.snapshot()});
       return;
     }
 
     if (isApiRequest(url)) {
+      try { await rescope(); } catch (error) { sendApiError(res, error); return; }
       try {
         if (federationHandler?.(req,res,url)) return;
         if (url.pathname === '/api/v1/state' && req.method === 'GET') {
@@ -680,7 +680,7 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
           const body=await readJson(req);
           const action=beginAction(req,body,'user.manage',url.pathname);
           try {
-            const user=createUser({id:body.id,name:body.name,role:body.role,capabilities:body.capabilities});
+            const user=createUser({id:body.id,name:body.name,role:body.role,workspaceId:body.workspaceId,capabilities:body.capabilities});
             completeAction(action.key,{status:'accepted'});
             sendJson(res,201,{version:API_VERSION,user});
           } catch(error){ actionGuard.fail(action.key,error?.message||error);sendJson(res,422,{error:error?.code||'invalid_user'}); }
@@ -815,7 +815,7 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
     for (const hub of hubs.values()) { try { hub.stopAll(); } catch {} }
     sse.closeAll();
   });
-  server.workspace = { store, runtimeHub, upstreamHub, federation, ready, stores, hubs, bootToken };
+  server.workspace = { store, storeFor, runtimeHub, upstreamHub, federation, ready, stores, hubs, bootToken };
   // ponytail: close drains per-user persists first — teardown rmdir otherwise
   // races in-flight stateFile writes (CI ENOTEMPTY flake).
   const rawClose = server.close.bind(server);

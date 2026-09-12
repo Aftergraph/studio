@@ -64,3 +64,9 @@ Create the dedicated repository/deployment when:
 - rollback from the extracted deployment is tested.
 
 The current implementation already satisfies the product/domain isolation side of this gate. Remaining work is deployment and operational ownership, not a financial-model rewrite.
+
+## Operational source boundary
+
+Extraction must also move `src/billing/source-contract.mjs`, `src/billing/source-sync.mjs` and the producer-facing push contract. Preserve `POST /api/v1/billing/sync` and the `aftergraph.billing.source.v1` schema during the first extraction.
+
+`billing.sync` remains distinct from `billing.manage`. Producers may upsert their owned operational customer/visit projections with revision provenance, but cannot mutate invoice ledger, invoice sequence or contradictory established actual evidence.

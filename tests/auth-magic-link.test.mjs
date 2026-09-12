@@ -95,3 +95,23 @@ test('auth server: token issuance is capability-gated and binding enforced', asy
     assert.equal(bad.status, 403, 'forged token rejected');
   });
 });
+
+test('auth server: static Billing shell stays public while API remains bearer-gated', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'aftergraph-auth-static-'));
+  const server = createAppServer({
+    root: new URL('../', import.meta.url), stateFile: join(dir, 'ws.json'),
+    runtimeIntervalMs: 20, authSecret: SECRET, requireAuth: true, fixtures: false,
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const port = server.address().port;
+    const shell = await fetch(`http://127.0.0.1:${port}/billing/`);
+    assert.equal(shell.status, 200, 'static Billing shell must load before browser token auth');
+    assert.match(await shell.text(), /Aftergraph Billing/);
+    const api = await fetch(`http://127.0.0.1:${port}/api/v1/state`);
+    assert.equal(api.status, 401, 'API remains bearer-gated');
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+    await rm(dir, { recursive: true, force: true });
+  }
+});
