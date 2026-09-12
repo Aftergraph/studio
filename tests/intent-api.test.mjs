@@ -65,14 +65,22 @@ test('manual target override is respected',async()=>{
   });
 });
 test('ambiguity is returned as findings instead of hidden',async()=>{
-  const provider={analyze:async()=>({
-    goal:{statement:'Preserve behavior'},
-    ambiguities:['Persistence is unclear'],
-  })};
+  const provider={analyze:async()=>({goal:{statement:'Preserve behavior'},ambiguities:['Persistence is unclear']})};
   await withServer(provider,async port=>{
     const result=await compile(port,{source:'make this permanent maybe',target:'auto'});
     assert.equal(result.status,200);
     assert.ok(result.json.findings.some(finding=>finding.code==='AMBIGUITY'));
     assert.deepEqual(result.json.ir.ambiguities,['Persistence is unclear']);
+  });
+});
+test('refinement changes artifact while preserving authority',async()=>{
+  const provider={analyze:async()=>({goal:{statement:'Finish the task'},authority:{write:[],execute:[]}})};
+  await withServer(provider,async port=>{
+    const result=await compile(port,{source:'finish this properly',target:'generic',refinement:'more-autonomous'});
+    assert.equal(result.status,200);
+    assert.match(result.json.artifact.content,/independently within the granted authority/i);
+    assert.deepEqual(result.json.artifact.authorityBefore,result.json.artifact.authorityAfter);
+    assert.deepEqual(result.json.ir.authority.write,[]);
+    assert.deepEqual(result.json.ir.authority.execute,[]);
   });
 });
