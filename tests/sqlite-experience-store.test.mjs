@@ -132,3 +132,14 @@ test('backup is independently restorable and passes integrity check',async()=>{
     await store.close();
   });
 });
+test('history floor never moves backwards after repeated pruning',async()=>{
+  const store=await new SQLiteExperienceStore().init();
+  await store.write({tenantId:'tenant:acme',document:document('tenant:acme'),expectedVersion:0,idempotencyKey:'floor-1'});
+  await store.write({tenantId:'tenant:acme',document:{tenantId:'tenant:acme',layout:{mode:'work'}},expectedVersion:1,idempotencyKey:'floor-2'});
+  const first=await store.pruneEventsThrough('tenant:acme',2);
+  const second=await store.pruneEventsThrough('tenant:acme',1);
+  assert.equal(first.historyFloor,2);
+  assert.equal(second.historyFloor,2);
+  assert.equal((await store.readEvents('tenant:acme',{after:1})).resyncRequired,true);
+  await store.close();
+});

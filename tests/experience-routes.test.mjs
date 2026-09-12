@@ -61,4 +61,30 @@ test('tenant-bound experience route reads writes and returns deltas',async()=>{
     assert.equal(read.response.status,200);
     assert.deepEqual(read.body.events.map(event=>event.sequence),[1]);
   }finally{await new Promise(resolve=>server.close(resolve));await store.close();await rm(dir,{recursive:true,force:true});}
+});test('experience route maps stale version and idempotency conflicts to 409',async()=>{
+  const store=await new SQLiteExperienceStore().init();
+  const server=createAppServer({
+    root:new URL('../',import.meta.url),experienceStore:store,
+    tenantBindingProvider:async()=>({tenantId:'tenant:acme'}),
+  });
+  const base=await listen(server);
+  try{
+    const first=await json(`${base}/api/v1/experience`,{
+      method:'PUT',headers:{'content-type':'application/json','idempotency-key':'route-conflict'},
+      body:JSON.stringify({expectedVersion:0,document:document()}),
+    });
+    assert.equal(first.response.status,200);
+    const stale=await json(`${base}/api/v1/experience`,{
+      method:'PUT',headers:{'content-type':'application/json','idempotency-key':'route-stale'},
+      body:JSON.stringify({expectedVersion:0,document:document()}),
+    });
+    assert.equal(stale.response.status,409);
+    assert.equal(stale.body.error,'version_conflict');
+    const reused=await json(`${base}/api/v1/experience`,{
+      method:'PUT',headers:{'content-type':'application/json','idempotency-key':'route-conflict'},
+      body:JSON.stringify({expectedVersion:1,document:{layout:{mode:'work'}}}),
+    });
+    assert.equal(reused.response.status,409);
+    assert.equal(reused.body.error,'idempotency_conflict');
+  }finally{await new Promise(resolve=>server.close(resolve));await store.close();}
 });

@@ -164,7 +164,8 @@ export class SQLiteExperienceStore {
       db.prepare('DELETE FROM experience_events WHERE tenant_id=? AND sequence<=?').run(tenantId,nextFloor);
       db.prepare(`INSERT INTO experience_history_floor(tenant_id,floor) VALUES(?,?)
         ON CONFLICT(tenant_id) DO UPDATE SET floor=MAX(floor,excluded.floor)`).run(tenantId,nextFloor);
-      return Object.freeze({tenantId,historyFloor:nextFloor,currentVersion:current});
+      const historyFloor=Number(db.prepare('SELECT floor FROM experience_history_floor WHERE tenant_id=?').get(tenantId)?.floor ?? 0);
+      return Object.freeze({tenantId,historyFloor,currentVersion:current});
     });
     return tx();
   }
