@@ -6,6 +6,7 @@ const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const AUTH_TOKEN_KEY = 'aftergraph.auth.token';
 const IDENTITY_BINDING_PREFIX = 'aftergraph.billing.identity.v1';
+const SECURE_CONTEXT_REQUIRED = typeof globalThis.isSecureContext !== 'undefined' ? !globalThis.isSecureContext : (typeof location !== 'undefined' && location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1');
 
 const VIEWS = Object.freeze({
   inbox: ['Indbakke', 'Mangler oplysninger først, derefter det der er klar til fakturering.'],
@@ -70,12 +71,24 @@ function itemKey(item) {
 }
 
 function getActor() {
-  return new URLSearchParams(location.search).get('actor')?.trim() || 'demo-user';
+  // URL actor param is no longer used for auth bootstrap; retained only for
+  // test harness compatibility. Real identity comes from stored token or login.
+  return null;
 }
 
 function readStoredToken() {
   try { return localStorage.getItem(AUTH_TOKEN_KEY) || null; }
   catch { return null; }
+}
+
+function clearStoredToken() {
+  try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch {}
+}
+
+function storeToken(token) {
+  if (!token) return false;
+  try { localStorage.setItem(AUTH_TOKEN_KEY, token); return true; }
+  catch { return false; }
 }
 
 async function tokenFingerprint(token) {
@@ -106,9 +119,8 @@ function actorForFingerprint(fingerprint) {
 async function resolveBillingSession(client, { online = true } = {}) {
   const token = readStoredToken();
   if (!token) {
-    const actor = getActor();
-    client.setSession({ actor, token: null });
-    return { actor, cacheIdentity: `${actor}:anonymous`, authenticated: false };
+    client.setSession({ actor: null, token: null });
+    return { actor: null, cacheIdentity: null, authenticated: false };
   }
 
   const fingerprint = await tokenFingerprint(token);
@@ -145,6 +157,49 @@ async function resolveBillingSession(client, { online = true } = {}) {
   }
 }
 
+function renderLoginScreen(els, { error = '', secureWarning = false, onLogin }) {
+  const app = $('#billing-app');
+  if (!app) return;
+  const warningHtml = secureWarning
+    ? '<div class="billing-login-warning" role="alert"><strong>⚠ Usikker forbindelse</strong><br>Denne side kører ikke over HTTPS. Login er deaktiveret for at beskytte dine oplysninger. Kontakt administratoren.</div>'
+    : '';
+  const errorHtml = error ? `<div class="billing-login-error" role="alert">${esc(error)}</div>` : '';
+  app.innerHTML = `
+    <section class="billing-login" aria-labelledby="billing-login-title">
+      <div class="billing-login-card">
+        <h1 id="billing-login-title">Log ind på Fakturering</h1>
+        <p>Indtast din magic-link token for at fortsætte.</p>
+        ${warningHtml}
+        <form id="billing-login-form" autocomplete="off">
+          <label for="billing-login-token">Token</label>
+          <input id="billing-login-token" name="token" type="password" required
+            placeholder="v1.…" inputmode="text" autocapitalize="off" spellcheck="false"
+            ${secureWarning ? 'disabled' : ''}>
+          <button type="submit" class="billing-primary-button" ${secureWarning ? 'disabled' : ''}>Log ind</button>
+        </form>
+        ${errorHtml}
+      </div>
+    </section>`;
+  const form = $('#billing-login-form');
+  if (form && !secureWarning) {
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const input = $('input[name="token"]', form);
+      const token = String(input?.value || '').trim();
+      if (!token) return;
+      onLogin(token);
+    });
+    const input = $('input[name="token"]', form);
+    input?.focus();
+  }
+}
+
+function restoreAppShell() {
+  // Re-inject the original billing shell if login replaced it.
+  // This is a simplified restore; full shell lives in index.html and is
+  // reloaded via location.reload() after login succeeds.
+}
+
 function createApp() {
   const client = createBillingClient();
   const state = {
@@ -163,6 +218,7 @@ function createApp() {
     activeInvoice: null,
     toastTimer: null,
     returnFocus: null,
+    loginRequired: false,
   };
 
   const els = {
@@ -1477,9 +1533,68 @@ function createApp() {
     void refresh();
   });
 
+  async function attemptLogin(token) {
+    storeToken(token);
+    try {
+      const session = await resolveBillingSession(client, { online: true });
+      if (session.authenticated && session.actor) {
+        applyIdentity(session);
+        location.reload();
+        return;
+      }
+      clearStoredToken();
+      renderLoginScreen(els, { error: 'Ugyldig eller udløbet token.', secureWarning: SECURE_CONTEXT_REQUIRED, onLogin: attemptLogin });
+    } catch (err) {
+      clearStoredToken();
+      const msg = err?.status === 401 || err?.status === 403
+        ? 'Token blev afvist.'
+        : 'Kunne ikke verificere token. Prøv igen.';
+      renderLoginScreen(els, { error: msg, secureWarning: SECURE_CONTEXT_REQUIRED, onLogin: attemptLogin });
+    }
+  }
+
+  function handleLogout() {
+    clearStoredToken();
+    client.setSession({ actor: null, token: null });
+    clearSensitiveState();
+    state.actor = null;
+    state.cacheIdentity = null;
+    renderLoginScreen(els, { secureWarning: SECURE_CONTEXT_REQUIRED, onLogin: attemptLogin });
+  }
+
+  // Secure-context gate: block login on non-HTTPS non-localhost
+  if (SECURE_CONTEXT_REQUIRED) {
+    renderLoginScreen(els, { secureWarning: true, onLogin: attemptLogin });
+    return Object.freeze({ refresh: () => {}, render: () => {} });
+  }
+
+  // Check existing session before showing UI
+  const existingToken = readStoredToken();
+  if (!existingToken) {
+    state.loginRequired = true;
+    renderLoginScreen(els, { secureWarning: false, onLogin: attemptLogin });
+    return Object.freeze({ refresh: () => {}, render: () => {} });
+  }
+
   els.refresh.addEventListener('click', refresh);
   els.review.addEventListener('click', (event) => { if (event.target === els.review) closeDialog(); });
   els.review.addEventListener('cancel', (event) => { event.preventDefault(); closeDialog(); });
+
+  // Add logout handler to header if button exists or inject one
+  const headerActions = $('.billing-header-actions');
+  if (headerActions && !$('[data-action="logout"]')) {
+    const logoutBtn = document.createElement('button');
+    logoutBtn.className = 'billing-quiet-button';
+    logoutBtn.type = 'button';
+    logoutBtn.dataset.action = 'logout';
+    logoutBtn.textContent = 'Log ud';
+    logoutBtn.addEventListener('click', handleLogout);
+    headerActions.prepend(logoutBtn);
+  }
+  document.addEventListener('click', (event) => {
+    if (event.target?.dataset?.action === 'logout') handleLogout();
+  });
+
   refresh();
   return Object.freeze({ refresh, render });
 }
