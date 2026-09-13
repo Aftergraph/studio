@@ -51,12 +51,12 @@ export const TARGETS = [
 
 // Refinement options
 export const REFINEMENTS = [
-  'Clearer',
-  'More detailed',
-  'Shorter',
-  'More autonomous',
-  'Safer',
-  'Execution-ready',
+  { label: 'Clearer', value: 'clearer' },
+  { label: 'More detailed', value: 'more-detailed' },
+  { label: 'Shorter', value: 'shorter' },
+  { label: 'More autonomous', value: 'more-autonomous' },
+  { label: 'Safer', value: 'safer' },
+  { label: 'Execution-ready', value: 'execution-ready' },
 ] as const;
 
 // Toast types

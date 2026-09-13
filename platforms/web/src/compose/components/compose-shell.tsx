@@ -308,9 +308,9 @@ export function ComposeShell() {
     void runCompile(source);
   }
 
-  async function refine(label: string) {
+  async function refine(value: string) {
     if (!conversation) return;
-    await runCompile(conversation.source, label);
+    await runCompile(conversation.source, value);
   }
 
   async function copyArtifact() {
@@ -711,12 +711,12 @@ export function ComposeShell() {
               {REFINEMENTS.map((item) => (
                 <button
                   type="button"
-                  key={item}
-                  onClick={() => void refine(item)}
+                  key={item.value}
+                  onClick={() => void refine(item.value)}
                   disabled={status === 'working' || isRateLimited || !isOnlineState}
-                  aria-label={`Refine to make ${item.toLowerCase()}`}
+                  aria-label={`Refine to make ${item.label.toLowerCase()}`}
                 >
-                  {item}
+                  {item.label}
                 </button>
               ))}
             </div>
