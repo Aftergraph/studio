@@ -45,25 +45,25 @@
 
     <nav class="billing-queue-nav" aria-label="Faktureringsnavigation">
       <div class="billing-tabs" role="tablist" aria-label="Faktureringsvisning">
-        <button class="billing-tab is-active" type="button" role="tab" aria-selected="true" data-view="inbox">
+        <button class="billing-tab is-active" type="button" role="tab" aria-selected="true" data-view="inbox" id="billing-tab-inbox" aria-controls="billing-panel" tabindex="0">
           Indbakke <span data-count="inbox">0</span>
         </button>
-        <button class="billing-tab" type="button" role="tab" aria-selected="false" data-view="ready">
+        <button class="billing-tab" type="button" role="tab" aria-selected="false" data-view="ready" id="billing-tab-ready" aria-controls="billing-panel" tabindex="-1">
           Klar <span data-count="ready">0</span>
         </button>
-        <button class="billing-tab" type="button" role="tab" aria-selected="false" data-view="waiting">
+        <button class="billing-tab" type="button" role="tab" aria-selected="false" data-view="waiting" id="billing-tab-waiting" aria-controls="billing-panel" tabindex="-1">
           Venter <span data-count="waiting">0</span>
         </button>
-        <button class="billing-tab" type="button" role="tab" aria-selected="false" data-view="needs_info">
+        <button class="billing-tab" type="button" role="tab" aria-selected="false" data-view="needs_info" id="billing-tab-needs_info" aria-controls="billing-panel" tabindex="-1">
           Mangler <span data-count="needs_info">0</span>
         </button>
-        <button class="billing-tab" type="button" role="tab" aria-selected="false" data-view="invoiced">
+        <button class="billing-tab" type="button" role="tab" aria-selected="false" data-view="invoiced" id="billing-tab-invoiced" aria-controls="billing-panel" tabindex="-1">
           Faktureret <span data-count="invoiced">0</span>
         </button>
       </div>
     </nav>
 
-    <section class="billing-worklist" aria-labelledby="billing-list-title">
+    <section class="billing-worklist" aria-labelledby="billing-list-title" role="tabpanel" id="billing-panel">
       <div class="billing-list-heading">
         <h2 id="billing-list-title">Indbakke</h2>
         <p id="billing-list-context">Mangler oplysninger først, derefter det der er klar til fakturering.</p>

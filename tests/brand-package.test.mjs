@@ -143,5 +143,7 @@ test('styles/tokens.css defines official institutional brand variables', () => {
   assert.match(css, /--bg:\s*var\(--ag-brand-canvas\)/);
   assert.match(css, /--canvas:\s*var\(--ag-brand-canvas-raised\)/);
   assert.match(css, /--accent:\s*var\(--ag-brand-control\)/);
-  assert.match(css, /--success:\s*var\(--ag-brand-evidence\)/);
+  // R-011: success/warning overridden with accessible values for WCAG AA
+  assert.match(css, /--success:\s*#0b7a47/);
+  assert.match(css, /--warning:\s*#8a5700/);
 });

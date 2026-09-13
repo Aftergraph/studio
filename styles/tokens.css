@@ -41,9 +41,9 @@
   --accent-soft: var(--ag-brand-control-soft);
   --accent-strong: #003ebd;
   --text-active: #0c52ef;
-  --success: var(--ag-brand-evidence);
+  --success: #0b7a47;
   --success-soft: var(--ag-brand-evidence-soft);
-  --warning: var(--ag-brand-decision);
+  --warning: #8a5700;
   --warning-soft: var(--ag-brand-decision-soft);
   --danger: var(--ag-brand-danger-tone);
   --danger-soft: var(--ag-brand-danger-soft);
@@ -80,9 +80,9 @@ html[data-theme="dark"] {
   --accent-soft: var(--ag-brand-control-soft);
   --accent-strong: #70d8f0;
   --text-active: #dcecff;
-  --success: var(--ag-brand-evidence);
+  --success: #2ecfb5;
   --success-soft: var(--ag-brand-evidence-soft);
-  --warning: var(--ag-brand-decision);
+  --warning: #f0a64a;
   --warning-soft: var(--ag-brand-decision-soft);
   --danger: var(--ag-brand-danger-tone);
   --danger-soft: var(--ag-brand-danger-soft);

@@ -39,6 +39,21 @@ test('ActionGuard: reset confirmation is explicit', () => {
   assert.ok(RESET_CONFIRMATION.length >= 8);
 });
 
+test('R-009 ActionGuard: persist.onComplete is called with key and result on success', () => {
+  const persisted = [];
+  const guard = createActionGuard({ now: () => 1000, persist: { onComplete: (key, record) => persisted.push({ key, ...record }) } });
+  guard.begin('audit:a1:k1');
+  guard.complete('audit:a1:k1', { status: 'done' });
+  assert.equal(persisted.length, 1);
+  assert.equal(persisted[0].key, 'audit:a1:k1');
+  assert.equal(persisted[0].state, 'success');
+  assert.deepEqual(persisted[0].result, { status: 'done' });
+  // fail should NOT trigger persist
+  guard.begin('audit:a1:k2');
+  guard.fail('audit:a1:k2', 'oops');
+  assert.equal(persisted.length, 1);
+});
+
 test('Approval UI: loading disables decisions and describes decision context', () => {
   const html = AGApproval({ id: 'a1', title: 'Deploy', risk: 'high', state: 'loading', why: 'Reason', impact: 'Impact', rollback: 'Rollback' });
   assert.match(html, /aria-describedby="a1-description"/);

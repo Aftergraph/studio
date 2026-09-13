@@ -16,14 +16,14 @@ button {
 }
 
 .billing-header {
-  min-height: 58px;
-  padding: 0 28px;
+  min-height: var(--ag-brand-space-5xl);
+  padding: 0 var(--ag-brand-space-xl);
   border-bottom: 1px solid var(--border);
   background: color-mix(in srgb, var(--surface) 94%, transparent);
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: 20px;
+  gap: var(--ag-brand-space-lg);
   position: sticky;
   top: 0;
   z-index: 20;
@@ -34,10 +34,10 @@ button {
 .billing-brand {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
+  gap: var(--ag-brand-space-sm);
   color: var(--text-2);
   text-decoration: none;
-  font-size: 14px;
+  font-size: var(--ag-brand-type-body);
   font-weight: 620;
 }
 
@@ -64,11 +64,11 @@ button {
 }
 
 .billing-mark {
-  width: 9px;
-  height: 9px;
-  border-radius: 999px;
+  width: var(--ag-brand-space-sm);
+  height: var(--ag-brand-space-sm);
+  border-radius: var(--ag-brand-radius-pill);
   background: var(--ag-control-cyan);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ag-control-cyan) 14%, transparent);
+  box-shadow: 0 0 0 var(--ag-brand-space-xs) color-mix(in srgb, var(--ag-control-cyan) 14%, transparent);
 }
 
 .billing-quiet-button,
@@ -76,7 +76,7 @@ button {
 .billing-secondary-button,
 .billing-primary-button {
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--ag-brand-radius-button);
   cursor: pointer;
   min-height: 44px;
   font-weight: 680;
@@ -85,7 +85,7 @@ button {
 
 .billing-quiet-button {
   justify-self: end;
-  padding: 0 14px;
+  padding: 0 var(--ag-brand-space-md);
   background: transparent;
   color: var(--text-2);
 }
@@ -97,22 +97,22 @@ button {
 }
 
 .billing-shell {
-  width: min(1120px, calc(100% - 48px));
+  width: min(1120px, calc(100% - var(--ag-brand-space-4xl)));
   margin: 0 auto;
-  padding: 58px 0 96px;
+  padding: var(--ag-brand-space-5xl) 0 calc(var(--ag-brand-space-5xl) + var(--ag-brand-space-xxl));
 }
 
 .billing-intro {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 32px;
-  margin-bottom: 34px;
+  gap: var(--ag-brand-space-xxl);
+  margin-bottom: var(--ag-brand-space-3xl);
 }
 
 .billing-intro h1 {
   margin: 0;
-  font-size: clamp(34px, 4vw, 52px);
+  font-size: clamp(var(--ag-brand-type-display), 4vw, 52px);
   line-height: 1.02;
   letter-spacing: -0.045em;
   font-weight: 760;
@@ -120,16 +120,16 @@ button {
 
 .billing-intro p {
   max-width: 650px;
-  margin: 12px 0 0;
+  margin: var(--ag-brand-space-md) 0 0;
   color: var(--text-2);
-  font-size: 17px;
+  font-size: var(--ag-brand-type-subhead);
   line-height: 1.55;
 }
 
 .billing-connection {
   flex: 0 0 auto;
   color: var(--text-3);
-  font-size: 13px;
+  font-size: var(--ag-brand-type-body-sm);
   font-weight: 650;
 }
 
@@ -146,12 +146,12 @@ button {
   grid-template-columns: minmax(220px, 1.45fr) repeat(3, minmax(130px, 1fr));
   border-top: 1px solid var(--border-strong);
   border-bottom: 1px solid var(--border);
-  margin-bottom: 26px;
+  margin-bottom: var(--ag-brand-space-xl);
 }
 
 .billing-summary-item {
   min-height: 108px;
-  padding: 22px 22px 22px 0;
+  padding: var(--ag-brand-space-lg) var(--ag-brand-space-lg) var(--ag-brand-space-lg) 0;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -159,20 +159,20 @@ button {
 
 .billing-summary-item + .billing-summary-item {
   border-left: 1px solid var(--border);
-  padding-left: 22px;
+  padding-left: var(--ag-brand-space-lg);
 }
 
 .billing-summary-label {
   color: var(--text-3);
-  font-size: 12px;
+  font-size: var(--ag-brand-type-ui);
   font-weight: 720;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .billing-summary-value {
-  margin-top: 10px;
-  font-size: clamp(22px, 2.7vw, 34px);
+  margin-top: var(--ag-brand-space-sm);
+  font-size: clamp(var(--ag-brand-type-title), 2.7vw, var(--ag-brand-type-display));
   line-height: 1;
   letter-spacing: -0.04em;
   font-weight: 760;
@@ -184,23 +184,23 @@ button {
 }
 
 .billing-summary-detail {
-  margin-top: 6px;
+  margin-top: var(--ag-brand-space-xs);
   color: var(--text-3);
-  font-size: 12px;
+  font-size: var(--ag-brand-type-ui);
 }
 
 .billing-queue-nav {
   position: sticky;
-  top: 58px;
+  top: var(--ag-brand-space-5xl);
   z-index: 15;
-  padding: 11px 0;
+  padding: var(--ag-brand-space-sm) 0;
   background: color-mix(in srgb, var(--bg) 94%, transparent);
   backdrop-filter: blur(16px);
 }
 
 .billing-tabs {
   display: flex;
-  gap: 6px;
+  gap: var(--ag-brand-space-xs);
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -212,12 +212,12 @@ button {
 .billing-tab {
   flex: 0 0 auto;
   min-height: 44px;
-  padding: 0 13px;
+  padding: 0 var(--ag-brand-space-md);
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--ag-brand-radius-pill);
   background: transparent;
   color: var(--text-2);
-  font-size: 14px;
+  font-size: var(--ag-brand-type-body);
   font-weight: 680;
   cursor: pointer;
 }
@@ -240,20 +240,20 @@ button {
 }
 
 .billing-worklist {
-  padding-top: 22px;
+  padding-top: var(--ag-brand-space-lg);
 }
 
 .billing-list-heading {
   display: flex;
   justify-content: space-between;
   align-items: end;
-  gap: 24px;
-  margin-bottom: 16px;
+  gap: var(--ag-brand-space-xl);
+  margin-bottom: var(--ag-brand-space-base);
 }
 
 .billing-list-heading h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--ag-brand-type-title);
   letter-spacing: -0.02em;
 }
 
@@ -261,7 +261,7 @@ button {
   margin: 0;
   max-width: 520px;
   color: var(--text-3);
-  font-size: 13px;
+  font-size: var(--ag-brand-type-body-sm);
   text-align: right;
 }
 
@@ -272,10 +272,10 @@ button {
 .billing-row {
   display: grid;
   grid-template-columns: minmax(220px, 1.35fr) minmax(160px, 0.85fr) minmax(220px, 1fr) auto;
-  gap: 22px;
+  gap: var(--ag-brand-space-lg);
   align-items: center;
   min-height: 112px;
-  padding: 21px 2px;
+  padding: var(--ag-brand-space-lg) var(--ag-brand-space-xxs);
   border-bottom: 1px solid var(--border);
 }
 
@@ -286,9 +286,9 @@ button {
 }
 
 .billing-row-name {
-  margin: 0 0 6px;
+  margin: 0 0 var(--ag-brand-space-xs);
   color: var(--text);
-  font-size: 16px;
+  font-size: var(--ag-brand-type-body-lg);
   font-weight: 720;
   letter-spacing: -0.012em;
 }
@@ -297,32 +297,32 @@ button {
 .billing-row-reason,
 .billing-row-meta small {
   color: var(--text-3);
-  font-size: 13px;
+  font-size: var(--ag-brand-type-body-sm);
   line-height: 1.45;
 }
 
 .billing-row-meta strong {
   display: block;
   color: var(--text-emphasis);
-  font-size: 18px;
+  font-size: var(--ag-brand-type-subhead);
   font-weight: 730;
   font-variant-numeric: tabular-nums;
 }
 
 .billing-row-reason strong {
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: var(--ag-brand-space-xs);
   color: var(--text-2);
-  font-size: 13px;
+  font-size: var(--ag-brand-type-body-sm);
   font-weight: 700;
 }
 
 .billing-status-dot {
   display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin-right: 8px;
-  border-radius: 999px;
+  width: var(--ag-brand-space-sm);
+  height: var(--ag-brand-space-sm);
+  margin-right: var(--ag-brand-space-sm);
+  border-radius: var(--ag-brand-radius-pill);
   background: var(--text-3);
 }
 
@@ -344,7 +344,7 @@ button {
 
 .billing-primary-button,
 .billing-secondary-button {
-  padding: 0 15px;
+  padding: 0 var(--ag-brand-space-md);
   white-space: nowrap;
 }
 
@@ -378,9 +378,9 @@ button {
 
 .billing-empty,
 .billing-error {
-  padding: 42px 0;
+  padding: var(--ag-brand-space-4xl) 0;
   color: var(--text-3);
-  font-size: 15px;
+  font-size: var(--ag-brand-type-body);
   line-height: 1.55;
 }
 
@@ -394,7 +394,7 @@ button {
   margin: auto;
   padding: 0;
   border: 1px solid var(--border-strong);
-  border-radius: 20px;
+  border-radius: var(--ag-brand-radius-card);
   background: var(--surface);
   color: var(--text);
   box-shadow: var(--shadow-float);
@@ -415,8 +415,8 @@ button {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 20px;
-  padding: 24px 24px 18px;
+  gap: var(--ag-brand-space-lg);
+  padding: var(--ag-brand-space-xl) var(--ag-brand-space-xl) var(--ag-brand-space-lg);
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
@@ -425,9 +425,9 @@ button {
 }
 
 .billing-review-kicker {
-  margin: 0 0 6px;
+  margin: 0 0 var(--ag-brand-space-xs);
   color: var(--text-3);
-  font-size: 11px;
+  font-size: var(--ag-brand-type-caption);
   font-weight: 740;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -435,7 +435,7 @@ button {
 
 .billing-review-header h2 {
   margin: 0;
-  font-size: 24px;
+  font-size: var(--ag-brand-type-headline);
   letter-spacing: -0.03em;
 }
 
@@ -445,52 +445,52 @@ button {
   padding: 0;
   background: transparent;
   color: var(--text-2);
-  font-size: 24px;
+  font-size: var(--ag-brand-type-headline);
   line-height: 1;
 }
 
 .billing-review-body {
-  padding: 24px;
+  padding: var(--ag-brand-space-xl);
 }
 
 .billing-review-customer {
-  margin-bottom: 24px;
+  margin-bottom: var(--ag-brand-space-xl);
 }
 
 .billing-review-customer h3 {
-  margin: 0 0 5px;
-  font-size: 18px;
+  margin: 0 0 var(--ag-brand-space-xs);
+  font-size: var(--ag-brand-type-subhead);
 }
 
 .billing-review-customer p {
   margin: 0;
   color: var(--text-3);
-  font-size: 13px;
+  font-size: var(--ag-brand-type-body-sm);
 }
 
 .billing-review-lines {
   border-top: 1px solid var(--border-strong);
-  margin-bottom: 24px;
+  margin-bottom: var(--ag-brand-space-xl);
 }
 
 .billing-review-line {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 16px;
-  padding: 14px 0;
+  gap: var(--ag-brand-space-base);
+  padding: var(--ag-brand-space-md) 0;
   border-bottom: 1px solid var(--border);
 }
 
 .billing-review-line strong {
   display: block;
-  font-size: 14px;
+  font-size: var(--ag-brand-type-body);
 }
 
 .billing-review-line small {
   display: block;
-  margin-top: 4px;
+  margin-top: var(--ag-brand-space-xs);
   color: var(--text-3);
-  font-size: 12px;
+  font-size: var(--ag-brand-type-ui);
 }
 
 .billing-review-line-amount {
@@ -499,47 +499,47 @@ button {
 }
 
 .billing-totals {
-  margin: 0 0 26px auto;
+  margin: 0 0 var(--ag-brand-space-xl) auto;
   width: min(100%, 340px);
 }
 
 .billing-total-row {
   display: flex;
   justify-content: space-between;
-  gap: 20px;
-  padding: 5px 0;
+  gap: var(--ag-brand-space-lg);
+  padding: var(--ag-brand-space-xs) 0;
   color: var(--text-2);
-  font-size: 13px;
+  font-size: var(--ag-brand-type-body-sm);
 }
 
 .billing-total-row.is-total {
-  margin-top: 7px;
-  padding-top: 12px;
+  margin-top: var(--ag-brand-space-xs);
+  padding-top: var(--ag-brand-space-md);
   border-top: 1px solid var(--border-strong);
   color: var(--text);
-  font-size: 17px;
+  font-size: var(--ag-brand-type-subhead);
   font-weight: 760;
 }
 
 .billing-form {
   display: grid;
-  gap: 15px;
+  gap: var(--ag-brand-space-md);
 }
 
 .billing-form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: var(--ag-brand-space-md);
 }
 
 .billing-field {
   display: grid;
-  gap: 7px;
+  gap: var(--ag-brand-space-xs);
 }
 
 .billing-field label {
   color: var(--text-2);
-  font-size: 12px;
+  font-size: var(--ag-brand-type-ui);
   font-weight: 700;
 }
 
@@ -547,9 +547,9 @@ button {
   min-height: 44px;
   width: 100%;
   box-sizing: border-box;
-  padding: 0 12px;
+  padding: 0 var(--ag-brand-space-md);
   border: 1px solid var(--border-strong);
-  border-radius: 10px;
+  border-radius: var(--ag-brand-radius-button);
   background: var(--canvas);
   color: var(--text);
   outline: none;
@@ -563,56 +563,56 @@ button {
 .billing-form-error {
   margin: -4px 0 2px;
   color: var(--danger);
-  font-size: 13px;
+  font-size: var(--ag-brand-type-body-sm);
   line-height: 1.45;
 }
 
 .billing-form-help {
   margin: -4px 0 2px;
   color: var(--text-3);
-  font-size: 12px;
+  font-size: var(--ag-brand-type-ui);
   line-height: 1.45;
 }
 
 .billing-form-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  padding-top: 8px;
+  gap: var(--ag-brand-space-sm);
+  padding-top: var(--ag-brand-space-sm);
 }
 
 .billing-draft-status {
-  padding: 16px;
-  margin-bottom: 18px;
+  padding: var(--ag-brand-space-base);
+  margin-bottom: var(--ag-brand-space-lg);
   border: 1px solid color-mix(in srgb, var(--success) 30%, var(--border));
-  border-radius: 12px;
+  border-radius: var(--ag-brand-radius-card);
   background: var(--success-soft);
 }
 
 .billing-draft-status strong {
   display: block;
   color: var(--success);
-  font-size: 13px;
+  font-size: var(--ag-brand-type-body-sm);
 }
 
 .billing-draft-status p {
-  margin: 4px 0 0;
+  margin: var(--ag-brand-space-xs) 0 0;
   color: var(--text-2);
-  font-size: 13px;
+  font-size: var(--ag-brand-type-body-sm);
 }
 
 .billing-toast {
   position: fixed;
   left: 50%;
-  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--ag-brand-space-xl) + env(safe-area-inset-bottom, 0px));
   z-index: 50;
   transform: translate(-50%, 18px);
-  padding: 11px 15px;
-  border-radius: 999px;
+  padding: var(--ag-brand-space-sm) var(--ag-brand-space-md);
+  border-radius: var(--ag-brand-radius-pill);
   background: var(--text);
   color: var(--canvas);
   box-shadow: var(--shadow-float);
-  font-size: 13px;
+  font-size: var(--ag-brand-type-body-sm);
   font-weight: 680;
   opacity: 0;
   pointer-events: none;
@@ -652,7 +652,7 @@ button {
 @media (max-width: 760px) {
   .billing-header {
     min-height: 54px;
-    padding: 0 16px;
+    padding: 0 var(--ag-brand-space-base);
     grid-template-columns: auto 1fr auto;
   }
 
@@ -668,30 +668,30 @@ button {
 
   .billing-quiet-button {
     min-height: 44px;
-    padding: 0 10px;
-    font-size: 13px;
+    padding: 0 var(--ag-brand-space-sm);
+    font-size: var(--ag-brand-type-body-sm);
   }
 
   .billing-shell {
     width: min(100% - 30px, 680px);
-    padding: 36px 0 calc(84px + env(safe-area-inset-bottom, 0px));
+    padding: var(--ag-brand-space-3xl) 0 calc(var(--ag-brand-space-5xl) + env(safe-area-inset-bottom, 0px));
   }
 
   .billing-intro {
     display: block;
-    margin-bottom: 26px;
+    margin-bottom: var(--ag-brand-space-xl);
   }
 
   .billing-intro h1 {
-    font-size: 36px;
+    font-size: var(--ag-brand-type-display);
   }
 
   .billing-intro p {
-    font-size: 15px;
+    font-size: var(--ag-brand-type-body);
   }
 
   .billing-connection {
-    margin-top: 14px;
+    margin-top: var(--ag-brand-space-md);
   }
 
   .billing-summary {
@@ -700,15 +700,15 @@ button {
 
   .billing-summary-item {
     min-height: 92px;
-    padding: 17px 14px 17px 0;
+    padding: var(--ag-brand-space-lg) var(--ag-brand-space-md) var(--ag-brand-space-lg) 0;
   }
 
   .billing-summary-item + .billing-summary-item {
-    padding-left: 14px;
+    padding-left: var(--ag-brand-space-md);
   }
 
   .billing-summary-value {
-    font-size: 23px;
+    font-size: var(--ag-brand-type-title);
   }
 
   .billing-queue-nav {
@@ -724,15 +724,15 @@ button {
   }
 
   .billing-list-heading p {
-    margin-top: 6px;
+    margin-top: var(--ag-brand-space-xs);
     text-align: left;
   }
 
   .billing-row {
     grid-template-columns: 1fr auto;
-    gap: 13px 16px;
+    gap: var(--ag-brand-space-sm) var(--ag-brand-space-base);
     min-height: 0;
-    padding: 20px 0;
+    padding: var(--ag-brand-space-lg) 0;
   }
 
   .billing-row-main,
@@ -753,14 +753,14 @@ button {
   }
 
   .billing-row-meta strong {
-    font-size: 17px;
+    font-size: var(--ag-brand-type-subhead);
   }
 
   .billing-primary-button,
   .billing-secondary-button {
     min-height: 44px;
-    padding: 0 12px;
-    font-size: 13px;
+    padding: 0 var(--ag-brand-space-md);
+    font-size: var(--ag-brand-type-body-sm);
   }
 
   .billing-review {
@@ -770,7 +770,7 @@ button {
     max-height: none;
     margin: auto 0 0;
     border-width: 1px 0 0;
-    border-radius: 20px 20px 0 0;
+    border-radius: var(--ag-brand-radius-card) var(--ag-brand-radius-card) 0 0;
   }
 
   .billing-review-frame {
@@ -779,8 +779,8 @@ button {
 
   .billing-review-header,
   .billing-review-body {
-    padding-left: 18px;
-    padding-right: 18px;
+    padding-left: var(--ag-brand-space-lg);
+    padding-right: var(--ag-brand-space-lg);
   }
 
   .billing-form-row {
@@ -790,8 +790,8 @@ button {
   .billing-form-actions {
     position: sticky;
     bottom: 0;
-    margin: 8px -18px -24px;
-    padding: 14px 18px calc(14px + env(safe-area-inset-bottom, 0px));
+    margin: var(--ag-brand-space-sm) -18px calc(-1 * var(--ag-brand-space-xl));
+    padding: var(--ag-brand-space-md) var(--ag-brand-space-lg) calc(var(--ag-brand-space-md) + env(safe-area-inset-bottom, 0px));
     border-top: 1px solid var(--border);
     background: var(--surface);
   }
@@ -812,15 +812,15 @@ button {
   justify-self: end;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--ag-brand-space-xs);
 }
 
-.billing-company-form { gap: 18px; }
+.billing-company-form { gap: var(--ag-brand-space-lg); }
 
 .billing-advanced {
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px 16px;
+  border-radius: var(--ag-brand-radius-card);
+  padding: var(--ag-brand-space-md) var(--ag-brand-space-base);
   background: var(--surface);
 }
 
@@ -830,4 +830,45 @@ button {
   color: var(--text-2);
 }
 
-.billing-advanced[open] summary { margin-bottom: 16px; }
+.billing-advanced[open] summary { margin-bottom: var(--ag-brand-space-base); }
+
+/* Skeleton loading state */
+.billing-skeleton {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--ag-brand-space-lg);
+  margin-top: var(--ag-brand-space-xl);
+}
+
+.billing-skeleton-card {
+  padding: var(--ag-brand-space-lg);
+  border-radius: var(--ag-brand-radius-card);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ag-brand-space-md);
+}
+
+.billing-skeleton-line {
+  height: var(--ag-brand-space-base);
+  border-radius: var(--ag-brand-space-xxs);
+  background: color-mix(in srgb, var(--text-3) 18%, transparent);
+  animation: billing-skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.billing-skeleton-line.is-short { width: 40%; }
+.billing-skeleton-line.is-medium { width: 65%; }
+.billing-skeleton-line.is-long { width: 90%; }
+.billing-skeleton-line.is-title { height: var(--ag-brand-space-lg); width: 55%; }
+
+@keyframes billing-skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .billing-skeleton-line {
+    animation: none;
+  }
+}

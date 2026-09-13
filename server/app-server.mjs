@@ -528,10 +528,16 @@ export function createAppServer({
           const mode = url.searchParams.get('mode') || 'historical';
           let temporal = { mode: 'historical', cursor: Math.max(0, Math.min(frames.length - 1, Math.trunc(cursor) || 0)), state: reconstructAt(frames, cursor), frames };
           if (mode === 'counterfactual') {
-            const hypothetical = JSON.parse(url.searchParams.get('event') || '{}');
+            let hypothetical;
+            try { hypothetical = JSON.parse(url.searchParams.get('event') || '{}'); } catch (e) {
+              sendJson(res, 422, { error: 'invalid_json', param: 'event', detail: e.message }); return;
+            }
             temporal = counterfactualAt(frames, cursor, hypothetical);
           } else if (mode === 'forecast') {
-            const steps = JSON.parse(url.searchParams.get('steps') || '[]');
+            let steps;
+            try { steps = JSON.parse(url.searchParams.get('steps') || '[]'); } catch (e) {
+              sendJson(res, 422, { error: 'invalid_json', param: 'steps', detail: e.message }); return;
+            }
             temporal = futureTrajectory(frames, cursor, steps);
           } else if (!frames.length) {
             temporal = { mode: 'historical', cursor: -1, state: {}, frames: [] };

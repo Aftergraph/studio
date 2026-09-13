@@ -86,11 +86,12 @@ test('billing light palette meets WCAG AA for muted and status text', async () =
   assert.match(html, /<body class="billing-page">/);
   // R-003: billing.css uses ADS aliases; verify the alias references exist
   assert.match(tokens, /--text-3:\s*var\(--ag-brand-text-subtle\)/);
-  assert.match(tokens, /--success:\s*var\(--ag-brand-evidence\)/);
+  // R-011: success/warning overridden with accessible values instead of ADS aliases
+  assert.match(tokens, /--success:\s*#0b7a47/);
+  assert.match(tokens, /--warning:\s*#8a5700/);
   assert.match(tokens, /--danger:\s*var\(--ag-brand-danger-tone\)/);
   // Resolve actual ADS light-theme values for contrast validation
   assert.match(adsTokens, /--ag-brand-text-subtle:\s*#8993a4/);
-  assert.match(adsTokens, /--ag-brand-evidence:\s*#15985d/);
   assert.match(adsTokens, /--ag-brand-danger-tone:\s*#d24242/);
   const luminance = (hex) => {
     const channels = hex.slice(1).match(/../g).map((value) => Number.parseInt(value, 16) / 255);
@@ -102,12 +103,49 @@ test('billing light palette meets WCAG AA for muted and status text', async () =
     const b = luminance(background);
     return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
   };
-  // Validate resolved ADS values meet WCAG AA against white canvas
-  // text-subtle and evidence are used as UI component/status indicators (large text / non-text)
-  // which require 3.0:1 per WCAG 2.2 SC 1.4.11; danger is used in body text requiring 4.5:1
+  // Validate resolved values meet WCAG AA against white canvas
   assert.ok(contrast('#8993a4', '#ffffff') >= 3.0, 'text-subtle must meet WCAG AA for UI components (3.0:1)');
-  assert.ok(contrast('#15985d', '#ffffff') >= 3.0, 'evidence/success must meet WCAG AA for UI components (3.0:1)');
+  assert.ok(contrast('#0b7a47', '#ffffff') >= 4.5, 'success must meet WCAG AA for normal text (4.5:1)');
+  assert.ok(contrast('#8a5700', '#ffffff') >= 4.5, 'warning must meet WCAG AA for normal text (4.5:1)');
   assert.ok(contrast('#d24242', '#ffffff') >= 4.5, 'danger must meet WCAG AA for normal text (4.5:1)');
+});
+
+test('billing dark palette meets WCAG AA for status colors', async () => {
+  const tokens = await text('styles/tokens.css');
+  // R-011: dark mode overrides for success/warning
+  assert.match(tokens, /html\[data-theme="dark"\]/);
+  const luminance = (hex) => {
+    const channels = hex.slice(1).match(/../g).map((value) => Number.parseInt(value, 16) / 255);
+    const linear = channels.map((value) => value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+  };
+  const contrast = (foreground, background) => {
+    const a = luminance(foreground);
+    const b = luminance(background);
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  };
+  // Dark canvas is #080c14
+  assert.ok(contrast('#2ecfb5', '#080c14') >= 4.5, 'dark success must meet WCAG AA (4.5:1)');
+  assert.ok(contrast('#f0a64a', '#080c14') >= 4.5, 'dark warning must meet WCAG AA (4.5:1)');
+});
+
+test('billing tablist supports keyboard navigation with roving tabindex and aria-controls', async () => {
+  const html = await text('billing/index.html');
+  const source = await text('src/billing/billing-app.mjs');
+  // R-010: tabs have ids, aria-controls, and roving tabindex
+  assert.match(html, /id="billing-tab-inbox"/);
+  assert.match(html, /id="billing-tab-ready"/);
+  assert.match(html, /aria-controls="billing-panel"/);
+  assert.match(html, /role="tabpanel"\s+id="billing-panel"/);
+  assert.match(html, /tabindex="0"/);
+  assert.match(html, /tabindex="-1"/);
+  // R-010: keydown handler implements arrow/home/end navigation
+  assert.match(source, /keydown/);
+  assert.match(source, /ArrowRight/);
+  assert.match(source, /ArrowLeft/);
+  assert.match(source, /Home/);
+  assert.match(source, /End/);
+  assert.match(source, /roving tabindex/i);
 });
 
 test('billing app loads only first-party modules and token/reset/billing styles', async () => {

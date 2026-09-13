@@ -173,6 +173,22 @@ function createApp() {
     companySettings: $('[data-action="company-settings"]'),
   };
 
+  function showSkeleton() {
+    if (!els.list) return;
+    els.list.innerHTML = `<div class="billing-skeleton" aria-busy="true" aria-label="Indlæser fakturering">
+      ${Array.from({ length: 4 }, () => `<div class="billing-skeleton-card">
+        <div class="billing-skeleton-line is-title"></div>
+        <div class="billing-skeleton-line is-long"></div>
+        <div class="billing-skeleton-line is-medium"></div>
+        <div class="billing-skeleton-line is-short"></div>
+      </div>`).join('')}
+    </div>`;
+  }
+
+  function hideSkeleton() {
+    // Skeleton is replaced by renderList() or error states; no-op if already cleared.
+  }
+
   const locale = () => state.billing?.settings?.locale || 'da-DK';
   const projection = () => state.billing?.projection || { items: [], summary: {} };
   const customer = (id) => state.billing?.customers?.find((entry) => entry.id === id) || null;
@@ -360,6 +376,7 @@ function createApp() {
     if (state.busy) { state.refreshPending = true; return; }
     state.busy = true;
     els.refresh.disabled = true;
+    showSkeleton();
     state.online = typeof navigator === 'undefined' ? true : navigator.onLine !== false;
     try {
       const session = await resolveBillingSession(client, { online: state.online });
@@ -830,10 +847,37 @@ function createApp() {
     }
   }
 
+  // R-010: Keyboard navigation for tablist (ArrowLeft/Right/Home/End + roving tabindex)
+  const tablist = $('.billing-tabs[role="tablist"]');
+  if (tablist) {
+    tablist.addEventListener('keydown', (event) => {
+      const tabs = $$('.billing-tab[role="tab"]', tablist);
+      if (!tabs.length) return;
+      const current = event.target.closest('[role="tab"]');
+      if (!current || !tablist.contains(current)) return;
+      const idx = tabs.indexOf(current);
+      let next = -1;
+      switch (event.key) {
+        case 'ArrowRight': next = (idx + 1) % tabs.length; break;
+        case 'ArrowLeft': next = (idx - 1 + tabs.length) % tabs.length; break;
+        case 'Home': next = 0; break;
+        case 'End': next = tabs.length - 1; break;
+        default: return;
+      }
+      event.preventDefault();
+      tabs.forEach((tab, i) => tab.setAttribute('tabindex', i === next ? '0' : '-1'));
+      tabs[next].focus();
+      tabs[next].click();
+    });
+  }
+
   document.addEventListener('click', (event) => {
     const tab = event.target.closest('[data-view]');
     if (tab) {
       state.view = tab.dataset.view;
+      // R-010: Update roving tabindex on click
+      const tabs = $$('.billing-tab[role="tab"]');
+      tabs.forEach((t) => t.setAttribute('tabindex', t === tab ? '0' : '-1'));
       renderList();
       return;
     }
