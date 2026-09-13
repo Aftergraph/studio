@@ -40,6 +40,7 @@ function isBillingPath(pathname) {
     || pathname === '/api/v1/billing/actuals'
     || pathname === '/api/v1/billing/actuals/correct'
     || pathname === '/api/v1/billing/invoices/draft'
+    || pathname === '/api/v1/billing/dashboard'
     || pathname === '/api/v1/billing/audit'
     || pathname === '/api/v1/billing/invoices/manual-draft'
     || /^\/api\/v1\/billing\/invoices\/[^/]+\/(issue|artifact|document|peppol-bis3|deliver|void|payment|remind)$/.test(pathname)
@@ -122,6 +123,53 @@ export function decorateBillingServer(server, {
       sendJson(res, 200, {
         version: API_VERSION,
         billing: projectBillingState(store.snapshot().billing),
+      });
+      return;
+    }
+
+    if (url.pathname === '/api/v1/billing/dashboard' && req.method === 'GET') {
+      const { actor, store } = await resolveScope(req, url);
+      try { assertActorCapability({ state: store.snapshot(), actor, capability: 'billing.read', users }); }
+      catch { throw actorError('forbidden', 403); }
+      const billing = store.snapshot().billing || {};
+      const invoices = billing.invoices || [];
+      const now = new Date();
+      const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      let totalOutstandingMinor = 0;
+      let overdueCount = 0;
+      let monthlyRevenueMinor = 0;
+      const recentPayments = [];
+      for (const invoice of invoices) {
+        if (invoice.status === 'void') continue;
+        const paid = (invoice.payments || []).reduce((sum, p) => sum + (p.amountMinor || 0), 0);
+        const outstanding = (invoice.totalGrossMinor || 0) - paid;
+        if (outstanding > 0) {
+          totalOutstandingMinor += outstanding;
+          if (invoice.dueDate && new Date(invoice.dueDate) < now) overdueCount++;
+        }
+        for (const payment of (invoice.payments || [])) {
+          if (payment.paidAt >= currentMonthStart) monthlyRevenueMinor += payment.amountMinor || 0;
+          recentPayments.push({
+            invoiceId: invoice.id,
+            invoiceNumber: invoice.number || null,
+            customerName: (billing.customers || []).find(c => c.id === invoice.customerId)?.name || null,
+            amountMinor: payment.amountMinor,
+            paidAt: payment.paidAt,
+            method: payment.method || null,
+          });
+        }
+      }
+      recentPayments.sort((a, b) => (b.paidAt || '').localeCompare(a.paidAt || ''));
+      sendJson(res, 200, {
+        version: API_VERSION,
+        dashboard: {
+          totalOutstandingMinor,
+          overdueCount,
+          monthlyRevenueMinor,
+          currency: billing.settings?.currency || 'DKK',
+          recentPayments: recentPayments.slice(0, 10),
+          generatedAt: now.toISOString(),
+        },
       });
       return;
     }

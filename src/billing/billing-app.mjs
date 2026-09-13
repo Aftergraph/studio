@@ -206,7 +206,7 @@ function createApp() {
     billing: null,
     actor: null,
     cacheIdentity: null,
-    view: 'inbox',
+    view: 'dashboard',
     busy: false,
     refreshPending: false,
     retryTimer: null,
@@ -216,6 +216,7 @@ function createApp() {
     online: typeof navigator === 'undefined' ? true : navigator.onLine !== false,
     activeItem: null,
     activeInvoice: null,
+    dashboard: null,
     toastTimer: null,
     returnFocus: null,
     loginRequired: false,
@@ -391,7 +392,41 @@ function createApp() {
     return '';
   }
 
+  async function fetchDashboard() {
+    try {
+      const body = await client.read('/api/v1/billing/dashboard');
+      state.dashboard = body?.dashboard || null;
+    } catch (err) {
+      console.error('fetchDashboard failed', err);
+      state.dashboard = null;
+    }
+  }
+
+  function renderDashboard() {
+    const d = state.dashboard;
+    if (!d) {
+      els.list.innerHTML = '<div class="billing-skeleton" aria-busy="true" aria-label="Indlæser overblik"><div class="billing-skeleton-card"><div class="billing-skeleton-line is-title"></div><div class="billing-skeleton-line is-long"></div></div></div>';
+      return;
+    }
+    const currency = d.currency || 'DKK';
+    const loc = locale();
+    const payments = (d.recentPayments || []).map((p) => `
+      <li class="billing-dashboard-payment">
+        <span class="billing-dashboard-payment-customer">${esc(p.customerName || 'Ukendt kunde')}</span>
+        <span class="billing-dashboard-payment-amount">${esc(formatMoney(p.amountMinor, currency, loc))}</span>
+        <time datetime="${esc(p.paidAt)}">${esc(formatDate(p.paidAt, loc))}</time>
+      </li>`).join('') || '<li class="billing-empty">Ingen betalinger denne måned.</li>';
+    els.summary.innerHTML = `
+      <article class="billing-summary-item is-primary"><span class="billing-summary-label">Udestående</span><strong class="billing-summary-value">${esc(formatMoney(d.totalOutstandingMinor, currency, loc))}</strong><span class="billing-summary-detail">åbne fakturaer</span></article>
+      <article class="billing-summary-item${d.overdueCount > 0 ? ' is-alert' : ''}"><span class="billing-summary-label">Forfaldne</span><strong class="billing-summary-value">${esc(d.overdueCount)}</strong><span class="billing-summary-detail">kræver opfølgning</span></article>
+      <article class="billing-summary-item"><span class="billing-summary-label">Månedsomsætning</span><strong class="billing-summary-value">${esc(formatMoney(d.monthlyRevenueMinor, currency, loc))}</strong><span class="billing-summary-detail">indbetalinger i ${esc(new Date().toLocaleString(loc, { month: 'long' }))}</span></article>`;
+    els.title.textContent = 'Økonomisk overblik';
+    els.context.textContent = 'Udestående fordringer, forfaldne fakturaer og månedens indbetalinger.';
+    els.list.innerHTML = `<section class="billing-dashboard-recent" aria-label="Seneste betalinger"><h3>Seneste betalinger</h3><ul class="billing-dashboard-payment-list">${payments}</ul></section>`;
+  }
+
   function renderSummary() {
+    if (state.view === 'dashboard') return;
     try {
       const summary = projection().summary || {};
       const readyItems = projection().items.filter((item) => item.status === 'ready');
@@ -409,15 +444,20 @@ function createApp() {
   }
 
   function renderList() {
+    // Update tab active states for all views including dashboard
+    $$('.billing-tab').forEach((tab) => {
+      const selected = tab.dataset.view === state.view;
+      tab.classList.toggle('is-active', selected);
+      tab.setAttribute('aria-selected', String(selected));
+    });
+    if (state.view === 'dashboard') {
+      renderDashboard();
+      return;
+    }
     try {
       const [label, contextText] = VIEWS[state.view];
       els.title.textContent = label;
       els.context.textContent = contextText;
-      $$('.billing-tab').forEach((tab) => {
-        const selected = tab.dataset.view === state.view;
-        tab.classList.toggle('is-active', selected);
-        tab.setAttribute('aria-selected', String(selected));
-      });
       const summary = projection().summary || {};
       const counts = {
         inbox: (summary.needsInfo || 0) + (summary.ready || 0) + (summary.waiting || 0),
@@ -525,6 +565,7 @@ function createApp() {
       state.cachedAt = null;
       state.lastSyncedAt = syncedAt;
       clearRetry();
+      if (state.view === 'dashboard') await fetchDashboard();
       render();
     } catch (error) {
       const authenticationFailed = error?.status === 401 || error?.status === 403 || error?.code === 'authentication_required';
@@ -1376,7 +1417,11 @@ function createApp() {
       // R-010: Update roving tabindex on click
       const tabs = $$('.billing-tab[role="tab"]');
       tabs.forEach((t) => t.setAttribute('tabindex', t === tab ? '0' : '-1'));
-      renderList();
+      if (state.view === 'dashboard') {
+        fetchDashboard().then(() => renderList());
+      } else {
+        renderList();
+      }
       return;
     }
     const action = event.target.closest('[data-action]');
