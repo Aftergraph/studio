@@ -3,10 +3,12 @@ import { createLiveRuntime, pauseMission, resumeMission, stepMission } from './l
 const clone = value => structuredClone(value);
 
 export class MissionRuntimeHub {
-  constructor({ store, intervalMs = 1250, onChange = () => {}, isHalted = () => false } = {}) {
+  constructor({ store, intervalMs = 2500, onChange = () => {}, isHalted = () => false } = {}) {
     if (!store) throw new Error('store required');
     this.store = store;
-    this.intervalMs = Math.max(10, Number(intervalMs) || 1250);
+    // ponytail: reduced from 1250ms to 2500ms to halve tick frequency
+    // and reduce cascading clone overhead
+    this.intervalMs = Math.max(10, Number(intervalMs) || 2500);
     this.onChange = onChange;
     this.isHalted = isHalted;
     this.runtimes = new Map();
