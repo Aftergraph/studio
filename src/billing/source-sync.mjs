@@ -29,18 +29,43 @@ function assertSource(source) {
   if (!source?.syncedAt || Number.isNaN(Date.parse(source.syncedAt))) throw codedError('source_synced_at_required');
 }
 
+function assertUnique(records, field, code) {
+  const seen = new Set();
+  for (const record of records) {
+    const value = record?.[field];
+    if (seen.has(value)) throw codedError(code);
+    seen.add(value);
+  }
+}
+
 function assertCustomer(customer) {
   if (!customer?.id || !customer?.name) throw codedError('invalid_customer');
   if (!['active', 'inactive'].includes(customer.status)) throw codedError('invalid_customer_status');
   const billing = customer.billing;
   if (!billing || !['per_visit', 'monthly_batch'].includes(billing.mode)) throw codedError('invalid_customer_billing');
+  if (!Number.isInteger(billing.paymentTermsDays) || billing.paymentTermsDays < 0) {
+    throw codedError('invalid_customer_billing');
+  }
   if (!Number.isInteger(billing.rateMinor) || billing.rateMinor < 0) throw codedError('invalid_customer_billing');
-  if (!billing.currency) throw codedError('invalid_customer_billing');
+  if (typeof billing.currency !== 'string' || !/^[A-Z]{3}$/.test(billing.currency)) {
+    throw codedError('invalid_customer_billing');
+  }
+  if (billing.discountPercent !== undefined
+    && (!Number.isFinite(billing.discountPercent) || billing.discountPercent < 0 || billing.discountPercent > 100)) {
+    throw codedError('invalid_customer_billing');
+  }
 }
 function assertVisit(visit) {
   if (!visit?.id || !visit?.customerId) throw codedError('invalid_visit');
   if (!['planned', 'completed', 'cancelled'].includes(visit.status)) throw codedError('invalid_visit_status');
-  if (!visit.scheduledStart || !visit.scheduledEnd) throw codedError('invalid_visit_schedule');
+  if (typeof visit.scheduledStart !== 'string' || typeof visit.scheduledEnd !== 'string') {
+    throw codedError('invalid_visit_schedule');
+  }
+  const start = new Date(visit.scheduledStart);
+  const end = new Date(visit.scheduledEnd);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+    throw codedError('invalid_visit_schedule');
+  }
   if (visit.actual !== undefined) {
     const minutes = visit.actual?.workMinutes;
     if (!Number.isInteger(minutes) || minutes < 0) throw codedError('invalid_actuals');
@@ -83,6 +108,8 @@ export function syncBillingSource(billing, { schema, source, customers = [], vis
   if (schema !== BILLING_SOURCE_SCHEMA) throw codedError('unsupported_source_schema');
   assertSource(source);
   if (!Array.isArray(customers) || !Array.isArray(visits)) throw codedError('invalid_source_payload');
+  assertUnique(customers, 'id', 'duplicate_customer_id');
+  assertUnique(visits, 'id', 'duplicate_visit_id');
   customers.forEach(assertCustomer);
   visits.forEach(assertVisit);
 

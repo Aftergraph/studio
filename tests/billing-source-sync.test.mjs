@@ -27,6 +27,60 @@ test('source sync imports customers and visits into an empty production billing 
   });
 });
 
+test('source sync rejects duplicate identities and invalid customer billing boundaries', () => {
+  assert.throws(
+    () => syncBillingSource(emptyBillingState(), {
+      schema: 'aftergraph.billing.source.v1',
+      source,
+      customers: [customer, { ...customer, name: 'Duplicate Customer' }],
+      visits: [visit],
+    }),
+    (error) => error?.code === 'duplicate_customer_id',
+  );
+
+  assert.throws(
+    () => syncBillingSource(emptyBillingState(), {
+      schema: 'aftergraph.billing.source.v1',
+      source,
+      customers: [{ ...customer, billing: { ...customer.billing, paymentTermsDays: -1 } }],
+      visits: [visit],
+    }),
+    (error) => error?.code === 'invalid_customer_billing',
+  );
+
+  assert.throws(
+    () => syncBillingSource(emptyBillingState(), {
+      schema: 'aftergraph.billing.source.v1',
+      source,
+      customers: [{ ...customer, billing: { ...customer.billing, currency: 'dk' } }],
+      visits: [visit],
+    }),
+    (error) => error?.code === 'invalid_customer_billing',
+  );
+});
+
+test('source sync rejects duplicate visit identities and impossible schedules', () => {
+  assert.throws(
+    () => syncBillingSource(emptyBillingState(), {
+      schema: 'aftergraph.billing.source.v1',
+      source,
+      customers: [customer],
+      visits: [visit, { ...visit, status: 'planned' }],
+    }),
+    (error) => error?.code === 'duplicate_visit_id',
+  );
+
+  assert.throws(
+    () => syncBillingSource(emptyBillingState(), {
+      schema: 'aftergraph.billing.source.v1',
+      source,
+      customers: [customer],
+      visits: [{ ...visit, scheduledEnd: visit.scheduledStart }],
+    }),
+    (error) => error?.code === 'invalid_visit_schedule',
+  );
+});
+
 test('same source revision and payload is idempotent while changed payload conflicts', () => {
   const first = syncBillingSource(emptyBillingState(), { schema: 'aftergraph.billing.source.v1', source, customers: [customer], visits: [visit] });
   const replay = syncBillingSource(first.billing, { schema: 'aftergraph.billing.source.v1', source, customers: [customer], visits: [visit] });

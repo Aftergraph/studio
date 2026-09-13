@@ -44,7 +44,7 @@ export function createWebhookBillingDeliveryAdapter({
 
   return Object.freeze({
     name: 'webhook',
-    async deliver({ invoice, artifact } = {}) {
+    async deliver({ invoice, artifact, attemptId } = {}) {
       const recipientEmail = invoice?.customerSnapshot?.email;
       if (!recipientEmail) throw deliveryAdapterError('delivery_recipient_missing', 422);
       if (!artifact?.body || !artifact?.filename || !artifact?.contentType) {
@@ -59,6 +59,7 @@ export function createWebhookBillingDeliveryAdapter({
           dueDate: invoice.dueDate, currency: invoice.currency,
           totalGrossMinor: invoice.totalGrossMinor,
         },
+        ...(attemptId ? { deliveryAttemptId: String(attemptId) } : {}),
         artifact: {
           filename: artifact.filename,
           contentType: artifact.contentType,
@@ -66,6 +67,7 @@ export function createWebhookBillingDeliveryAdapter({
         },
       };
       const headers = { 'content-type': 'application/json' };
+      if (attemptId) headers['idempotency-key'] = String(attemptId);
       if (token) headers.authorization = `Bearer ${token}`;
       let response;
       try {
@@ -124,13 +126,19 @@ export async function handleBillingDelivery(options) {
   const customer = snapshot.customers.find((entry) => entry.id === invoice.customerId);
   const artifact = renderInvoicePdf({ billing: snapshot, invoiceId });
   try {
-    const receipt = await adapter.deliver({ invoice, customer, artifact });
+    const receipt = await adapter.deliver({
+      invoice,
+      customer,
+      artifact,
+      attemptId: invoice.delivery?.attemptId,
+    });
     const next = await store.mutate((draft) => {
       const result = deliverBillingInvoice(draft.billing, {
         invoiceId,
         actor,
         delivery: {
           provider: adapter.name,
+          attemptId: invoice.delivery?.attemptId,
           messageId: receipt?.messageId,
           deliveredAt: receipt?.deliveredAt,
         },

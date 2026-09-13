@@ -80,6 +80,9 @@ export function createBillingClient({
     recordActuals({ visitId, actual }) {
       return write('/api/v1/billing/actuals', { visitId, actual }, 'billing-actuals');
     },
+    correctActuals({ visitId, actual, reason, correctedAt }) {
+      return write('/api/v1/billing/actuals/correct', { visitId, actual, reason, correctedAt }, 'billing-actuals-correction');
+    },
     createDraft({ customerId, visitIds, number, issueDate }) {
       return write('/api/v1/billing/invoices/draft', {
         customerId,

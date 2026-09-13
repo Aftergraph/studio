@@ -49,6 +49,31 @@ test('billing writes carry the bearer-bound actor and idempotency key', async ()
   assert.ok(call.options.headers['idempotency-key']);
 });
 
+test('billing client exposes governed actual correction with reason', async () => {
+  let call;
+  const client = createBillingClient({
+    actor: 'operator-1',
+    token: 'studio-token',
+    fetchFn: async (url, options = {}) => {
+      call = { url, options };
+      return jsonResponse({ billing: {}, visit: { id: 'visit-1' } });
+    },
+  });
+
+  await client.correctActuals({
+    visitId: 'visit-1',
+    actual: { workMinutes: 90 },
+    reason: 'Customer-confirmed correction',
+  });
+  assert.equal(call.url, '/api/v1/billing/actuals/correct');
+  const body = JSON.parse(call.options.body);
+  assert.equal(body.actor, 'operator-1');
+  assert.equal(body.actual.workMinutes, 90);
+  assert.equal(body.reason, 'Customer-confirmed correction');
+  assert.match(call.options.headers.authorization, /^Bearer /);
+  assert.ok(call.options.headers['idempotency-key']);
+});
+
 test('billing client exposes authenticated artifact download and guarded delivery', async () => {
   const calls = [];
   const client = createBillingClient({

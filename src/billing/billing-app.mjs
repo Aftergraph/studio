@@ -456,7 +456,11 @@ function createApp() {
       return `<div class="billing-draft-status"><strong>${status}</strong><p>Nr. ${esc(state.activeInvoice.number)} · forfalder ${esc(formatDate(state.activeInvoice.dueDate, locale()))}</p>${deliveryDetail}</div><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Luk</button>${artifact}${issue}${deliver}</div>`;
     }
     const nextNumber = state.billing?.settings?.invoiceSequence?.nextNumber ?? '—';
-    return `<form id="billing-draft-form" class="billing-form"><div class="billing-field"><label for="billing-issue-date">Fakturadato</label><input id="billing-issue-date" name="issueDate" type="date" value="${today()}" required${disabled}></div><p class="billing-form-help">Næste fakturanummer: <strong>${esc(nextNumber)}</strong>. Nummeret reserveres automatisk og atomisk, når kladden oprettes.</p><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Annuller</button><button type="submit" class="billing-primary-button"${disabled}>Opret kladde</button></div></form>`;
+    const correctionVisit = state.activeItem?.visitIds?.length === 1 ? visit(state.activeItem.visitIds[0]) : null;
+    const correction = correctionVisit?.actual
+      ? `<div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="correct-actuals"${disabled}>Korrigér actuals</button></div>`
+      : '';
+    return `${correction}<form id="billing-draft-form" class="billing-form"><div class="billing-field"><label for="billing-issue-date">Fakturadato</label><input id="billing-issue-date" name="issueDate" type="date" value="${today()}" required${disabled}></div><p class="billing-form-help">Næste fakturanummer: <strong>${esc(nextNumber)}</strong>. Nummeret reserveres automatisk og atomisk, når kladden oprettes.</p><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Annuller</button><button type="submit" class="billing-primary-button"${disabled}>Opret kladde</button></div></form>`;
   }
 
   function renderReview() {
@@ -533,6 +537,20 @@ function createApp() {
     els.reviewBody.innerHTML = `<section class="billing-review-customer"><h3>${esc(item.customerName)}</h3><p>${esc(formatDate(visit(item.visitId)?.scheduledStart, locale()))}</p></section><form id="billing-actuals-form" class="billing-form"><div class="billing-field"><label for="billing-work-hours">Samlede faktiske arbejdstimer</label><input id="billing-work-hours" name="workHours" type="number" min="0" step="0.25" inputmode="decimal" placeholder="fx 2" required></div><p class="billing-form-help">Skriv den samlede arbejdstid på tværs af medarbejdere. Kalenderens planlagte varighed bruges ikke som fakturagrundlag.</p><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Annuller</button><button type="submit" class="billing-primary-button">Gem actuals</button></div></form>`;
     openDialog();
     setTimeout(() => $('#billing-work-hours', els.review)?.focus(), 0);
+  }
+
+  function openActualCorrection(item) {
+    if (state.busy || !canMutate()) return toast('Kræver online og aktuelle data');
+    const visitId = item?.visitIds?.length === 1 ? item.visitIds[0] : null;
+    const current = visit(visitId);
+    if (!current?.actual) return toast('Der findes ingen actuals at korrigere');
+    state.activeItem = structuredClone(item);
+    state.activeInvoice = null;
+    els.reviewKicker.textContent = 'Korrigering';
+    els.reviewTitle.textContent = 'Korrigér actuals';
+    els.reviewBody.innerHTML = `<section class="billing-review-customer"><h3>${esc(item.customerName)}</h3><p>${esc(formatDate(current.scheduledStart, locale()))}</p></section><form id="billing-actual-correction-form" class="billing-form"><div class="billing-field"><label for="billing-correction-hours">Samlede faktiske arbejdstimer</label><input id="billing-correction-hours" name="workHours" type="number" min="0" step="0.25" inputmode="decimal" value="${esc(String(current.actual.workMinutes / 60))}" required></div><div class="billing-field"><label for="billing-correction-reason">Årsag til korrektion</label><textarea id="billing-correction-reason" name="reason" maxlength="1000" required></textarea></div><p class="billing-form-help">Korrigeringer kræver en begrundelse og er ikke mulige, når besøget allerede er bundet til en faktura.</p><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Annuller</button><button type="submit" class="billing-primary-button">Gem korrektion</button></div></form>`;
+    openDialog();
+    setTimeout(() => $('#billing-correction-hours', els.review)?.focus(), 0);
   }
 
   async function createDraft(form) {
@@ -709,6 +727,37 @@ function createApp() {
     }
   }
 
+  async function saveActualCorrection(form) {
+    const visitId = state.activeItem?.visitIds?.length === 1 ? state.activeItem.visitIds[0] : null;
+    if (!visitId || state.busy || !canMutate()) return;
+    const data = new FormData(form);
+    const hours = Number(String(data.get('workHours') || '').replace(',', '.'));
+    const reason = String(data.get('reason') || '').trim();
+    if (!Number.isFinite(hours) || hours < 0 || !reason) return toast('Angiv timer og en begrundelse');
+    state.busy = true;
+    form.querySelectorAll('button,input,textarea').forEach((node) => { node.disabled = true; });
+    try {
+      const body = await client.correctActuals({
+        visitId,
+        actual: { workMinutes: Math.round(hours * 60) },
+        reason,
+      });
+      state.billing = body.billing;
+      state.cached = false;
+      state.lastSyncedAt = new Date().toISOString();
+      closeDialog();
+      render();
+      toast('Actuals er korrigeret');
+    } catch (error) {
+      form.querySelectorAll('button,input,textarea').forEach((node) => { node.disabled = false; });
+      toast(error.code === 'actuals_locked'
+        ? 'Actuals er låst, fordi besøget allerede er faktureret'
+        : 'Kunne ikke korrigere actuals');
+    } finally {
+      state.busy = false;
+    }
+  }
+
   document.addEventListener('click', (event) => {
     const tab = event.target.closest('[data-view]');
     if (tab) {
@@ -730,6 +779,10 @@ function createApp() {
       if (item) openActuals(item);
       return;
     }
+    if (action.dataset.action === 'correct-actuals') {
+      if (state.activeItem) openActualCorrection(state.activeItem);
+      return;
+    }
     if (action.dataset.action === 'issue') return issueInvoice(action.dataset.invoiceId, action);
     if (action.dataset.action === 'download') return downloadInvoice(action.dataset.invoiceId, action);
     if (action.dataset.action === 'peppol') return downloadPeppolInvoice(action.dataset.invoiceId, action);
@@ -743,6 +796,9 @@ function createApp() {
     } else if (event.target.id === 'billing-actuals-form') {
       event.preventDefault();
       saveActuals(event.target);
+    } else if (event.target.id === 'billing-actual-correction-form') {
+      event.preventDefault();
+      saveActualCorrection(event.target);
     } else if (event.target.id === 'billing-company-form') {
       event.preventDefault();
       saveCompanySettings(event.target);

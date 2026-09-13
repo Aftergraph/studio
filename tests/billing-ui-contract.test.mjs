@@ -96,6 +96,19 @@ test('issued invoice review exposes artifact download, delivery action and deliv
   assert.match(source, /deliverInvoice/);
 });
 
+test('billing app exposes governed actual correction with an audited reason', async () => {
+  const source = await text('src/billing/billing-app.mjs');
+  const client = await text('src/billing/browser-client.mjs');
+  assert.match(source, /data-action="correct-actuals"/);
+  assert.match(source, /Korrigér actuals/);
+  assert.match(source, /id="billing-actual-correction-form"/);
+  assert.match(source, /id="billing-correction-reason"/);
+  assert.match(source, /maxlength="1000"/);
+  assert.match(source, /actuals_locked/);
+  assert.match(client, /\/api\/v1\/billing\/actuals\/correct/);
+  assert.match(client, /billing-actuals-correction/);
+});
+
 test('billing app exposes tenant company settings and uses automatic invoice numbering', async () => {
   const html = await text('billing/index.html');
   const source = await text('src/billing/billing-app.mjs');

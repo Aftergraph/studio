@@ -64,6 +64,50 @@ test('auth server: requireAuth mode rejects bare actors, accepts tokens', async 
   }
 });
 
+test('auth server: production magic-link issuance requires bearer-bound auth.issue capability', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'aftergraph-auth-issue-gate-'));
+  const server = createAppServer({
+    root: new URL('../', import.meta.url),
+    stateFile: join(dir, 'ws.json'),
+    runtimeIntervalMs: 20,
+    authSecret: SECRET,
+    requireAuth: true,
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const port = server.address().port;
+    const bootstrapHeaders = { authorization: `Bearer ${server.workspace.bootToken}` };
+    const seeded = await post(port, '/api/v1/users', {
+      actor: 'demo-user',
+      id: 'alice',
+      capabilities: ['memory.write'],
+    }, 'auth-issue-seed', bootstrapHeaders);
+    assert.equal(seeded.status, 201);
+
+    const bare = await post(port, '/api/v1/auth/magic-link', {
+      actor: 'demo-user',
+      userId: 'alice',
+    }, 'auth-issue-bare');
+    assert.equal(bare.status, 401, 'production token issuance must reject bare callers');
+
+    const mismatch = await post(port, '/api/v1/auth/magic-link', {
+      actor: 'alice',
+      userId: 'alice',
+    }, 'auth-issue-mismatch', bootstrapHeaders);
+    assert.equal(mismatch.status, 403, 'claimed actor must remain bound to bearer subject');
+
+    const issued = await post(port, '/api/v1/auth/magic-link', {
+      actor: 'demo-user',
+      userId: 'alice',
+    }, 'auth-issue-authorized', bootstrapHeaders);
+    assert.equal(issued.status, 201);
+    assert.match(issued.json.token, /^v1\./);
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('auth server: magic-link issuance is rate limited per IP', async () => {
   await withServer(async port => {
     const admin = await post(port, '/api/v1/users', { actor: 'demo-user', id: 'rl-user', capabilities: [] }, 'rl-seed');

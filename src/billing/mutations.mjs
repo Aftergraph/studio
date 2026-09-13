@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { evaluateBilling } from './readiness.mjs';
 import { projectInvoice } from './money.mjs';
 
@@ -10,6 +11,29 @@ function codedError(code, message = code, status = 422) {
 
 function clone(value) {
   return structuredClone(value);
+}
+
+function canonicalize(value) {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalize(value[key])]));
+}
+
+function sameJson(left, right) {
+  return JSON.stringify(canonicalize(left)) === JSON.stringify(canonicalize(right));
+}
+
+function assertActual(actual) {
+  if (!actual || !Number.isInteger(actual.workMinutes) || actual.workMinutes < 0) {
+    throw codedError('invalid_actuals', 'actual workMinutes must be a non-negative integer');
+  }
+  if (actual.workers !== undefined && (!Number.isInteger(actual.workers) || actual.workers < 1)) {
+    throw codedError('invalid_actuals', 'actual workers must be a positive integer');
+  }
+}
+
+function activeInvoiceForVisit(invoices, visitId) {
+  return invoices.find((invoice) => invoice?.status !== 'void' && invoice?.visitIds?.includes(visitId));
 }
 
 function assertDateOnly(value, field) {
@@ -37,14 +61,69 @@ export function recordBillingActual(billing, { visitId, actual } = {}) {
   const visit = next.visits.find((entry) => entry.id === visitId);
   if (!visit) throw codedError('visit_not_found', 'visit not found', 404);
   if (visit.status !== 'completed') throw codedError('visit_not_completed');
-  if (!actual || !Number.isInteger(actual.workMinutes) || actual.workMinutes < 0) {
-    throw codedError('invalid_actuals', 'actual workMinutes must be a non-negative integer');
+  assertActual(actual);
+
+  if (visit.actual !== undefined) {
+    if (sameJson(visit.actual, actual)) {
+      return { billing: next, visit: clone(visit), replayed: true };
+    }
+    throw codedError('actuals_conflict', 'actual evidence already recorded', 409);
   }
-  if (actual.workers !== undefined && (!Number.isInteger(actual.workers) || actual.workers < 1)) {
-    throw codedError('invalid_actuals', 'actual workers must be a positive integer');
+
+  const activeInvoice = activeInvoiceForVisit(next.invoices, visitId);
+  if (activeInvoice) {
+    throw codedError('actuals_locked', 'actual evidence is locked by an invoice', 409);
   }
+
   visit.actual = clone(actual);
-  return { billing: next, visit: clone(visit) };
+  return { billing: next, visit: clone(visit), replayed: false };
+}
+
+export function correctBillingActual(billing, {
+  visitId,
+  actual,
+  actor,
+  reason,
+  correctionId,
+  correctedAt,
+} = {}) {
+  const next = clone(billing);
+  const visit = next.visits.find((entry) => entry.id === visitId);
+  if (!visit) throw codedError('visit_not_found', 'visit not found', 404);
+  if (visit.status !== 'completed') throw codedError('visit_not_completed');
+  if (!visit.actual) throw codedError('actuals_missing');
+  if (!String(actor || '').trim()) throw codedError('correction_actor_required');
+  const cleanReason = String(reason || '').trim();
+  if (!cleanReason) throw codedError('correction_reason_required');
+  if (cleanReason.length > 1000) throw codedError('correction_reason_too_long');
+  assertActual(actual);
+
+  const existingAudit = (next.auditLog || []).find((event) =>
+    event.type === 'billing.actuals.corrected' && event.id === correctionId);
+  if (existingAudit) {
+    return { billing: next, visit: clone(visit), audit: clone(existingAudit), replayed: true };
+  }
+  if (sameJson(visit.actual, actual)) throw codedError('actuals_unchanged');
+  if (activeInvoiceForVisit(next.invoices, visitId)) {
+    throw codedError('actuals_locked', 'actual evidence is locked by an invoice', 409);
+  }
+
+  const at = new Date(correctedAt || new Date().toISOString());
+  if (Number.isNaN(at.getTime())) throw codedError('invalid_correction_time');
+  const audit = {
+    id: String(correctionId || `actual-correction-${randomUUID()}`),
+    type: 'billing.actuals.corrected',
+    visitId,
+    actor: String(actor),
+    reason: cleanReason,
+    correctedAt: at.toISOString(),
+    before: clone(visit.actual),
+    after: clone(actual),
+  };
+  visit.actual = clone(actual);
+  next.auditLog ||= [];
+  next.auditLog.push(audit);
+  return { billing: next, visit: clone(visit), audit: clone(audit), replayed: false };
 }
 
 export function createBillingDraft(billing, {
@@ -149,6 +228,9 @@ export function deliverBillingInvoice(billing, { invoiceId, actor, delivery } = 
   if (Number.isNaN(deliveredAt.getTime())) throw codedError('invalid_delivery_confirmation');
   invoice.status = 'emailed';
   invoice.delivery = {
+    ...(delivery.attemptId || invoice.delivery?.attemptId
+      ? { attemptId: String(delivery.attemptId || invoice.delivery.attemptId) }
+      : {}),
     provider: String(delivery.provider),
     messageId: String(delivery.messageId),
     deliveredAt: deliveredAt.toISOString(),
@@ -158,17 +240,23 @@ export function deliverBillingInvoice(billing, { invoiceId, actor, delivery } = 
 }
 
 
-export function beginBillingDelivery(billing, { invoiceId, actor, provider, requestedAt } = {}) {
+export function beginBillingDelivery(billing, { invoiceId, actor, provider, attemptId, requestedAt } = {}) {
   const next = clone(billing);
   const invoice = next.invoices.find((entry) => entry.id === invoiceId);
   if (!invoice) throw codedError('invoice_not_found', 'invoice not found', 404);
   if (invoice.status === 'emailed') return { billing: next, invoice: clone(invoice) };
   if (invoice.status !== 'issued') throw codedError('invoice_not_deliverable');
+  if (invoice.delivery?.state === 'pending') {
+    throw codedError('delivery_in_progress', 'delivery attempt already in progress', 409);
+  }
   if (!String(provider || '').trim()) throw codedError('delivery_provider_required');
   const at = new Date(requestedAt || new Date().toISOString());
   if (Number.isNaN(at.getTime())) throw codedError('invalid_delivery_request');
+  const resolvedAttemptId = String(attemptId || `delivery-${randomUUID()}`);
+  if (!resolvedAttemptId.trim()) throw codedError('delivery_attempt_id_required');
   invoice.delivery = {
     state: 'pending',
+    attemptId: resolvedAttemptId,
     provider: String(provider).trim(),
     requestedAt: at.toISOString(),
     requestedBy: actor ?? null,

@@ -26,14 +26,16 @@ test('webhook delivery posts immutable invoice recipient and PDF attachment', as
       });
     },
   });
-  const receipt = await adapter.deliver({ invoice, artifact });
+  const receipt = await adapter.deliver({ invoice, artifact, attemptId: 'attempt-1400' });
   assert.deepEqual(receipt, { messageId: 'msg-1400', deliveredAt: '2026-09-11T19:00:00.000Z' });
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, 'https://delivery.test.invalid/invoices');
   assert.equal(calls[0].options.headers.authorization, 'Bearer secret-token');
+  assert.equal(calls[0].options.headers['idempotency-key'], 'attempt-1400');
   const body = JSON.parse(calls[0].options.body);
   assert.equal(body.recipient.email, 'customer@test.invalid');
   assert.equal(body.invoice.number, '1400');
+  assert.equal(body.deliveryAttemptId, 'attempt-1400');
   assert.equal(body.artifact.filename, 'invoice-1400.pdf');
   assert.equal(Buffer.from(body.artifact.bodyBase64, 'base64').toString(), '%PDF-test');
   assert.equal(JSON.stringify(body).includes('secret-token'), false);

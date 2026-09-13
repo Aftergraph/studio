@@ -674,6 +674,10 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
 
         if (url.pathname === '/api/v1/auth/magic-link' && req.method === 'POST') {
           const body=await readJson(req);
+          if (requireAuth && !subjectFromAuthHeader(req, { secret })) {
+            sendJson(res, 401, { error: 'authentication_required' });
+            return;
+          }
           await rescope(body?.actor);
           const throttle=magicLinkLimiter.hit(req.socket?.remoteAddress || 'unknown');
           if(!throttle.allowed){sendJson(res,429,{error:'rate_limited',retryAfterSec:throttle.retryAfterSec});return;}

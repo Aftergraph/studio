@@ -40,24 +40,45 @@ test('confirmed provider delivery marks an issued invoice emailed with immutable
 test('delivery attempt is persisted as pending before a provider side effect', () => {
   const billing = issuedState();
   const result = beginBillingDelivery(billing, {
-    invoiceId: 'invoice-1370', actor: 'operator-1', provider: 'test-mail', requestedAt: '2026-09-11T14:59:00.000Z',
+    invoiceId: 'invoice-1370', actor: 'operator-1', provider: 'test-mail', attemptId: 'attempt-000', requestedAt: '2026-09-11T14:59:00.000Z',
   });
   assert.equal(result.invoice.status, 'issued');
   assert.deepEqual(result.invoice.delivery, {
-    state: 'pending', provider: 'test-mail', requestedAt: '2026-09-11T14:59:00.000Z', requestedBy: 'operator-1',
+    state: 'pending', attemptId: 'attempt-000', provider: 'test-mail', requestedAt: '2026-09-11T14:59:00.000Z', requestedBy: 'operator-1',
   });
+});
+
+test('delivery claim rejects a second pending attempt for the same invoice', () => {
+  const first = beginBillingDelivery(issuedState(), {
+    invoiceId: 'invoice-1370',
+    actor: 'operator-1',
+    provider: 'test-mail',
+    attemptId: 'attempt-001',
+    requestedAt: '2026-09-11T14:59:00.000Z',
+  });
+  assert.equal(first.invoice.delivery.attemptId, 'attempt-001');
+  assert.throws(
+    () => beginBillingDelivery(first.billing, {
+      invoiceId: 'invoice-1370',
+      actor: 'operator-2',
+      provider: 'test-mail',
+      attemptId: 'attempt-002',
+      requestedAt: '2026-09-11T15:00:00.000Z',
+    }),
+    (error) => error?.code === 'delivery_in_progress' && error?.status === 409,
+  );
 });
 
 test('provider failure leaves invoice issued and records a retryable safe failure', () => {
   const billing = beginBillingDelivery(issuedState(), {
-    invoiceId: 'invoice-1370', actor: 'operator-1', provider: 'test-mail', requestedAt: '2026-09-11T14:59:00.000Z',
+    invoiceId: 'invoice-1370', actor: 'operator-1', provider: 'test-mail', attemptId: 'attempt-failed', requestedAt: '2026-09-11T14:59:00.000Z',
   }).billing;
   const result = failBillingDelivery(billing, {
     invoiceId: 'invoice-1370', errorCode: 'provider_unavailable', failedAt: '2026-09-11T15:00:00.000Z',
   });
   assert.equal(result.invoice.status, 'issued');
   assert.deepEqual(result.invoice.delivery, {
-    state: 'failed', provider: 'test-mail', requestedAt: '2026-09-11T14:59:00.000Z', requestedBy: 'operator-1',
+    state: 'failed', attemptId: 'attempt-failed', provider: 'test-mail', requestedAt: '2026-09-11T14:59:00.000Z', requestedBy: 'operator-1',
     errorCode: 'provider_unavailable', failedAt: '2026-09-11T15:00:00.000Z',
   });
 });

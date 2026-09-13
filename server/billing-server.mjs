@@ -5,11 +5,12 @@ import { subjectFromAuthHeader, authSecretFromEnv } from '../src/auth/magic-link
 import { getUser, updateCapabilities } from '../src/user/user-store.mjs';
 import { evaluateBilling } from '../src/billing/readiness.mjs';
 import { renderInvoicePdf } from '../src/billing/artifact.mjs';
-import { buildInvoiceDocument, validateInvoiceDocument } from '../src/billing/document-profile.mjs';
+import { DOCUMENT_PROFILES, buildInvoiceDocument, validateInvoiceDocument } from '../src/billing/document-profile.mjs';
 import { renderPeppolBis3Ubl } from '../src/billing/peppol-bis3.mjs';
 import { syncBillingSource } from '../src/billing/source-sync.mjs';
 import {
   recordBillingActual,
+  correctBillingActual,
   createBillingDraft,
   issueBillingInvoice,
   beginBillingDelivery,
@@ -28,6 +29,7 @@ function isBillingPath(pathname) {
     || pathname === '/api/v1/billing/settings'
     || pathname === '/api/v1/billing/sync'
     || pathname === '/api/v1/billing/actuals'
+    || pathname === '/api/v1/billing/actuals/correct'
     || pathname === '/api/v1/billing/invoices/draft'
     || /^\/api\/v1\/billing\/invoices\/[^/]+\/(issue|artifact|document|peppol-bis3|deliver)$/.test(pathname);
 }
@@ -146,9 +148,20 @@ export function decorateBillingServer(server, {
         sendJson(res, 422, { error: 'document_profile_validation_failed', profile, errors: preflight.errors });
         return;
       }
+      const descriptor = DOCUMENT_PROFILES[profile];
+      if (descriptor?.externalValidationRequired && typeof billingDocumentValidator !== 'function') {
+        sendJson(res, 503, { error: 'document_validator_unavailable', profile });
+        return;
+      }
       const xml = renderPeppolBis3Ubl(document);
-      if (typeof billingDocumentValidator === 'function') {
-        const external = await billingDocumentValidator({ profile, document, xml });
+      if (descriptor?.externalValidationRequired) {
+        let external;
+        try {
+          external = await billingDocumentValidator({ profile, document, xml });
+        } catch {
+          sendJson(res, 503, { error: 'document_validator_unavailable', profile });
+          return;
+        }
         if (!external?.ok) {
           sendJson(res, 422, {
             error: 'document_external_validation_failed',
@@ -168,7 +181,11 @@ export function decorateBillingServer(server, {
     const body = await readJson(req);
     if (!body?.actor) throw actorError('actor_required', 422);
     const { actor, store } = await resolveScope(req, url, body.actor);
-    const capability = url.pathname === '/api/v1/billing/sync' ? 'billing.sync' : 'billing.manage';
+    const capability = url.pathname === '/api/v1/billing/sync'
+      ? 'billing.sync'
+      : url.pathname === '/api/v1/billing/actuals/correct'
+        ? 'billing.actuals.correct'
+        : 'billing.manage';
     const actionKey = begin(req, body, actor, store, url.pathname, capability);
 
     try {
@@ -199,6 +216,30 @@ export function decorateBillingServer(server, {
         });
         actionGuard.complete(actionKey, { status: 'accepted', settingsUpdated: true });
         sendJson(res, 200, { version: API_VERSION, settings, billing: projectBillingState(next.billing) });
+        return;
+      }
+
+      if (url.pathname === '/api/v1/billing/actuals/correct' && req.method === 'POST') {
+        let visit;
+        const next = await store.mutate((draft) => {
+          const result = correctBillingActual(draft.billing, {
+            visitId: body.visitId,
+            actual: body.actual,
+            actor,
+            reason: body.reason,
+            correctionId: actionKey,
+            correctedAt: body.correctedAt,
+          });
+          draft.billing = result.billing;
+          visit = result.visit;
+          return draft;
+        });
+        actionGuard.complete(actionKey, { status: 'accepted', visitId: visit.id, corrected: true });
+        sendJson(res, 200, {
+          version: API_VERSION,
+          visit,
+          billing: projectBillingState(next.billing),
+        });
         return;
       }
 
