@@ -162,6 +162,7 @@ function createApp() {
     activeItem: null,
     activeInvoice: null,
     toastTimer: null,
+    returnFocus: null,
   };
 
   const els = {
@@ -196,6 +197,13 @@ function createApp() {
     els.toast.textContent = message;
     els.toast.classList.add('is-visible');
     state.toastTimer = setTimeout(() => els.toast.classList.remove('is-visible'), 2400);
+  }
+
+  function showFormError(form, message = '') {
+    const error = $('.billing-form-error', form);
+    if (!error) return;
+    error.textContent = message;
+    error.hidden = !message;
   }
 
   function connection(text, kind = '') {
@@ -419,6 +427,7 @@ function createApp() {
   }
 
   function openDialog() {
+    state.returnFocus = document.activeElement;
     if (typeof els.review.showModal === 'function') els.review.showModal();
     else els.review.setAttribute('open', '');
   }
@@ -428,6 +437,9 @@ function createApp() {
     else els.review.removeAttribute('open');
     state.activeItem = null;
     state.activeInvoice = null;
+    const returnFocus = state.returnFocus;
+    state.returnFocus = null;
+    if (returnFocus?.isConnected && typeof returnFocus.focus === 'function') returnFocus.focus();
   }
 
   function lineHtml(item, projected) {
@@ -460,7 +472,7 @@ function createApp() {
     const correction = correctionVisit?.actual
       ? `<div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="correct-actuals"${disabled}>Korrigér actuals</button></div>`
       : '';
-    return `${correction}<form id="billing-draft-form" class="billing-form"><div class="billing-field"><label for="billing-issue-date">Fakturadato</label><input id="billing-issue-date" name="issueDate" type="date" value="${today()}" required${disabled}></div><p class="billing-form-help">Næste fakturanummer: <strong>${esc(nextNumber)}</strong>. Nummeret reserveres automatisk og atomisk, når kladden oprettes.</p><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Annuller</button><button type="submit" class="billing-primary-button"${disabled}>Opret kladde</button></div></form>`;
+    return `${correction}<form id="billing-draft-form" class="billing-form" aria-describedby="billing-draft-error"><div class="billing-field"><label for="billing-issue-date">Fakturadato</label><input id="billing-issue-date" name="issueDate" type="date" value="${today()}" required${disabled}></div><p class="billing-form-help">Næste fakturanummer: <strong>${esc(nextNumber)}</strong>. Nummeret reserveres automatisk og atomisk, når kladden oprettes.</p><p id="billing-draft-error" class="billing-form-error" role="alert" hidden></p><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Annuller</button><button type="submit" class="billing-primary-button"${disabled}>Opret kladde</button></div></form>`;
   }
 
   function renderReview() {
@@ -511,7 +523,7 @@ function createApp() {
     state.activeInvoice = null;
     els.reviewKicker.textContent = 'Indstillinger';
     els.reviewTitle.textContent = 'Virksomhedsprofil';
-    els.reviewBody.innerHTML = `<form id="billing-company-form" class="billing-form billing-company-form">
+    els.reviewBody.innerHTML = `<form id="billing-company-form" class="billing-form billing-company-form" aria-describedby="billing-company-error">
       <div class="billing-form-row"><div class="billing-field"><label for="company-name">Virksomhedsnavn</label><input id="company-name" name="name" value="${esc(issuer.name || '')}" required></div><div class="billing-field"><label for="company-country">Landekode</label><input id="company-country" name="countryCode" value="${esc(issuer.countryCode || '')}" maxlength="2" placeholder="DK" required></div></div>
       <div class="billing-field"><label for="company-address">Adresse</label><input id="company-address" name="address" value="${esc(issuer.address || '')}" required></div>
       <div class="billing-form-row"><div class="billing-field"><label for="company-registration">Registrerings-ID / CVR</label><input id="company-registration" name="registrationId" value="${esc(issuer.registrationId || issuer.cvr || '')}" required></div><div class="billing-field"><label for="company-registration-scheme">ID-scheme</label><input id="company-registration-scheme" name="registrationScheme" value="${esc(issuer.registrationScheme || '')}" placeholder="0184"></div></div>
@@ -522,7 +534,7 @@ function createApp() {
         <div class="billing-form-row"><div class="billing-field"><label for="company-endpoint-scheme">Endpoint scheme</label><input id="company-endpoint-scheme" name="endpointScheme" value="${esc(endpoint.schemeId || '')}" placeholder="0184"></div><div class="billing-field"><label for="company-endpoint-value">Elektronisk endpoint</label><input id="company-endpoint-value" name="endpointValue" value="${esc(endpoint.value || '')}"></div></div>
         <p class="billing-form-help">Kun nødvendigt for struktureret e-faktura. PDF og e-mail kræver ikke Peppol.</p>
       </details>
-      <div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Annuller</button><button type="submit" class="billing-primary-button">Gem virksomhed</button></div>
+      <p id="billing-company-error" class="billing-form-error" role="alert" hidden></p><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Annuller</button><button type="submit" class="billing-primary-button">Gem virksomhed</button></div>
     </form>`;
     openDialog();
     setTimeout(() => $('#company-name', els.review)?.focus(), 0);
@@ -534,7 +546,7 @@ function createApp() {
     state.activeInvoice = null;
     els.reviewKicker.textContent = 'Manglende oplysninger';
     els.reviewTitle.textContent = 'Tilføj arbejdstid';
-    els.reviewBody.innerHTML = `<section class="billing-review-customer"><h3>${esc(item.customerName)}</h3><p>${esc(formatDate(visit(item.visitId)?.scheduledStart, locale()))}</p></section><form id="billing-actuals-form" class="billing-form"><div class="billing-field"><label for="billing-work-hours">Samlede faktiske arbejdstimer</label><input id="billing-work-hours" name="workHours" type="number" min="0" step="0.25" inputmode="decimal" placeholder="fx 2" required></div><p class="billing-form-help">Skriv den samlede arbejdstid på tværs af medarbejdere. Kalenderens planlagte varighed bruges ikke som fakturagrundlag.</p><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Annuller</button><button type="submit" class="billing-primary-button">Gem actuals</button></div></form>`;
+    els.reviewBody.innerHTML = `<section class="billing-review-customer"><h3>${esc(item.customerName)}</h3><p>${esc(formatDate(visit(item.visitId)?.scheduledStart, locale()))}</p></section><form id="billing-actuals-form" class="billing-form" aria-describedby="billing-actuals-error"><div class="billing-field"><label for="billing-work-hours">Samlede faktiske arbejdstimer</label><input id="billing-work-hours" name="workHours" type="number" min="0" step="0.25" inputmode="decimal" placeholder="fx 2" required aria-describedby="billing-actuals-error"></div><p class="billing-form-help">Skriv den samlede arbejdstid på tværs af medarbejdere. Kalenderens planlagte varighed bruges ikke som fakturagrundlag.</p><p id="billing-actuals-error" class="billing-form-error" role="alert" hidden></p><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Annuller</button><button type="submit" class="billing-primary-button">Gem actuals</button></div></form>`;
     openDialog();
     setTimeout(() => $('#billing-work-hours', els.review)?.focus(), 0);
   }
@@ -548,7 +560,7 @@ function createApp() {
     state.activeInvoice = null;
     els.reviewKicker.textContent = 'Korrigering';
     els.reviewTitle.textContent = 'Korrigér actuals';
-    els.reviewBody.innerHTML = `<section class="billing-review-customer"><h3>${esc(item.customerName)}</h3><p>${esc(formatDate(current.scheduledStart, locale()))}</p></section><form id="billing-actual-correction-form" class="billing-form"><div class="billing-field"><label for="billing-correction-hours">Samlede faktiske arbejdstimer</label><input id="billing-correction-hours" name="workHours" type="number" min="0" step="0.25" inputmode="decimal" value="${esc(String(current.actual.workMinutes / 60))}" required></div><div class="billing-field"><label for="billing-correction-reason">Årsag til korrektion</label><textarea id="billing-correction-reason" name="reason" maxlength="1000" required></textarea></div><p class="billing-form-help">Korrigeringer kræver en begrundelse og er ikke mulige, når besøget allerede er bundet til en faktura.</p><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Annuller</button><button type="submit" class="billing-primary-button">Gem korrektion</button></div></form>`;
+    els.reviewBody.innerHTML = `<section class="billing-review-customer"><h3>${esc(item.customerName)}</h3><p>${esc(formatDate(current.scheduledStart, locale()))}</p></section><form id="billing-actual-correction-form" class="billing-form" aria-describedby="billing-correction-error"><div class="billing-field"><label for="billing-correction-hours">Samlede faktiske arbejdstimer</label><input id="billing-correction-hours" name="workHours" type="number" min="0" step="0.25" inputmode="decimal" value="${esc(String(current.actual.workMinutes / 60))}" required aria-describedby="billing-correction-error"></div><div class="billing-field"><label for="billing-correction-reason">Årsag til korrektion</label><textarea id="billing-correction-reason" name="reason" maxlength="1000" required aria-describedby="billing-correction-error"></textarea></div><p class="billing-form-help">Korrigeringer kræver en begrundelse og er ikke mulige, når besøget allerede er bundet til en faktura.</p><p id="billing-correction-error" class="billing-form-error" role="alert" hidden></p><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Annuller</button><button type="submit" class="billing-primary-button">Gem korrektion</button></div></form>`;
     openDialog();
     setTimeout(() => $('#billing-correction-hours', els.review)?.focus(), 0);
   }
@@ -557,7 +569,11 @@ function createApp() {
     if (!state.activeItem || state.busy || !canMutate()) return;
     const data = new FormData(form);
     const issueDate = String(data.get('issueDate') || '').trim();
-    if (!issueDate) return;
+    if (!issueDate) {
+      showFormError(form, 'Vælg en fakturadato.');
+      return;
+    }
+    showFormError(form);
     state.busy = true;
     form.querySelectorAll('button,input').forEach((node) => { node.disabled = true; });
     try {
@@ -570,7 +586,9 @@ function createApp() {
       renderReview();
       toast(`Fakturakladde ${body.invoice.number} oprettet`);
     } catch (error) {
-      toast(error.code === 'invoice_number_conflict' ? 'Fakturanummeret er allerede i brug' : 'Kunne ikke oprette fakturakladde');
+      const message = error.code === 'invoice_number_conflict' ? 'Fakturanummeret er allerede i brug' : 'Kunne ikke oprette fakturakladde';
+      showFormError(form, message);
+      toast(message);
       form.querySelectorAll('button,input').forEach((node) => { node.disabled = false; });
     } finally {
       state.busy = false;
@@ -686,6 +704,7 @@ function createApp() {
     };
     const nextNumber = Number(data.get('nextNumber'));
     const defaultServiceLabel = String(data.get('defaultServiceLabel') || '').trim();
+    showFormError(form);
     state.busy = true;
     form.querySelectorAll('button,input').forEach((node) => { node.disabled = true; });
     try {
@@ -697,8 +716,10 @@ function createApp() {
       render();
       toast('Virksomhedsprofilen er gemt');
     } catch (error) {
+      const message = error.code === 'invoice_sequence_conflict' ? 'Næste fakturanummer kolliderer med en eksisterende faktura' : 'Kunne ikke gemme virksomhedsprofilen';
+      showFormError(form, message);
       form.querySelectorAll('button,input').forEach((node) => { node.disabled = false; });
-      toast(error.code === 'invoice_sequence_conflict' ? 'Næste fakturanummer kolliderer med en eksisterende faktura' : 'Kunne ikke gemme virksomhedsprofilen');
+      toast(message);
     } finally {
       state.busy = false;
     }
@@ -707,7 +728,11 @@ function createApp() {
   async function saveActuals(form) {
     if (!state.activeItem?.visitId || state.busy || !canMutate()) return;
     const hours = Number(String(new FormData(form).get('workHours') || '').replace(',', '.'));
-    if (!Number.isFinite(hours) || hours < 0) return;
+    if (!Number.isFinite(hours) || hours < 0) {
+      showFormError(form, 'Angiv et gyldigt antal arbejdstimer.');
+      return;
+    }
+    showFormError(form);
     state.busy = true;
     form.querySelectorAll('button,input').forEach((node) => { node.disabled = true; });
     try {
@@ -720,6 +745,7 @@ function createApp() {
       render();
       toast('Arbejdstiden er gemt');
     } catch {
+      showFormError(form, 'Kunne ikke gemme arbejdstiden.');
       form.querySelectorAll('button,input').forEach((node) => { node.disabled = false; });
       toast('Kunne ikke gemme arbejdstiden');
     } finally {
@@ -733,7 +759,11 @@ function createApp() {
     const data = new FormData(form);
     const hours = Number(String(data.get('workHours') || '').replace(',', '.'));
     const reason = String(data.get('reason') || '').trim();
-    if (!Number.isFinite(hours) || hours < 0 || !reason) return toast('Angiv timer og en begrundelse');
+    if (!Number.isFinite(hours) || hours < 0 || !reason) {
+      showFormError(form, 'Angiv timer og en begrundelse.');
+      return;
+    }
+    showFormError(form);
     state.busy = true;
     form.querySelectorAll('button,input,textarea').forEach((node) => { node.disabled = true; });
     try {
@@ -749,10 +779,12 @@ function createApp() {
       render();
       toast('Actuals er korrigeret');
     } catch (error) {
-      form.querySelectorAll('button,input,textarea').forEach((node) => { node.disabled = false; });
-      toast(error.code === 'actuals_locked'
+      const message = error.code === 'actuals_locked'
         ? 'Actuals er låst, fordi besøget allerede er faktureret'
-        : 'Kunne ikke korrigere actuals');
+        : 'Kunne ikke korrigere actuals';
+      showFormError(form, message);
+      form.querySelectorAll('button,input,textarea').forEach((node) => { node.disabled = false; });
+      toast(message);
     } finally {
       state.busy = false;
     }
@@ -823,6 +855,7 @@ function createApp() {
 
   els.refresh.addEventListener('click', refresh);
   els.review.addEventListener('click', (event) => { if (event.target === els.review) closeDialog(); });
+  els.review.addEventListener('cancel', (event) => { event.preventDefault(); closeDialog(); });
   refresh();
   return Object.freeze({ refresh, render });
 }

@@ -79,11 +79,11 @@ flowchart TD
 
 | Sort | ID | Task | Scope / files | Acceptance evidence | Depends | State |
 |---:|---|---|---|---|---|---|
-| 6 | FIN-302 | Add governed actual correction workflow | src/billing/mutations.mjs; server/billing-server.mjs; src/billing/browser-client.mjs; src/billing/billing-app.mjs; capability and Billing tests | Correction requires explicit actor, dedicated `billing.actuals.correct` permission, non-empty bounded reason, immutable audit event, replay-safe correction identity, and rejection after active invoice binding; UI exposes a reasoned correction dialog and client route | FIN-301 | DONE — 18/18 Billing API, 5/5 browser-client, 10/10 UI-contract tests pass; exact SHA pending commit |
+| 6 | FIN-302 | Add governed actual correction workflow | src/billing/mutations.mjs; server/billing-server.mjs; src/billing/browser-client.mjs; src/billing/billing-app.mjs; capability and Billing tests | Correction requires explicit actor, dedicated `billing.actuals.correct` permission, non-empty bounded reason, immutable audit event, replay-safe correction identity, and rejection after active invoice binding; UI exposes a reasoned correction dialog and client route | FIN-301 | DONE — 18/18 Billing API, 5/5 browser-client, 13/13 UI-contract tests pass; exact SHA pending commit |
 | 7 | VAL-701 | Harden Billing/source boundary validation | src/billing/mutations.mjs; src/billing/source-sync.mjs; source/Billing tests | Impossible dates, duplicate IDs, invalid schedules/currency and negative terms are rejected with typed errors; UI cannot crash on malformed currency | FIN-301 | DONE — source suite 17/17 pass; exact SHA pending commit |
 | 8 | COMP-601 | Enforce Peppol validator contract | src/billing/document-profile.mjs; server/billing-server.mjs; server.mjs; API tests | Missing external validator fails closed; configured validator result is required; no false 200 compliance export | VAL-701 | BLOCKED — fail-closed guard + 17 Billing API tests pass; production validator contract/config authority missing |
-| 9 | UI-801 | Add real Billing production browser-QA gate | Billing browser harness, test scripts, CI/release verification | Reachable production route proves auth/source/Ready/draft/issue/PDF/delivery/offline/reconnect/390px/no overflow/no errors at exact SHA | AUD-000 | BLOCKED: VDS network boundary |
-| 10 | A11Y-802 | Close Billing UI accessibility gaps | billing/index.html; src/billing/billing-app.mjs; styles/billing.css/tokens.css; UI tests | Correct tabs or buttons, keyboard behavior, focus return, 44px targets, contrast >=4.5:1, offline semantics and axe evidence | UI-801 | LOCKED |
+| 9 | UI-801 | Add real Billing production browser-QA gate | Billing browser harness, test scripts, CI/release verification | Reachable production route proves auth/source/Ready/draft/issue/PDF/delivery/offline/reconnect/390px/no overflow/no errors at exact SHA | AUD-000 | DONE — fresh production tenant QA PASS: route/auth/source/Ready/draft/issue/PDF/Peppol/delivery/invoiced/mobile/offline/cold reload/reconnect/no errors |
+| 10 | A11Y-802 | Close Billing UI accessibility gaps | billing/index.html; src/billing/billing-app.mjs; styles/billing.css/tokens.css; UI tests; VDS axe harness | Correct tabs or buttons, keyboard behavior, focus return, 44px targets, contrast >=4.5:1, offline semantics and axe evidence | UI-801 | DONE — fresh Billing axe WCAG 2.2 A/AA: 61 checks, 0 violations; UI contract 13/13; production browser-QA PASS |
 | 11 | SUP-901 | Restore dependency reproducibility | package.json; package-lock.json; CI | Lockfile committed, `npm ci --dry-run` and `npm audit --omit=dev` pass; supported Node version is documented | AUD-000 | DONE — lockfile generated; npm ci dry-run and audit 0 vulnerabilities |
  
 ### P2 — residual hardening and release
@@ -91,21 +91,23 @@ flowchart TD
 | Sort | ID | Task | Scope / files | Acceptance evidence | Depends | State |
 |---:|---|---|---|---|---|---|
 | 12 | AUTH-102 | Migrate bearer storage away from localStorage | auth transport, bootstrap, Billing client, auth tests/docs | Short-lived HttpOnly/Secure/SameSite session or reviewed memory-only token path; XSS token exfiltration risk reduced | SEC-101 | PARKED until auth flow is stable |
-| 13 | UX-803 | Improve coded error recovery and dialog focus | src/billing/billing-app.mjs; UI tests | Inline field/form errors, aria-describedby, trigger-focus restoration, Escape/backdrop paths | A11Y-802 | LOCKED |
+| 13 | UX-803 | Improve coded error recovery and dialog focus | src/billing/billing-app.mjs; styles/billing.css; UI tests | Inline field/form errors, aria-describedby, trigger-focus restoration, Escape/backdrop paths | A11Y-802 | DONE — inline error targets plus focus/Escape handling; UI contract 13/13 pass; fresh browser-QA and axe rerun pass |
 | 14 | REL-999 | Final exact-head release verification | all local gates, VDS, GitHub checks, PR evidence | All required local gates pass; final SHA equals local/remote/PR; CI and aggregate CodeQL success; PR stays OPEN and unmerged | SEC-101, DATA-201, FIN-301, FIN-302, DEL-401, OPS-501, COMP-601, VAL-701, A11Y-802, SUP-901 | LOCKED |
 
 ## Verification checkpoint (2026-09-13, uncommitted remediation worktree)
 
 - Source suite: **17/17 PASS**.
-- All Billing tests: **107/107 PASS**.
-- Full `npm test`: **769/769 PASS**.
+- All Billing tests: **110/110 PASS**.
+- Full `npm test`: **772/772 PASS**.
+- Fresh production tenant browser-QA: **PASS**.
+- Fresh Billing axe WCAG 2.2 A/AA: **22 passes, 0 violations**.
 - `npm run verify:secrets`: **PASS**.
 - `git diff --check`: **PASS**.
 - `node scripts/v6_release_verify.mjs`: **49/49 PASS**.
 - `npm run verify`: **PASS**.
 - Dependency reproducibility: `npm ci --ignore-scripts --no-audit --dry-run` PASS; `npm audit --omit=dev` reports 0 vulnerabilities.
 - Generated screenshots/performance output were restored and are excluded from the remediation scope.
-- External blockers remain: OPS-501 production backup evidence, COMP-601 validator contract/config, UI-801 fresh public VDS browser-QA, then A11Y-802 and REL-999 exact-head GitHub evidence.
+- External blockers remain: OPS-501 production backup evidence, COMP-601 validator contract/config, and REL-999 exact-head GitHub evidence/PR update.
 
 ## Execution loop
 

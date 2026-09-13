@@ -23,6 +23,14 @@ test('billing app is a focused accessible Aftergraph surface with human work que
   assert.doesNotMatch(html, /https?:\/\/[^"']+\.(?:js|css)/i);
 });
 
+test('billing dialogs restore trigger focus and normalize Escape cancellation', async () => {
+  const source = await text('src/billing/billing-app.mjs');
+  assert.match(source, /returnFocus/);
+  assert.match(source, /state\.returnFocus\s*=\s*document\.activeElement/);
+  assert.match(source, /addEventListener\('cancel'/);
+  assert.match(source, /returnFocus\.focus\(\)/);
+});
+
 test('billing client exposes only same-origin canonical read and guarded mutation operations', async () => {
   const source = await text('src/billing/browser-client.mjs');
   assert.match(source, /export function createBillingClient/);
@@ -49,6 +57,15 @@ test('billing operator app uses plain Danish workflow copy and never derives bil
   assert.doesNotMatch(source, /alarm|nøglekode|keycode|door code/i);
 });
 
+test('billing forms expose inline accessible error targets', async () => {
+  const source = await text('src/billing/billing-app.mjs');
+  assert.match(source, /function showFormError/);
+  assert.match(source, /aria-describedby="billing-correction-error"/);
+  assert.match(source, /id="billing-correction-error"/);
+  assert.match(source, /role="alert"/);
+  assert.match(source, /showFormError\(form/);
+});
+
 test('billing styling dogfoods Aftergraph tokens and remains usable on mobile safe areas', async () => {
   const css = await text('styles/billing.css');
   assert.match(css, /var\(--bg\)/);
@@ -59,6 +76,28 @@ test('billing styling dogfoods Aftergraph tokens and remains usable on mobile sa
   assert.match(css, /safe-area-inset-bottom/);
   assert.match(css, /prefers-reduced-motion/);
   assert.doesNotMatch(css, /@import\s+url\(/i);
+});
+
+test('billing light palette meets WCAG AA for muted and status text', async () => {
+  const html = await text('billing/index.html');
+  const css = await text('styles/billing.css');
+  assert.match(html, /<body class="billing-page">/);
+  assert.match(css, /--text-3:\s*#5c6675/);
+  assert.match(css, /--success:\s*#0b7a47/);
+  assert.match(css, /--danger:\s*#b42318/);
+  const luminance = (hex) => {
+    const channels = hex.slice(1).match(/../g).map((value) => Number.parseInt(value, 16) / 255);
+    const linear = channels.map((value) => value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+  };
+  const contrast = (foreground, background) => {
+    const a = luminance(foreground);
+    const b = luminance(background);
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  };
+  assert.ok(contrast('#5c6675', '#ffffff') >= 4.5);
+  assert.ok(contrast('#0b7a47', '#ffffff') >= 4.5);
+  assert.ok(contrast('#b42318', '#ffffff') >= 4.5);
 });
 
 test('billing app loads only first-party modules and token/reset/billing styles', async () => {
