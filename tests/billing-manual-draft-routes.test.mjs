@@ -59,7 +59,7 @@ async function seedCustomer(base) {
       name: 'Manual Test ApS',
       address: 'Testvej 1, 1000 København',
       countryCode: 'DK',
-      billing: { currency: 'DKK', paymentTermsDays: 8 },
+      billing: { mode: 'per_visit', rateMinor: 75000, currency: 'DKK', paymentTermsDays: 8 },
     }),
   });
   assert.equal(response.status, 201, `customer seed failed: ${response.status} ${JSON.stringify(body)}`);
@@ -211,7 +211,7 @@ test('POST /api/v1/billing/invoices/manual-draft requires authentication when re
         name: 'Auth Test ApS',
         address: 'Testvej 2',
         countryCode: 'DK',
-        billing: { currency: 'DKK', paymentTermsDays: 8 },
+        billing: { mode: 'per_visit', rateMinor: 75000, currency: 'DKK', paymentTermsDays: 8 },
       }),
     });
 
