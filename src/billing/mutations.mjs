@@ -582,6 +582,69 @@ export function updateManualBillingDraft(billing, {
   return { billing: next, invoice: clone(invoice) };
 }
 
+export function remindBillingInvoice(billing, { invoiceId, actor } = {}) {
+  const next = clone(billing);
+  const invoice = next.invoices.find((entry) => entry.id === invoiceId);
+  if (!invoice) throw codedError('invoice_not_found', 'invoice not found', 404);
+  if (invoice.status === 'void') throw codedError('invoice_voided');
+  if (!['issued', 'emailed'].includes(invoice.status)) {
+    throw codedError('invoice_not_remindable', 'only issued or emailed invoices can receive reminders');
+  }
+  if (!invoice.dueDate) throw codedError('invoice_missing_due_date');
+  const now = new Date();
+  const due = new Date(`${invoice.dueDate}T23:59:59.999Z`);
+  const isOverdue = now > due;
+  const customer = next.customers.find((c) => c.id === invoice.customerId);
+  const customerName = invoice.customerSnapshot?.name || customer?.name || 'Kunde';
+  const customerEmail = invoice.customerSnapshot?.email || customer?.email || null;
+  const outstandingMinor = invoice.totalGrossMinor
+    - (invoice.payments || []).reduce((sum, p) => sum + (Number.isInteger(p.amountMinor) ? p.amountMinor : 0), 0);
+  const currency = invoice.currency || 'DKK';
+  const amountFormatted = `${(outstandingMinor / 100).toFixed(2).replace('.', ',')} ${currency}`;
+  const subject = `Rykker: Faktura nr. ${invoice.number} – venligst betal`;
+  const body = [
+    `Kære ${customerName},`,
+    '',
+    `Vi har endnu ikke modtaget betaling for faktura nr. ${invoice.number}.`,
+    '',
+    `Fakturadato: ${invoice.issueDate}`,
+    `Forfaldsdato: ${invoice.dueDate}`,
+    `Udestående beløb: ${amountFormatted}`,
+    '',
+    isOverdue
+      ? 'Fakturaen er nu forfalden. Vi beder dig venligst betale hurtigst muligt.'
+      : 'Dette er en venlig påmindelse om den kommende forfaldsdato.',
+    '',
+    'Hvis du allerede har betalt, kan du se bort fra denne meddelelse.',
+    '',
+    'Med venlig hilsen',
+    next.settings?.issuer?.name || 'Aftergraph Studio',
+  ].join('\n');
+  const reminder = {
+    id: `reminder-${randomUUID()}`,
+    invoiceId,
+    generatedAt: now.toISOString(),
+    generatedBy: actor ?? null,
+    overdue: isOverdue,
+    daysOverdue: isOverdue ? Math.floor((now - due) / 86400000) : 0,
+    subject,
+    body,
+    recipientEmail: customerEmail,
+  };
+  invoice.reminders = [...(invoice.reminders || []), reminder];
+  next.auditLog ||= [];
+  next.auditLog.push({
+    id: `audit-reminder-${randomUUID()}`,
+    type: 'billing.invoice.reminder_generated',
+    invoiceId,
+    reminderId: reminder.id,
+    actor: actor ?? null,
+    overdue: isOverdue,
+    at: reminder.generatedAt,
+  });
+  return { billing: next, invoice: clone(invoice), reminder: clone(reminder) };
+}
+
 export function updateBillingSettings(billing, {
   issuer = undefined,
   defaultServiceLabel = undefined,

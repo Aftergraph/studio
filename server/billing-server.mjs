@@ -23,6 +23,7 @@ import {
   beginBillingDelivery,
   deliverBillingInvoice,
   failBillingDelivery,
+  remindBillingInvoice,
   updateBillingSettings,
 } from '../src/billing/mutations.mjs';
 
@@ -41,7 +42,7 @@ function isBillingPath(pathname) {
     || pathname === '/api/v1/billing/invoices/draft'
     || pathname === '/api/v1/billing/audit'
     || pathname === '/api/v1/billing/invoices/manual-draft'
-    || /^\/api\/v1\/billing\/invoices\/[^/]+\/(issue|artifact|document|peppol-bis3|deliver|void|payment)$/.test(pathname)
+    || /^\/api\/v1\/billing\/invoices\/[^/]+\/(issue|artifact|document|peppol-bis3|deliver|void|payment|remind)$/.test(pathname)
     || /^\/api\/v1\/billing\/invoices\/[^/]+$/.test(pathname)
     || /^\/api\/v1\/billing\/customers\/[^/]+$/.test(pathname);
 }
@@ -508,6 +509,31 @@ export function decorateBillingServer(server, {
         sendJson(res, 201, {
           version: API_VERSION,
           payment,
+          invoice,
+          billing: projectBillingState(next.billing),
+        });
+        return;
+      }
+
+      const remindMatch = url.pathname.match(/^\/api\/v1\/billing\/invoices\/([^/]+)\/remind$/);
+      if (remindMatch && req.method === 'POST') {
+        const invoiceId = decodeURIComponent(remindMatch[1]);
+        let invoice;
+        let reminder;
+        const next = await store.mutate((draft) => {
+          const result = remindBillingInvoice(draft.billing, {
+            invoiceId,
+            actor,
+          });
+          draft.billing = result.billing;
+          invoice = result.invoice;
+          reminder = result.reminder;
+          return draft;
+        });
+        actionGuard.complete(actionKey, { status: 'accepted', invoiceId: invoice.id, reminderId: reminder.id });
+        sendJson(res, 201, {
+          version: API_VERSION,
+          reminder,
           invoice,
           billing: projectBillingState(next.billing),
         });

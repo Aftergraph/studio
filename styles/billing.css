@@ -920,3 +920,17 @@ button {
     justify-content: center;
   }
 }
+
+.billing-overdue-badge {
+  display: inline-block;
+  margin-left: var(--ag-brand-space-xs, 0.5rem);
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #991b1b;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: var(--ag-brand-space-xxs, 0.25rem);
+  vertical-align: middle;
+}

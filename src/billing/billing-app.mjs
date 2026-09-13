@@ -676,9 +676,12 @@ function createApp() {
       const deliver = issued && !emailed && !voided ? `<button type="button" class="billing-primary-button" data-action="deliver" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>${deliveryFailed ? 'Prøv levering igen' : 'Send faktura'}</button>` : '';
       const issue = issued || voided ? '' : `<button type="button" class="billing-primary-button" data-action="issue" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>Udsted faktura</button>`;
       const editManual = !issued && !voided && state.activeInvoice.source === 'manual' ? `<button type="button" class="billing-secondary-button" data-action="edit-manual-draft" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>Redigér kladde</button>` : '';
+      const isOverdue = issued && !voided && state.activeInvoice.dueDate && new Date() > new Date(`${state.activeInvoice.dueDate}T23:59:59.999Z`);
+      const overdueBadge = isOverdue ? '<span class="billing-overdue-badge" aria-label="Fakturaen er forfalden">⚠ Forfalden</span>' : '';
+      const remind = issued && !voided ? `<button type="button" class="billing-secondary-button" data-action="send-reminder" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>Send rykker</button>` : '';
       const paymentSection = issued && !voided ? paymentFormHtml(state.activeInvoice) : '';
       const creditSection = issued && !voided ? creditNoteFormHtml(state.activeInvoice) : '';
-      return `<div class="billing-draft-status"><strong>${status}</strong><p>Nr. ${esc(state.activeInvoice.number)} · forfalder ${esc(formatDate(state.activeInvoice.dueDate, locale()))}</p>${deliveryDetail}${voidDetail}</div><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Luk</button>${artifact}${editManual}${issue}${deliver}</div>${paymentSection}${creditSection}`;
+      return `<div class="billing-draft-status"><strong>${status}</strong>${overdueBadge}<p>Nr. ${esc(state.activeInvoice.number)} · forfalder ${esc(formatDate(state.activeInvoice.dueDate, locale()))}</p>${deliveryDetail}${voidDetail}</div><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Luk</button>${artifact}${editManual}${issue}${deliver}${remind}</div>${paymentSection}${creditSection}`;
     }
     const nextNumber = state.billing?.settings?.invoiceSequence?.nextNumber ?? '—';
     const correctionVisit = state.activeItem?.visitIds?.length === 1 ? visit(state.activeItem.visitIds[0]) : null;
@@ -1211,6 +1214,33 @@ function createApp() {
     }
   }
 
+  async function sendReminder(id, button) {
+    if (!id || state.busy || !canMutate()) return;
+    const confirmed = await showConfirmDialog('Generér rykker til kunden?');
+    if (!confirmed) return;
+    state.busy = true;
+    button.disabled = true;
+    try {
+      const body = await client.remindInvoice(id);
+      state.billing = body.billing;
+      state.cached = false;
+      state.activeInvoice = body.invoice;
+      state.lastSyncedAt = new Date().toISOString();
+      render();
+      renderReview();
+      toast(`Rykker genereret for faktura ${body.invoice.number}`);
+      void logAudit('generate_reminder', { invoiceId: id, reminderId: body.reminder.id, overdue: body.reminder.overdue });
+    } catch (error) {
+      toast(error.code === 'invoice_not_remindable' ? 'Fakturaen kan ikke modtage rykkere' : 'Kunne ikke generere rykker.');
+      await refresh();
+      const latest = invoice(id);
+      if (latest) state.activeInvoice = structuredClone(latest);
+      renderReview();
+    } finally {
+      state.busy = false;
+    }
+  }
+
   async function saveCompanySettings(form) {
     if (state.busy || !canMutate()) return;
     const data = new FormData(form);
@@ -1375,6 +1405,7 @@ function createApp() {
     if (action.dataset.action === 'download') return downloadInvoice(action.dataset.invoiceId, action);
     if (action.dataset.action === 'peppol') return downloadPeppolInvoice(action.dataset.invoiceId, action);
     if (action.dataset.action === 'deliver') return deliverInvoice(action.dataset.invoiceId, action);
+    if (action.dataset.action === 'send-reminder') return sendReminder(action.dataset.invoiceId, action);
     if (action.dataset.action === 'edit-manual-draft') return openManualDraftEdit(action.dataset.invoiceId);
     if (action.dataset.action === 'add-manual-line') {
       const container = $('#billing-manual-lines-container', els.review);

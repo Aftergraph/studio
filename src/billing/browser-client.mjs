@@ -207,5 +207,8 @@ export function createBillingClient({
     logAudit(payload) {
       return write('/api/v1/billing/audit', payload, 'billing-audit');
     },
+    remindInvoice(invoiceId) {
+      return write(`/api/v1/billing/invoices/${encodeURIComponent(invoiceId)}/remind`, {}, 'billing-remind');
+    },
   });
 }
