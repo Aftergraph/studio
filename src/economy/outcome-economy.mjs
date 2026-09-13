@@ -19,7 +19,11 @@ function freeze(value) {
   return Object.freeze(value);
 }
 
-function clone(value) { return structuredClone(value); }
+// ponytail: shallow clone sufficient for cost ledger entries (primitive values)
+function clone(value) { 
+  if (!value || typeof value !== 'object') return value;
+  return Array.isArray(value) ? [...value] : { ...value };
+}
 
 export class CostLedger {
   #entries = new Map();

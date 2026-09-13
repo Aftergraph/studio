@@ -11,7 +11,11 @@ function freeze(value) {
   for (const child of Object.values(value)) freeze(child);
   return Object.freeze(value);
 }
-function clone(value) { return structuredClone(value); }
+// ponytail: shallow clone for institutional graph data
+function clone(value) { 
+  if (!value || typeof value !== 'object') return value;
+  return Array.isArray(value) ? [...value] : { ...value };
+}
 
 export class InstitutionalGraph {
   #organizations = new Map();

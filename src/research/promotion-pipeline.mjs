@@ -66,7 +66,7 @@ export function advancePromotion(pipeline, nextStage, meta = {}) {
     if (!meta.approver) throw new TypeError('approver required to advance to approved');
   }
 
-  const entry = { stage: nextStage, at: new Date().toISOString(), ...structuredClone(meta) };
+  const entry = { stage: nextStage, at: new Date().toISOString(), ...meta };
 
   const base = {
     ...pipeline,

@@ -16,7 +16,7 @@ export function createOfflineEventLog({ nodeId } = {}) {
       id: id ?? `evt_${nodeId}_${sequence}_${Math.random().toString(36).slice(2, 8)}`,
       nodeId,
       type: String(type),
-      payload: Object.freeze(structuredClone(payload)),
+      payload: Object.freeze({...payload}),
       vectorClock: clock.snapshot(),
       appendedAt: new Date().toISOString(),
     });
@@ -36,7 +36,7 @@ export function createOfflineEventLog({ nodeId } = {}) {
         id: String(remote.id),
         nodeId: String(remote.nodeId ?? 'unknown'),
         type: String(remote.type ?? 'unknown.event'),
-        payload: Object.freeze(structuredClone(remote.payload ?? {})),
+        payload: Object.freeze({...(remote.payload ?? {})}),
         vectorClock: Object.freeze({ ...(remote.vectorClock ?? {}) }),
         appendedAt: String(remote.appendedAt ?? new Date().toISOString()),
       });

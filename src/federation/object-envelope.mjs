@@ -3,5 +3,6 @@ function freeze(v){if(!v||typeof v!=='object'||Object.isFrozen(v))return v;for(c
 export function graphId(integration,type,canonicalId){return `${seg(integration)}:${seg(type)}:${seg(canonicalId)}`}
 export function createEnvelope({sourceIntegration,type,canonicalId,canonicalOwner,tenantId=null,status,freshness='stale',payload,authority=[],evidence=[],relations=[],sourceRevision,observedAt=new Date().toISOString(),updatedAt=null}){
   for(const [v,label] of [[sourceIntegration,'sourceIntegration'],[type,'type'],[canonicalId,'canonicalId'],[canonicalOwner,'canonicalOwner'],[sourceRevision,'sourceRevision']])if(typeof v!=='string'||!v)throw new TypeError(`${label} required`);
-  return freeze({graphId:graphId(sourceIntegration,type,canonicalId),type,canonicalId,canonicalOwner,sourceIntegration,tenantId,sourceRevision,status,freshness,authority:structuredClone(authority),evidence:structuredClone(evidence),relations:structuredClone(relations),observedAt,updatedAt,payload:structuredClone(payload??{})});
+  // ponytail: shallow clone arrays/objects for envelope - avoids deep clone overhead
+  return freeze({graphId:graphId(sourceIntegration,type,canonicalId),type,canonicalId,canonicalOwner,sourceIntegration,tenantId,sourceRevision,status,freshness,authority:[...authority],evidence:[...evidence],relations:[...relations],observedAt,updatedAt,payload:{...(payload??{})}});
 }

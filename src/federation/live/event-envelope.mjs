@@ -30,9 +30,9 @@ export function createEventEnvelope({
     occurredAt: String(occurredAt),
     sequence,
     objectRef: objectRef ? String(objectRef) : null,
-    authorityDelta: authorityDelta ? Object.freeze(structuredClone(authorityDelta)) : null,
+    authorityDelta: authorityDelta ? Object.freeze({...authorityDelta}) : null,
     evidenceRef: evidenceRef ? String(evidenceRef) : null,
-    payload: Object.freeze(structuredClone(payload))
+    payload: Object.freeze({...payload})
   });
 }
 

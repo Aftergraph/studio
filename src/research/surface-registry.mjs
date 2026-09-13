@@ -60,6 +60,6 @@ export function createResearchSurface(surface, data = {}) {
     authority: schema.authority,
     runtimeAuthority: [],
     promotable: schema.promotable,
-    ...structuredClone(data),
+    ...data,
   });
 }

@@ -25,9 +25,11 @@ export function createKnowledgeEntry({
     throw new RangeError('retentionMs must be a positive duration or null');
   }
   const createdAt = new Date().toISOString();
+  // ponytail: value is already validated, shallow copy sufficient
+  const safeValue = value && typeof value === 'object' ? { ...value } : value;
   return freeze({
     id: id ?? `kn_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
-    scope, label, value: structuredClone(value), source, confidence,
+    scope, label, value: safeValue, source, confidence,
     status: 'ephemeral',
     retention: retentionMs === null ? freeze({ expires: false }) : freeze({
       expires: true,
@@ -56,11 +58,12 @@ export function promoteKnowledge(entry, { by, evidence, override = false } = {})
   if (entry.confidence < PROMOTION_CONFIDENCE_THRESHOLD && override !== true) {
     const error = new Error('low confidence promotion requires explicit override'); error.code = 'promotion_override_required'; throw error;
   }
+  // ponytail: shallow copy sufficient for knowledge entry promotion
   return freeze({
-    ...structuredClone(entry),
+    ...entry,
     status: 'authoritative',
     provenance: freeze({
-      ...structuredClone(entry.provenance),
+      ...entry.provenance,
       promotions: [...entry.provenance.promotions, {
         by, evidence, override: entry.confidence < PROMOTION_CONFIDENCE_THRESHOLD,
         at: new Date().toISOString(),

@@ -1,6 +1,10 @@
 import { createLiveRuntime, pauseMission, resumeMission, stepMission } from './live-runtime.mjs';
 
-const clone = value => structuredClone(value);
+// ponytail: use shallow clone for runtime objects - they contain primitives and simple objects
+// Runtime objects don't have deeply nested structures that need deep cloning
+const clone = value => value && typeof value === 'object' 
+  ? (Array.isArray(value) ? [...value] : { ...value })
+  : value;
 
 export class MissionRuntimeHub {
   constructor({ store, intervalMs = 2500, onChange = () => {}, isHalted = () => false } = {}) {

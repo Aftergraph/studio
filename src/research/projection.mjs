@@ -12,7 +12,7 @@ export function projectClaim(claim, { freshness = 'stale', revision = 'runtime' 
     canonicalOwner: 'isr',
     status: claim.status ?? 'unknown',
     freshness,
-    payload: structuredClone(claim),
+    payload: {...claim},
     sourceRevision: revision,
     authority: [],
     evidence: (claim.evidenceIds ?? claim.evidence ?? []).map(String)

@@ -2,7 +2,11 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createInitialState } from './state.mjs';
 
-const clone = value => structuredClone(value);
+// ponytail: use shallow clone for state snapshots - avoids deep clone overhead
+// For workspace state, shallow copy is sufficient since we control mutations
+const clone = value => value && typeof value === 'object' 
+  ? (Array.isArray(value) ? [...value] : { ...value })
+  : value;
 
 export class WorkspaceStateStore {
   constructor({ stateFile = null, initialState = createInitialState() } = {}) {
