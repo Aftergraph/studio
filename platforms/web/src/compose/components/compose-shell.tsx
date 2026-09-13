@@ -70,6 +70,7 @@ export function ComposeShell() {
   const [editTitle, setEditTitle] = useState('');
   const [isRateLimited, setIsRateLimited] = useState(false);
   const [retryIn, setRetryIn] = useState(0);
+  const [workspaceTab, setWorkspaceTab] = useState<'preview' | 'details'>('preview');
 
   const streamRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
@@ -795,60 +796,87 @@ export function ComposeShell() {
             </div>
 
             <div className="workspace-tabs">
-              <button className="active" type="button">Preview</button>
-              <button type="button">Details</button>
+              <button
+                className={workspaceTab === 'preview' ? 'active' : ''}
+                type="button"
+                onClick={() => setWorkspaceTab('preview')}
+                aria-pressed={workspaceTab === 'preview'}
+              >
+                Preview
+              </button>
+              <button
+                className={workspaceTab === 'details' ? 'active' : ''}
+                type="button"
+                onClick={() => setWorkspaceTab('details')}
+                aria-pressed={workspaceTab === 'details'}
+              >
+                Details
+              </button>
             </div>
 
-            <div className="workspace-meta">
-              <div>
-                <small>Target</small>
-                <strong>{getTargetLabel(selected.target)}</strong>
-              </div>
-              <div>
-                <small>Version</small>
-                <strong>v{selected.version}</strong>
-              </div>
-              <div>
-                <small>Status</small>
-                <strong className="ready">● Ready</strong>
-              </div>
-              <div>
-                <small>Created</small>
-                <strong>{formatDate(selected.createdAt)}</strong>
-              </div>
-            </div>
-
-            <section>
-              <h3>Objective</h3>
-              <p>{selected.goal}</p>
-            </section>
-
-            {selected.successCriteria.length > 0 && (
-              <section>
-                <h3>Completion criteria</h3>
-                <ul>
-                  {selected.successCriteria.map((item, index) => (
-                    <li key={index}>{item}</li>
-                  ))}
-                </ul>
+            {workspaceTab === 'preview' && (
+              <section className="artifact-content">
+                <h3>Instruction</h3>
+                <pre>
+                  <code>{selected.content}</code>
+                </pre>
               </section>
             )}
 
-            {selected.ambiguities.length > 0 && (
-              <section className="decision-card">
-                <h3>Needs clarity</h3>
-                {selected.ambiguities.map((ambiguity, index) => (
-                  <p key={index}>{ambiguity}</p>
-                ))}
-              </section>
-            )}
+            {workspaceTab === 'details' && (
+              <>
+                <div className="workspace-meta">
+                  <div>
+                    <small>Target</small>
+                    <strong>{getTargetLabel(selected.target)}</strong>
+                  </div>
+                  <div>
+                    <small>Version</small>
+                    <strong>v{selected.version}</strong>
+                  </div>
+                  <div>
+                    <small>Status</small>
+                    <strong className="ready">● Ready</strong>
+                  </div>
+                  <div>
+                    <small>Created</small>
+                    <strong>{formatDate(selected.createdAt)}</strong>
+                  </div>
+                </div>
 
-            <section className="artifact-content">
-              <h3>Instruction</h3>
-              <pre>
-                <code>{selected.content}</code>
-              </pre>
-            </section>
+                <section>
+                  <h3>Objective</h3>
+                  <p>{selected.goal}</p>
+                </section>
+
+                {selected.successCriteria.length > 0 && (
+                  <section>
+                    <h3>Completion criteria</h3>
+                    <ul>
+                      {selected.successCriteria.map((item, index) => (
+                        <li key={index}>{item}</li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+
+                {selected.ambiguities.length > 0 && (
+                  <section className="decision-card">
+                    <h3>Needs clarity</h3>
+                    {selected.ambiguities.map((ambiguity, index) => (
+                      <p key={index}>{ambiguity}</p>
+                    ))}
+                  </section>
+                )}
+
+                <section className="artifact-content">
+                  <h3>Instruction</h3>
+                  <pre>
+                    <code>{selected.content}</code>
+                  </pre>
+                </section>
+              </>
+            )}
 
             <div className="workspace-actions">
               <button type="button" onClick={() => void copyArtifact()}>Copy</button>
