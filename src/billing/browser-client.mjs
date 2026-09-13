@@ -228,6 +228,22 @@ export function createBillingClient({
     updateProduct(productId, updates) {
       return write(`/api/v1/billing/products/${encodeURIComponent(productId)}`, updates, 'billing-product-update', 'PATCH');
     },
+    listRecurring() {
+      const suffix = currentActor ? `?actor=${encodeURIComponent(currentActor)}` : '';
+      return read(`/api/v1/billing/recurring${suffix}`);
+    },
+    createRecurring({ customerId, productLines, schedule }) {
+      return write('/api/v1/billing/recurring', { customerId, productLines, schedule }, 'billing-recurring');
+    },
+    updateRecurring(recurringId, updates) {
+      return write(`/api/v1/billing/recurring/${encodeURIComponent(recurringId)}`, updates, 'billing-recurring-update', 'PATCH');
+    },
+    deleteRecurring(recurringId) {
+      return write(`/api/v1/billing/recurring/${encodeURIComponent(recurringId)}`, {}, 'billing-recurring-delete', 'DELETE');
+    },
+    tickRecurring(now) {
+      return write('/api/v1/billing/recurring/tick', { now }, 'billing-recurring-tick');
+    },
     queryBilling(params = {}) {
       const qs = new URLSearchParams();
       for (const [key, value] of Object.entries(params)) {

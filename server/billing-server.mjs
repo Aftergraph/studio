@@ -29,6 +29,12 @@ import {
   remindBillingInvoice,
   updateBillingSettings,
 } from '../src/billing/mutations.mjs';
+import {
+  createRecurringInvoice,
+  updateRecurringInvoice,
+  deleteRecurringInvoice,
+  tickRecurringScheduler,
+} from '../src/billing/recurring.mjs';
 
 function apiError(res, error) {
   const status = Number.isInteger(error?.status) ? error.status : 422;
@@ -51,7 +57,10 @@ function isBillingPath(pathname) {
     || /^\/api\/v1\/billing\/invoices\/[^/]+$/.test(pathname)
     || /^\/api\/v1\/billing\/customers\/[^/]+$/.test(pathname)
     || pathname === '/api/v1/billing/products'
-    || /^\/api\/v1\/billing\/products\/[^/]+$/.test(pathname);
+    || /^\/api\/v1\/billing\/products\/[^/]+$/.test(pathname)
+    || pathname === '/api/v1/billing/recurring'
+    || /^\/api\/v1\/billing\/recurring\/[^/]+$/.test(pathname)
+    || pathname === '/api/v1/billing/recurring/tick';
 }
 
 function queryBilling(billing, params = {}) {
@@ -837,6 +846,102 @@ export function decorateBillingServer(server, {
         sendJson(res, 200, {
           version: API_VERSION,
           product,
+          billing: projectBillingState(next.billing),
+        });
+        return;
+      }
+
+      // --- Recurring billing endpoints ---
+      if (url.pathname === '/api/v1/billing/recurring' && req.method === 'GET') {
+        const { actor, store } = await resolveScope(req, url);
+        try { assertActorCapability({ state: store.snapshot(), actor, capability: 'billing.read', users }); }
+        catch { throw actorError('forbidden', 403); }
+        const billing = store.snapshot().billing || {};
+        sendJson(res, 200, { version: API_VERSION, recurringInvoices: billing.recurringInvoices || [] });
+        return;
+      }
+
+      if (url.pathname === '/api/v1/billing/recurring' && req.method === 'POST') {
+        const actionKey = begin(req, body, actor, store, '/api/v1/billing/recurring');
+        let recurring;
+        const next = await store.mutate((draft) => {
+          const result = createRecurringInvoice(draft.billing, {
+            customerId: body.customerId,
+            productLines: body.productLines,
+            schedule: body.schedule,
+            actor,
+          });
+          draft.billing = result.billing;
+          recurring = result.recurring;
+          return draft;
+        });
+        actionGuard.complete(actionKey, { status: 'accepted', recurringId: recurring.id });
+        sendJson(res, 201, {
+          version: API_VERSION,
+          recurring,
+          billing: projectBillingState(next.billing),
+        });
+        return;
+      }
+
+      const recurringMatch = url.pathname.match(/^\/api\/v1\/billing\/recurring\/([^/]+)$/);
+      if (recurringMatch && req.method === 'PATCH') {
+        const recurringId = decodeURIComponent(recurringMatch[1]);
+        const actionKey = begin(req, body, actor, store, `/api/v1/billing/recurring/${recurringId}`);
+        let recurring;
+        const next = await store.mutate((draft) => {
+          const result = updateRecurringInvoice(draft.billing, {
+            id: recurringId,
+            productLines: body.productLines,
+            schedule: body.schedule,
+            active: body.active,
+            actor,
+          });
+          draft.billing = result.billing;
+          recurring = result.recurring;
+          return draft;
+        });
+        actionGuard.complete(actionKey, { status: 'accepted', recurringId: recurring.id });
+        sendJson(res, 200, {
+          version: API_VERSION,
+          recurring,
+          billing: projectBillingState(next.billing),
+        });
+        return;
+      }
+
+      if (recurringMatch && req.method === 'DELETE') {
+        const recurringId = decodeURIComponent(recurringMatch[1]);
+        const actionKey = begin(req, body, actor, store, `/api/v1/billing/recurring/${recurringId}`);
+        const next = await store.mutate((draft) => {
+          const result = deleteRecurringInvoice(draft.billing, { id: recurringId, actor });
+          draft.billing = result.billing;
+          return draft;
+        });
+        actionGuard.complete(actionKey, { status: 'accepted', recurringId });
+        sendJson(res, 200, {
+          version: API_VERSION,
+          billing: projectBillingState(next.billing),
+        });
+        return;
+      }
+
+      if (url.pathname === '/api/v1/billing/recurring/tick' && req.method === 'POST') {
+        const actionKey = begin(req, body, actor, store, '/api/v1/billing/recurring/tick');
+        let generated;
+        const next = await store.mutate((draft) => {
+          const result = tickRecurringScheduler(draft.billing, {
+            now: body.now,
+            actor,
+          });
+          draft.billing = result.billing;
+          generated = result.generated;
+          return draft;
+        });
+        actionGuard.complete(actionKey, { status: 'accepted', generatedCount: generated.length });
+        sendJson(res, 200, {
+          version: API_VERSION,
+          generated,
           billing: projectBillingState(next.billing),
         });
         return;

@@ -15,6 +15,7 @@ const VIEWS = Object.freeze({
   needs_info: ['Mangler oplysninger', 'Ret den manglende oplysning her, så posten kan gå videre.'],
   invoiced: ['Faktureret', 'Arbejdet er allerede bundet til en faktura og kan ikke faktureres igen.'],
   products: ['Produkter & ydelser', 'Administrer produktkataloget. Varer og tjenesteydelser til fakturalinjer.'],
+  recurring: ['Gentagende', 'Administrer gentagende fakturering. Opret, rediger, pause og genoptag automatiske fakturaer.'],
 });
 
 const REASONS = Object.freeze({
@@ -221,6 +222,8 @@ function createApp() {
     products: [],
     productsSearch: '',
     editingProduct: null,
+    recurringInvoices: [],
+    recurringSearch: '',
     toastTimer: null,
     returnFocus: null,
     loginRequired: false,
@@ -420,6 +423,70 @@ function createApp() {
     }
   }
 
+  async function fetchRecurring() {
+    try {
+      const result = await client.listRecurring();
+      state.recurringInvoices = result.recurringInvoices || [];
+    } catch (err) {
+      console.error('fetchRecurring failed', err);
+      state.recurringInvoices = [];
+    }
+  }
+
+  function renderRecurring() {
+    els.title.textContent = 'Gentagende fakturering';
+    els.context.textContent = 'Administrer gentagende fakturering. Opret, rediger, pause og genoptag automatiske fakturaer.';
+    const search = state.recurringSearch.toLowerCase();
+    const customers = state.billing?.customers || [];
+    const filtered = state.recurringInvoices.filter((r) => {
+      if (!search) return true;
+      const customer = customers.find((c) => c.id === r.customerId);
+      const customerName = customer?.name || '';
+      return customerName.toLowerCase().includes(search)
+        || r.productLines.some((l) => l.description.toLowerCase().includes(search));
+    });
+    const currency = state.billing?.settings?.currency || 'DKK';
+    const loc = locale();
+    const rows = filtered.length ? filtered.map((r) => {
+      const customer = customers.find((c) => c.id === r.customerId);
+      const totalMinor = r.productLines.reduce((sum, l) => sum + (l.quantity * l.unitPriceMinor), 0);
+      const scheduleLabel = r.schedule.interval
+        ? `Hver ${r.schedule.interval.value} ${r.schedule.interval.unit === 'day' ? 'dag' : r.schedule.interval.unit === 'week' ? 'uge' : r.schedule.interval.unit === 'month' ? 'måned' : r.schedule.interval.unit}`
+        : (r.schedule.cron || 'Cron');
+      const statusLabel = r.active ? '<span class="billing-status-dot is-active"></span>Aktiv' : '<span class="billing-status-dot"></span>Pause';
+      const nextRun = r.nextRunAt ? formatDate(r.nextRunAt, loc) : '—';
+      return `
+      <article class="billing-row" data-recurring-id="${esc(r.id)}">
+        <div class="billing-row-main">
+          <h3 class="billing-row-name">${esc(customer?.name || 'Ukendt kunde')}</h3>
+          <div class="billing-row-subtitle">${esc(r.productLines.map((l) => l.description).join(', '))}</div>
+        </div>
+        <div class="billing-row-meta">
+          <strong>${esc(formatMoney(totalMinor, currency, loc))}</strong>
+          <small>${esc(scheduleLabel)}</small>
+        </div>
+        <div class="billing-row-reason">${statusLabel}<br><small>Næste: ${esc(nextRun)}</small></div>
+        <div class="billing-row-action">
+          <button type="button" class="billing-secondary-button" data-action="edit-recurring" data-recurring-id="${esc(r.id)}">Rediger</button>
+          <button type="button" class="billing-quiet-button" data-action="toggle-recurring" data-recurring-id="${esc(r.id)}" data-active="${r.active}">${r.active ? 'Pause' : 'Genoptag'}</button>
+        </div>
+      </article>`;
+    }).join('') : '<div class="billing-empty">Ingen gentagende fakturaer fundet.</div>';
+    els.list.innerHTML = `
+      <div class="billing-form-row" style="margin-bottom:1rem">
+        <div class="billing-field is-flex-grow"><input type="search" id="billing-recurring-search" placeholder="Søg efter kunde eller produkt…" value="${esc(state.recurringSearch)}"></div>
+        <div class="billing-field is-align-end"><button type="button" class="billing-primary-button" data-action="create-recurring">Ny gentagende</button></div>
+      </div>
+      ${rows}`;
+    const searchInput = $('#billing-recurring-search');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        state.recurringSearch = e.target.value;
+        renderRecurring();
+      });
+    }
+  }
+
   function renderProducts() {
     els.title.textContent = 'Produkter & ydelser';
     els.context.textContent = 'Administrer produktkataloget. Varer og tjenesteydelser til fakturalinjer.';
@@ -549,6 +616,111 @@ function createApp() {
     }
   }
 
+  function openRecurringForm(recurring = null) {
+    const isEdit = !!recurring;
+    const title = isEdit ? 'Rediger gentagende faktura' : 'Ny gentagende faktura';
+    els.reviewTitle.textContent = title;
+    els.reviewKicker.textContent = 'Gentagende fakturering';
+    const customers = state.billing?.customers || [];
+    const customerOptions = customers.map((c) => `<option value="${esc(c.id)}" ${recurring?.customerId === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+    const lines = recurring?.productLines || [{ description: '', quantity: 1, unitPriceMinor: 0 }];
+    const linesHtml = lines.map((l, i) => `
+      <div class="billing-form-row billing-recurring-line" data-line-index="${i}">
+        <div class="billing-field is-flex-grow"><label>Beskrivelse</label><input name="line_desc_${i}" value="${esc(l.description)}" required></div>
+        <div class="billing-field"><label>Antal</label><input name="line_qty_${i}" type="number" min="1" value="${l.quantity}" required></div>
+        <div class="billing-field"><label>Pris (øre)</label><input name="line_price_${i}" type="number" min="0" value="${l.unitPriceMinor}" required></div>
+      </div>`).join('');
+    const intervalValue = recurring?.schedule?.interval?.value || 1;
+    const intervalUnit = recurring?.schedule?.interval?.unit || 'month';
+    els.reviewBody.innerHTML = `
+      <form id="billing-recurring-form" class="billing-form">
+        <div class="billing-form-row">
+          <div class="billing-field is-flex-grow"><label for="rf-customer">Kunde *</label><select id="rf-customer" name="customerId" required>${customerOptions}</select></div>
+        </div>
+        <fieldset><legend>Fakturalinjer</legend>${linesHtml}</fieldset>
+        <div class="billing-form-row">
+          <div class="billing-field"><label for="rf-interval-value">Interval</label><input id="rf-interval-value" name="intervalValue" type="number" min="1" value="${intervalValue}"></div>
+          <div class="billing-field"><label for="rf-interval-unit">Enhed</label><select id="rf-interval-unit" name="intervalUnit">
+            <option value="day" ${intervalUnit === 'day' ? 'selected' : ''}>Dag</option>
+            <option value="week" ${intervalUnit === 'week' ? 'selected' : ''}>Uge</option>
+            <option value="month" ${intervalUnit === 'month' ? 'selected' : ''}>Måned</option>
+          </select></div>
+        </div>
+        <div class="billing-form-actions">
+          <button type="submit" class="billing-primary-button">${isEdit ? 'Gem ændringer' : 'Opret'}</button>
+          <button type="button" class="billing-secondary-button" data-action="close-review">Annuller</button>
+        </div>
+        <div id="billing-recurring-error" class="billing-field-error" hidden></div>
+      </form>`;
+    openDialog();
+    setTimeout(() => $('#rf-customer', els.review)?.focus(), 0);
+    const form = $('#billing-recurring-form', els.review);
+    if (form) {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        submitRecurringForm(form, recurring);
+      });
+    }
+  }
+
+  async function submitRecurringForm(form, existing) {
+    if (state.busy || !canMutate()) return;
+    const errorEl = $('#billing-recurring-error', form);
+    if (errorEl) { errorEl.hidden = true; errorEl.textContent = ''; }
+    const customerId = form.customerId.value;
+    const lineInputs = form.querySelectorAll('.billing-recurring-line');
+    const productLines = [];
+    for (let i = 0; i < lineInputs.length; i++) {
+      const desc = form[`line_desc_${i}`]?.value?.trim();
+      const qty = Number(form[`line_qty_${i}`]?.value);
+      const price = Number(form[`line_price_${i}`]?.value);
+      if (!desc || !Number.isInteger(qty) || qty <= 0 || !Number.isInteger(price) || price < 0) {
+        if (errorEl) { errorEl.hidden = false; errorEl.textContent = 'Alle linjer skal have beskrivelse, antal og pris.'; }
+        return;
+      }
+      productLines.push({ description: desc, quantity: qty, unitPriceMinor: price });
+    }
+    const intervalValue = Number(form.intervalValue.value);
+    const intervalUnit = form.intervalUnit.value;
+    if (!Number.isInteger(intervalValue) || intervalValue <= 0) {
+      if (errorEl) { errorEl.hidden = false; errorEl.textContent = 'Interval skal være et positivt heltal.'; }
+      return;
+    }
+    const schedule = { interval: { value: intervalValue, unit: intervalUnit } };
+    state.busy = true;
+    try {
+      if (existing) {
+        await client.updateRecurring(existing.id, { productLines, schedule });
+        toast('Gentagende faktura opdateret');
+      } else {
+        await client.createRecurring({ customerId, productLines, schedule });
+        toast('Gentagende faktura oprettet');
+      }
+      closeDialog();
+      await fetchRecurring();
+      renderRecurring();
+    } catch (err) {
+      if (errorEl) { errorEl.hidden = false; errorEl.textContent = err?.message || 'Kunne ikke gemme.'; }
+    } finally {
+      state.busy = false;
+    }
+  }
+
+  async function toggleRecurring(recurringId, active) {
+    if (state.busy || !canMutate()) return;
+    state.busy = true;
+    try {
+      await client.updateRecurring(recurringId, { active });
+      toast(active ? 'Genoptaget' : 'Sat på pause');
+      await fetchRecurring();
+      renderRecurring();
+    } catch (err) {
+      toast(err?.message || 'Kunne ikke opdatere status');
+    } finally {
+      state.busy = false;
+    }
+  }
+
   function renderDashboard() {
     const d = state.dashboard;
     if (!d) {
@@ -603,6 +775,10 @@ function createApp() {
     }
     if (state.view === 'products') {
       renderProducts();
+      return;
+    }
+    if (state.view === 'recurring') {
+      renderRecurring();
       return;
     }
     if (state.view === 'search-invoices' || state.view === 'search-customers') {
@@ -1798,6 +1974,8 @@ function createApp() {
         fetchDashboard().then(() => renderList());
       } else if (state.view === 'products') {
         fetchProducts().then(() => renderList());
+      } else if (state.view === 'recurring') {
+        fetchRecurring().then(() => renderList());
       } else if (state.view === 'search-invoices' || state.view === 'search-customers') {
         state.searchQuery.type = state.view === 'search-customers' ? 'customer' : 'invoice';
         state.searchResults = null;
@@ -1828,6 +2006,18 @@ function createApp() {
       const product = state.products.find((p) => p.id === productId);
       if (product) return openProductForm(product);
       return;
+    }
+    if (action.dataset.action === 'create-recurring') return openRecurringForm();
+    if (action.dataset.action === 'edit-recurring') {
+      const recurringId = action.dataset.recurringId;
+      const recurring = state.recurringInvoices.find((r) => r.id === recurringId);
+      if (recurring) return openRecurringForm(recurring);
+      return;
+    }
+    if (action.dataset.action === 'toggle-recurring') {
+      const recurringId = action.dataset.recurringId;
+      const currentActive = action.dataset.active === 'true';
+      return toggleRecurring(recurringId, !currentActive);
     }
     if (action.dataset.action === 'create-customer') return openCreateCustomer();
     if (action.dataset.action === 'edit-customer') return openEditCustomer(action.dataset.customerId);
