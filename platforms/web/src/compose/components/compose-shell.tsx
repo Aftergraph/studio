@@ -190,7 +190,6 @@ export function ComposeShell() {
 
   function consumeRateLimit(): void {
     rateLimitRef.current.count++;
-    rateLimitRef.current.windowStart = Date.now();
   }
 
   function persist(next: ConversationItem) {
