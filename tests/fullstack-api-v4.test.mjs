@@ -197,7 +197,7 @@ test('canonical domain resources have scoped read endpoints', async()=>{
 test('V81-016 destructive endpoints require actor, confirmation and idempotency', async()=>{
   await withServer(async base=>{
     const denied=await json(`${base}/api/v1/approvals/apr_prod_1/decision`,{method:'POST',headers:{'content-type':'application/json','idempotency-key':'deny-1'},body:JSON.stringify({decision:'approved',actor:'agent:worker',idempotencyKey:'deny-1'})});
-    assert.equal(denied.response.status,403);
+    assert.equal(denied.response.status,422);
     const missing=await json(`${base}/api/v1/missions/mission_q4/control`,{method:'POST',headers:{'content-type':'application/json','idempotency-key':'missing-1'},body:JSON.stringify({mode:'takeover',idempotencyKey:'missing-1'})});
     assert.equal(missing.response.status,422);
     const noConfirm=await json(`${base}/api/v1/reset`,{method:'POST',headers:{'content-type':'application/json','idempotency-key':'reset-1'},body:JSON.stringify({actor:'demo-user',idempotencyKey:'reset-1'})});

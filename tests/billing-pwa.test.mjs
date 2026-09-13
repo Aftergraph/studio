@@ -74,3 +74,16 @@ test('billing offline fallback is memory-only and has no mutation replay API', a
   assert.match(source, /senest synkroniseret/);
   assert.doesNotMatch(source, /replayMutation|flushMutation|mutationQueue|writeQueue/i);
 });
+
+test('billing issue and deliver invoice require confirmation dialog before API call', async () => {
+  const source = await text('src/billing/billing-app.mjs');
+  assert.match(source, /showConfirmDialog/);
+  assert.match(source, /Udsted faktura\? Denne handling kan ikke fortrydes\./);
+  assert.match(source, /Send faktura til kunden\? Denne handling kan ikke fortrydes\./);
+  // Confirm that showConfirmDialog is awaited before client.issueInvoice
+  assert.match(source, /await showConfirmDialog\([^)]+\);[\s\S]*?if \(!confirmed\) return;[\s\S]*?client\.issueInvoice/);
+  // Confirm that showConfirmDialog is awaited before client.deliverInvoice
+  assert.match(source, /await showConfirmDialog\([^)]+\);[\s\S]*?if \(!confirmed\) return;[\s\S]*?client\.deliverInvoice/);
+  // Confirm cancel flow: early return prevents reaching client call
+  assert.match(source, /if \(!confirmed\) return;/);
+});

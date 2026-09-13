@@ -1,8 +1,9 @@
 import { API_VERSION, readJson, sendJson } from './http-utils.mjs';
 import { handleBillingDelivery } from './billing-delivery.mjs';
 import { createActionGuard, assertActorCapability } from '../src/action-guard.mjs';
-import { subjectFromAuthHeader, authSecretFromEnv } from '../src/auth/magic-link.mjs';
+import { authSecretFromEnv } from '../src/auth/magic-link.mjs';
 import { getUser, updateCapabilities } from '../src/user/user-store.mjs';
+import { createRequestScope } from './request-scope.mjs';
 import { evaluateBilling } from '../src/billing/readiness.mjs';
 import { renderInvoicePdf } from '../src/billing/artifact.mjs';
 import { DOCUMENT_PROFILES, buildInvoiceDocument, validateInvoiceDocument } from '../src/billing/document-profile.mjs';
@@ -78,27 +79,16 @@ export function decorateBillingServer(server, {
   if (!requireAuth) ensureDemoBillingCapability();
   server.removeAllListeners('request');
 
-  const resolveScope = async (req, url, claimedActor = undefined) => {
-    let bearer = null;
-    try { bearer = subjectFromAuthHeader(req, { secret }); }
-    catch { throw actorError('authentication_required', 401); }
-    if (requireAuth && !bearer) throw actorError('authentication_required', 401);
-
-    const queryActor = url.searchParams.get('actor') || undefined;
-    const claimed = claimedActor || queryActor;
-    if (bearer && claimed && bearer !== claimed) throw actorError('forbidden', 403);
-    const actor = bearer || claimed || (requireAuth ? null : 'demo-user');
-    if (!actor) throw actorError('authentication_required', 401);
-    const user = getUser(actor);
-    if (!user) throw actorError('forbidden', 403);
-    const workspaceId = user.workspaceId || actor;
-
-    const store = workspaceId === 'demo-user'
-      ? server.workspace.store
-      : server.workspace.storeFor(workspaceId);
-    if (!store) throw actorError('workspace_not_initialized', 409);
-    await store.readyP;
-    return { actor, store };
+  const resolveScope = (req, url, claimedActor = undefined) => {
+    const storeFor = (actor) => {
+      const workspaceId = getUser(actor)?.workspaceId || actor;
+      return workspaceId === 'demo-user'
+        ? server.workspace.store
+        : server.workspace.storeFor(workspaceId);
+    };
+    return createRequestScope({
+      req, url, secret, requireAuth, storeFor, claimedActor,
+    });
   };
 
   const begin = (req, body, actor, store, path, capability = 'billing.manage') => {

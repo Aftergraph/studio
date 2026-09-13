@@ -18,6 +18,7 @@ import { createGoal } from '../src/goal/goal-schema.mjs';
 import { createLesson } from '../src/goal/goal-lesson.mjs';
 import { assessGoalDrift } from '../src/goal/goal-drift.mjs';
 import { issueMagicToken, subjectFromAuthHeader, authSecretFromEnv, isDevSecret } from '../src/auth/magic-link.mjs';
+import { createRequestScope } from './request-scope.mjs';
 import { createRateLimiter } from '../src/auth/rate-limit.mjs';
 import { createKillSwitch, engageKill, releaseKill, assertAutonomyAllowed } from '../src/autonomy/bounds.mjs';
 import { CostLedger } from '../src/economy/outcome-economy.mjs';
@@ -187,31 +188,15 @@ export function createAppServer({
     let runtimeHub = hubFor(DEFAULT_ACTOR);
     let syncLog = logFor(DEFAULT_ACTOR);
     const rescope = async (actor) => {
-      const bearer = subjectFromAuthHeader(req, { secret });
-      // ponytail: enforcement mode — every API route except the auth booth
-      // itself requires a valid Bearer token.
-      if (requireAuth && !bearer && !url.pathname.startsWith('/api/v1/auth/')) {
-        const error = new Error('authentication required');
-        error.code = 'authentication_required'; error.status = 401; throw error;
-      }
-      const scoped = bearer || actor || queryActor;
-      // ponytail: fail-closed — only registered users own a workspace.
-      // demo-user is seeded at boot; everyone else must POST /api/v1/users first.
-      if (!getUser(scoped || DEFAULT_ACTOR)) {
-        const error = new Error('forbidden: unknown actor');
-        error.code = 'forbidden'; error.status = 403; throw error;
-      }
-      // ponytail: when a Bearer token is present it binds the request —
-      // a claimed actor that differs from the token subject is rejected.
-      const claimed = actor || queryActor;
-      if (bearer && claimed && bearer !== claimed) {
-        const error = new Error('forbidden: token subject mismatch');
-        error.code = 'forbidden'; error.status = 403; throw error;
-      }
-      store = storeFor(scoped);
-      runtimeHub = hubFor(scoped);
-      syncLog = logFor(scoped);
-      await store.readyP;
+      const isAuthRoute = url.pathname.startsWith('/api/v1/auth/');
+      const scope = await createRequestScope({
+        req, url, secret, requireAuth, storeFor,
+        claimedActor: actor,
+        isAuthRoute,
+      });
+      store = scope.store;
+      runtimeHub = hubFor(scope.actor);
+      syncLog = logFor(scope.actor);
     };
     if (url.pathname === '/healthz') {
       sendJson(res, 200, { status:'ok', app:'aftergraph-workspace-v5-reference', api:API_VERSION, releaseSha });

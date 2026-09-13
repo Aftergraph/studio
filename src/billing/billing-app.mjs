@@ -442,6 +442,42 @@ function createApp() {
     if (returnFocus?.isConnected && typeof returnFocus.focus === 'function') returnFocus.focus();
   }
 
+  function showConfirmDialog(message) {
+    return new Promise((resolve) => {
+      let dialog = document.getElementById('billing-confirm-dialog');
+      if (!dialog) {
+        dialog = document.createElement('dialog');
+        dialog.id = 'billing-confirm-dialog';
+        dialog.className = 'billing-confirm-dialog';
+        dialog.innerHTML = '<p class="billing-confirm-message"></p><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-confirm="cancel">Annuller</button><button type="button" class="billing-primary-button" data-confirm="ok">Bekræft</button></div>';
+        document.body.appendChild(dialog);
+      }
+      const msgEl = dialog.querySelector('.billing-confirm-message');
+      msgEl.textContent = message;
+      const cleanup = () => {
+        dialog.removeEventListener('click', onClick);
+        dialog.removeEventListener('cancel', onCancel);
+        if (typeof dialog.close === 'function') dialog.close();
+        else dialog.removeAttribute('open');
+      };
+      const onClick = (event) => {
+        const btn = event.target.closest('[data-confirm]');
+        if (!btn) return;
+        cleanup();
+        resolve(btn.dataset.confirm === 'ok');
+      };
+      const onCancel = (event) => {
+        event.preventDefault();
+        cleanup();
+        resolve(false);
+      };
+      dialog.addEventListener('click', onClick);
+      dialog.addEventListener('cancel', onCancel);
+      if (typeof dialog.showModal === 'function') dialog.showModal();
+      else dialog.setAttribute('open', '');
+    });
+  }
+
   function lineHtml(item, projected) {
     const visits = visitsFor(item);
     return projected.lines.map((line) => {
@@ -597,6 +633,8 @@ function createApp() {
 
   async function issueInvoice(id, button) {
     if (!id || state.busy || !canMutate()) return;
+    const confirmed = await showConfirmDialog('Udsted faktura? Denne handling kan ikke fortrydes.');
+    if (!confirmed) return;
     state.busy = true;
     button.disabled = true;
     try {
@@ -664,6 +702,8 @@ function createApp() {
 
   async function deliverInvoice(id, button) {
     if (!id || state.busy || !canMutate()) return;
+    const confirmed = await showConfirmDialog('Send faktura til kunden? Denne handling kan ikke fortrydes.');
+    if (!confirmed) return;
     state.busy = true;
     button.disabled = true;
     try {

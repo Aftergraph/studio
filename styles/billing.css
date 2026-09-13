@@ -78,7 +78,7 @@ button {
   border: 0;
   border-radius: 10px;
   cursor: pointer;
-  min-height: 40px;
+  min-height: 44px;
   font-weight: 680;
   transition: transform 150ms ease, background 150ms ease, border-color 150ms ease, opacity 150ms ease;
 }
@@ -211,7 +211,7 @@ button {
 
 .billing-tab {
   flex: 0 0 auto;
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 13px;
   border: 1px solid transparent;
   border-radius: 999px;
@@ -667,7 +667,7 @@ button {
   }
 
   .billing-quiet-button {
-    min-height: 36px;
+    min-height: 44px;
     padding: 0 10px;
     font-size: 13px;
   }
@@ -758,7 +758,7 @@ button {
 
   .billing-primary-button,
   .billing-secondary-button {
-    min-height: 38px;
+    min-height: 44px;
     padding: 0 12px;
     font-size: 13px;
   }

@@ -517,6 +517,17 @@ test('GET billing endpoints reject authenticated users without billing.read capa
   }, { requireAuth: true, authSecret: secret });
 });
 
+test('unknown claimedActor returns 422 on billing endpoints', async () => {
+  await withServer(async (base) => {
+    const result = await json(`${base}/api/v1/billing/actuals`, postAs('nonexistent-actor', {
+      visitId: 'test-visit',
+      actual: { workMinutes: 60, workers: 1, startedAt: '2026-09-01T08:00:00Z', endedAt: '2026-09-01T09:00:00Z' },
+    }, 'unknown-actor-test'));
+    assert.equal(result.response.status, 422);
+    assert.equal(result.body.error, 'unknown_actor');
+  });
+});
+
 test('company settings update persists per billing workspace and protects invoice sequence', async () => {
   await withServer(async (base) => {
     const update = await json(`${base}/api/v1/billing/settings`, post({
