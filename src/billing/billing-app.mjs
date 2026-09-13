@@ -675,6 +675,126 @@ function createApp() {
     setTimeout(() => $('#billing-new-customer', els.review)?.focus(), 0);
   }
 
+  function openCustomerManager() {
+    if (state.busy || !canMutate()) return toast('Kræver online og aktuelle data');
+    state.activeItem = null;
+    state.activeInvoice = null;
+    const customers = state.billing?.customers || [];
+    els.reviewKicker.textContent = 'Kundestyring';
+    els.reviewTitle.textContent = 'Kunder';
+    const listHtml = customers.length
+      ? `<ul class="billing-customer-list">${customers.map((c) => `<li class="billing-customer-row"><div><strong>${esc(c.name)}</strong><small>${esc(c.email || '')}${c.countryCode ? ` · ${esc(c.countryCode)}` : ''}</small></div><button type="button" class="billing-secondary-button" data-action="edit-customer" data-customer-id="${esc(c.id)}">Redigér</button></li>`).join('')}</ul>`
+      : '<p class="billing-form-help">Ingen kunder registreret endnu.</p>';
+    els.reviewBody.innerHTML = `${listHtml}<div class="billing-form-actions" style="margin-top:1rem"><button type="button" class="billing-secondary-button" data-action="close-review">Luk</button><button type="button" class="billing-primary-button" data-action="create-customer">Opret kunde</button></div>`;
+    openDialog();
+  }
+
+  function customerFormHtml(mode, customer = null) {
+    const isEdit = mode === 'edit';
+    const title = isEdit ? 'Redigér kunde' : 'Opret kunde';
+    const kicker = isEdit ? 'Kundestyring' : 'Ny kunde';
+    const c = customer || {};
+    const billingCurrency = c.billing?.currency || 'DKK';
+    const billingTaxRateBps = c.billing?.taxRateBps ?? 0;
+    const taxPercent = (billingTaxRateBps / 100).toFixed(2).replace(/\.00$/, '');
+    return { title, kicker, html: `<form id="billing-customer-form" class="billing-form" aria-describedby="billing-customer-error">
+      <input type="hidden" name="mode" value="${esc(mode)}">
+      <input type="hidden" name="customerId" value="${esc(c.id || '')}">
+      <div class="billing-field"><label for="customer-name">Navn</label><input id="customer-name" name="name" value="${esc(c.name || '')}" required></div>
+      <div class="billing-field"><label for="customer-email">E-mail</label><input id="customer-email" name="email" type="email" value="${esc(c.email || '')}" required></div>
+      <div class="billing-field"><label for="customer-address">Adresse</label><input id="customer-address" name="address" value="${esc(c.address || '')}" required></div>
+      <div class="billing-form-row"><div class="billing-field"><label for="customer-country">Landekode</label><input id="customer-country" name="countryCode" value="${esc(c.countryCode || '')}" maxlength="2" placeholder="DK" required></div><div class="billing-field"><label for="customer-registration">CVR / Registrerings-ID</label><input id="customer-registration" name="registrationId" value="${esc(c.registrationId || '')}"></div></div>
+      <div class="billing-field"><label for="customer-registration-scheme">ID-scheme</label><input id="customer-registration-scheme" name="registrationScheme" value="${esc(c.registrationScheme || '')}" placeholder="0184"></div>
+      <details class="billing-advanced"><summary>Faktureringsindstillinger</summary>
+        <div class="billing-form-row"><div class="billing-field"><label for="customer-currency">Valuta</label><input id="customer-currency" name="currency" value="${esc(billingCurrency)}" maxlength="3" placeholder="DKK" required></div><div class="billing-field"><label for="customer-tax">Moms (%)</label><input id="customer-tax" name="taxPercent" type="number" min="0" max="100" step="0.01" value="${esc(taxPercent)}"></div></div>
+      </details>
+      <p id="billing-customer-error" class="billing-form-error" role="alert" hidden></p>
+      <div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Annuller</button><button type="submit" class="billing-primary-button">${isEdit ? 'Gem ændringer' : 'Opret kunde'}</button></div>
+    </form>` };
+  }
+
+  function openCreateCustomer() {
+    if (state.busy || !canMutate()) return toast('Kræver online og aktuelle data');
+    const { title, kicker, html } = customerFormHtml('create');
+    els.reviewKicker.textContent = kicker;
+    els.reviewTitle.textContent = title;
+    els.reviewBody.innerHTML = html;
+    openDialog();
+    setTimeout(() => $('#customer-name', els.review)?.focus(), 0);
+  }
+
+  function openEditCustomer(customerId) {
+    if (state.busy || !canMutate()) return toast('Kræver online og aktuelle data');
+    const account = customer(customerId);
+    if (!account) return toast('Kunden findes ikke');
+    const { title, kicker, html } = customerFormHtml('edit', account);
+    els.reviewKicker.textContent = kicker;
+    els.reviewTitle.textContent = title;
+    els.reviewBody.innerHTML = html;
+    openDialog();
+    setTimeout(() => $('#customer-name', els.review)?.focus(), 0);
+  }
+
+  async function saveCustomer(form) {
+    if (state.busy || !canMutate()) return;
+    const data = new FormData(form);
+    const mode = String(data.get('mode') || '').trim();
+    const customerId = String(data.get('customerId') || '').trim();
+    const name = String(data.get('name') || '').trim();
+    const email = String(data.get('email') || '').trim();
+    const address = String(data.get('address') || '').trim();
+    const countryCode = String(data.get('countryCode') || '').trim().toUpperCase();
+    const registrationId = String(data.get('registrationId') || '').trim() || null;
+    const registrationScheme = String(data.get('registrationScheme') || '').trim() || null;
+    const currency = String(data.get('currency') || '').trim().toUpperCase() || 'DKK';
+    const taxPercent = Number(String(data.get('taxPercent') || '0').replace(',', '.'));
+    const taxRateBps = Number.isFinite(taxPercent) && taxPercent >= 0 ? Math.round(taxPercent * 100) : 0;
+
+    if (!name || !email || !address || !countryCode) {
+      showFormError(form, 'Udfyld navn, e-mail, adresse og landekode.');
+      return;
+    }
+    if (!/^[A-Z]{2}$/.test(countryCode)) {
+      showFormError(form, 'Landekode skal være to bogstaver (fx DK).');
+      return;
+    }
+    if (!/^[A-Z]{3}$/.test(currency)) {
+      showFormError(form, 'Valuta skal være tre bogstaver (fx DKK).');
+      return;
+    }
+
+    showFormError(form);
+    state.busy = true;
+    form.querySelectorAll('button,input,select,textarea').forEach((node) => { node.disabled = true; });
+    try {
+      const payload = { name, email, address, countryCode, registrationId, registrationScheme, billing: { currency, taxRateBps } };
+      let body;
+      if (mode === 'edit' && customerId) {
+        body = await client.updateCustomer(customerId, payload);
+      } else {
+        const id = globalThis.crypto?.randomUUID?.() ?? `cust-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        body = await client.createCustomer({ id, ...payload });
+      }
+      state.billing = body.billing;
+      state.cached = false;
+      state.lastSyncedAt = new Date().toISOString();
+      closeDialog();
+      render();
+      toast(mode === 'edit' ? 'Kunden er opdateret' : 'Kunden er oprettet');
+    } catch (error) {
+      const message = error?.code === 'customer_not_found'
+        ? 'Kunden findes ikke længere'
+        : error?.code === 'duplicate_customer_id'
+          ? 'En kunde med dette ID findes allerede'
+          : mode === 'edit' ? 'Kunne ikke opdatere kunden' : 'Kunne ikke oprette kunden';
+      showFormError(form, message);
+      form.querySelectorAll('button,input,select,textarea').forEach((node) => { node.disabled = false; });
+      toast(message);
+    } finally {
+      state.busy = false;
+    }
+  }
+
   function openCompanySettings() {
     if (state.busy || !canMutate()) return toast('Kræver online og aktuelle data');
     const settings = state.billing?.settings || {};
@@ -1003,6 +1123,9 @@ function createApp() {
     if (!action) return;
     if (action.dataset.action === 'close-review') return closeDialog();
     if (action.dataset.action === 'new-invoice') return openNewInvoice();
+    if (action.dataset.action === 'manage-customers') return openCustomerManager();
+    if (action.dataset.action === 'create-customer') return openCreateCustomer();
+    if (action.dataset.action === 'edit-customer') return openEditCustomer(action.dataset.customerId);
     if (action.dataset.action === 'company-settings') return openCompanySettings();
     if (action.dataset.action === 'review') {
       const item = findItem(action.dataset.key);
@@ -1040,6 +1163,9 @@ function createApp() {
     } else if (event.target.id === 'billing-new-invoice-form') {
       event.preventDefault();
       handleNewInvoiceSelect(event.target);
+    } else if (event.target.id === 'billing-customer-form') {
+      event.preventDefault();
+      saveCustomer(event.target);
     }
   });
 
