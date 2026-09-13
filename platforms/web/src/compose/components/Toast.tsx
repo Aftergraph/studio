@@ -30,15 +30,18 @@ export function Toast({
   const [isExiting, setIsExiting] = useState(false);
 
   useEffect(() => {
+    let exitTimer: ReturnType<typeof setTimeout> | null = null;
     const timer = setTimeout(() => {
       setIsExiting(true);
-      const exitTimer = setTimeout(() => {
+      exitTimer = setTimeout(() => {
         onDismiss?.();
       }, 300);
-      return () => clearTimeout(exitTimer);
     }, duration);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      if (exitTimer) clearTimeout(exitTimer);
+    };
   }, [duration, onDismiss]);
 
   const handleDismiss = () => {
