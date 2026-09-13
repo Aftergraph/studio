@@ -2307,6 +2307,9 @@ function createApp() {
   document.addEventListener('keydown', (event) => {
     if (event.target?.dataset?.searchField === 'search' && event.key === 'Enter') {
       handleSearchEvent(event);
+    }
+  });
+
   // ── Theme Toggle (persisted in settings API + localStorage fallback) ──
   const THEME_STORAGE_KEY = 'aftergraph.billing.theme';
   const themeToggle = $('#billing-theme-toggle');

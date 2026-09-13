@@ -35,10 +35,48 @@ import {
   deleteRecurringInvoice,
   tickRecurringScheduler,
 } from '../src/billing/recurring.mjs';
+import { computeReport } from '../src/billing/reports.mjs';
 
 function apiError(res, error) {
   const status = Number.isInteger(error?.status) ? error.status : 422;
   sendJson(res, status, { error: error?.code || 'billing_request_failed' });
+}
+
+function reportToCsv(report) {
+  const esc = (v) => {
+    if (v == null) return '';
+    const s = String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const rows = [];
+  if (report.type === 'revenue-by-customer') {
+    rows.push(['Kunde', 'Kunde-ID', 'Fakturaer', 'Betalt (øre)'].map(esc).join(','));
+    for (const r of (report.rows || [])) {
+      rows.push([r.customerName, r.customerId, r.invoiceCount, r.totalPaidMinor].map(esc).join(','));
+    }
+  } else if (report.type === 'revenue-by-period') {
+    rows.push(['Periode', 'Beløb (øre)'].map(esc).join(','));
+    for (const r of (report.rows || [])) {
+      rows.push([r.period, r.amountMinor].map(esc).join(','));
+    }
+  } else if (report.type === 'vat-overview') {
+    rows.push(['Netto (øre)', 'Moms (øre)', 'Brutto (øre)'].map(esc).join(','));
+    rows.push([report.totalNetMinor, report.totalTaxMinor, report.totalGrossMinor].map(esc).join(','));
+  } else if (report.type === 'days-to-pay') {
+    rows.push(['Faktura', 'Kunde', 'Dage', 'Beløb (øre)'].map(esc).join(','));
+    for (const r of (report.rows || [])) {
+      rows.push([r.invoiceNumber || r.invoiceId, r.customerName, r.days, r.amountMinor].map(esc).join(','));
+    }
+  } else if (report.type === 'outstanding-aging') {
+    rows.push(['Aldersgruppe', 'Label', 'Antal', 'Beløb (øre)'].map(esc).join(','));
+    for (const r of (report.rows || [])) {
+      rows.push([r.bucket, r.label, r.count, r.amountMinor].map(esc).join(','));
+    }
+  } else {
+    rows.push(['Type', 'Fejl'].map(esc).join(','));
+    rows.push([report.type, report.error || ''].map(esc).join(','));
+  }
+  return '\uFEFF' + rows.join('\n'); // BOM for Excel Danish locale
 }
 
 function isBillingPath(pathname) {
@@ -60,7 +98,8 @@ function isBillingPath(pathname) {
     || /^\/api\/v1\/billing\/products\/[^/]+$/.test(pathname)
     || pathname === '/api/v1/billing/recurring'
     || /^\/api\/v1\/billing\/recurring\/[^/]+$/.test(pathname)
-    || pathname === '/api/v1/billing/recurring/tick';
+    || pathname === '/api/v1/billing/recurring/tick'
+    || pathname === '/api/v1/billing/reports';
 }
 
 function queryBilling(billing, params = {}) {
@@ -947,6 +986,74 @@ export function decorateBillingServer(server, {
         return;
       }
 
+      // ── Reports ──────────────────────────────────────────────────────────
+      if (url.pathname === '/api/v1/billing/reports' && req.method === 'GET') {
+        const { actor, store } = await resolveScope(req, url);
+        try { assertActorCapability({ state: store.snapshot(), actor, capability: 'billing.read', users }); }
+        catch { throw actorError('forbidden', 403); }
+        const params = Object.fromEntries(url.searchParams.entries());
+        const type = params.type;
+        if (!type) {
+          sendJson(res, 422, { error: 'report_type_required' });
+          return;
+        }
+        const snapshot = store.snapshot();
+        const billing = snapshot.billing || {};
+        const report = computeReport({
+          invoices: billing.invoices || [],
+          customers: billing.customers || [],
+          type,
+          dateFrom: params.dateFrom || null,
+          dateTo: params.dateTo || null,
+          granularity: params.granularity || 'month',
+        });
+        if (report.error) {
+          sendJson(res, 422, { error: report.error });
+          return;
+        }
+        // CSV export when Accept header includes text/csv
+        const accept = (req.headers.accept || '').toLowerCase();
+        if (accept.includes('text/csv')) {
+          const csv = reportToCsv(report);
+          res.writeHead(200, {
+            'Content-Type': 'text/csv; charset=utf-8',
+            'Content-Disposition': `attachment; filename="${type}-report.csv"`,
+          });
+          res.end(csv);
+          return;
+        }
+        sendJson(res, 200, { version: API_VERSION, report });
+        return;
+      }
+
+      if (url.pathname === '/api/v1/billing/reports' && req.method === 'POST') {
+        const { actor, store } = await resolveScope(req, url);
+        try { assertActorCapability({ state: store.snapshot(), actor, capability: 'billing.read', users }); }
+        catch { throw actorError('forbidden', 403); }
+        const body = await readJson(req);
+        const type = body?.type;
+        if (!type) {
+          sendJson(res, 422, { error: 'report_type_required' });
+          return;
+        }
+        const snapshot = store.snapshot();
+        const billing = snapshot.billing || {};
+        const report = computeReport({
+          invoices: billing.invoices || [],
+          customers: billing.customers || [],
+          type,
+          dateFrom: body.dateFrom || null,
+          dateTo: body.dateTo || null,
+          granularity: body.granularity || 'month',
+        });
+        if (report.error) {
+          sendJson(res, 422, { error: report.error });
+          return;
+        }
+        sendJson(res, 200, { version: API_VERSION, report });
+        return;
+      }
+
       actionGuard.fail(actionKey, 'billing api not found');
       sendJson(res, 404, { error: 'api_not_found' });
     } catch (error) {
@@ -964,6 +1071,24 @@ export function decorateBillingServer(server, {
     try { await handle(req, res, url); }
     catch (error) { apiError(res, error); }
   });
+
+  // ── Recurring scheduler auto-tick ───────────────────────────────────────
+  const SCHEDULER_INTERVAL_MS = Number.parseInt(process.env.BILLING_SCHEDULER_INTERVAL_MS || '60000', 10);
+  if (SCHEDULER_INTERVAL_MS > 0 && !process.env.BILLING_SCHEDULER_DISABLED) {
+    const schedulerTimer = setInterval(async () => {
+      try {
+        const store = storeFor('__scheduler__');
+        await store.mutate((draft) => {
+          const result = tickRecurringScheduler(draft.billing, { actor: 'scheduler' });
+          draft.billing = result.billing;
+          return draft;
+        });
+      } catch (err) {
+        console.error('[scheduler] auto-tick failed:', err?.message || err);
+      }
+    }, SCHEDULER_INTERVAL_MS);
+    if (schedulerTimer.unref) schedulerTimer.unref();
+  }
 
   return server;
 }

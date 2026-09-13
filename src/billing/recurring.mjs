@@ -151,7 +151,11 @@ export function tickRecurringScheduler(billing, { now, actor } = {}) {
         issueDate,
         actor: actor ?? 'scheduler',
       });
-      Object.assign(next, result.billing);
+      // Merge billing changes but preserve our recurringInvoices reference
+      const updatedInvoices = result.billing.invoices;
+      const updatedSequence = result.billing.settings?.invoiceSequence;
+      if (updatedInvoices) next.invoices = updatedInvoices;
+      if (updatedSequence) next.settings.invoiceSequence = updatedSequence;
       recurring.lastInvoiceId = result.invoice.id;
       recurring.nextRunAt = computeNextRunAt(recurring.schedule, currentTime.toISOString());
       recurring.updatedAt = currentTime.toISOString();
