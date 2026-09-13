@@ -442,6 +442,55 @@ export function decorateBillingServer(server, {
       return;
     }
 
+    // ponytail: GET-only routes that don't need body parsing must be above the
+    // readJson/actor gate so they aren't blocked by missing body.actor.
+    if (url.pathname === '/api/v1/billing/recurring' && req.method === 'GET') {
+      const { actor, store } = await resolveScope(req, url);
+      try { assertActorCapability({ state: store.snapshot(), actor, capability: 'billing.read', users }); }
+      catch { throw actorError('forbidden', 403); }
+      const billing = store.snapshot().billing || {};
+      sendJson(res, 200, { version: API_VERSION, recurringInvoices: billing.recurringInvoices || [] });
+      return;
+    }
+
+    if (url.pathname === '/api/v1/billing/reports' && req.method === 'GET') {
+      const { actor, store } = await resolveScope(req, url);
+      try { assertActorCapability({ state: store.snapshot(), actor, capability: 'billing.read', users }); }
+      catch { throw actorError('forbidden', 403); }
+      const params = Object.fromEntries(url.searchParams.entries());
+      const type = params.type;
+      if (!type) {
+        sendJson(res, 422, { error: 'report_type_required' });
+        return;
+      }
+      const snapshot = store.snapshot();
+      const billing = snapshot.billing || {};
+      const report = computeReport({
+        invoices: billing.invoices || [],
+        customers: billing.customers || [],
+        type,
+        dateFrom: params.dateFrom || null,
+        dateTo: params.dateTo || null,
+        granularity: params.granularity || 'month',
+      });
+      if (report.error) {
+        sendJson(res, 422, { error: report.error });
+        return;
+      }
+      const accept = (req.headers.accept || '').toLowerCase();
+      if (accept.includes('text/csv')) {
+        const csv = reportToCsv(report);
+        res.writeHead(200, {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${type}-report.csv"`,
+        });
+        res.end(csv);
+        return;
+      }
+      sendJson(res, 200, { version: API_VERSION, report });
+      return;
+    }
+
     const body = await readJson(req);
     if (!body?.actor) throw actorError('actor_required', 422);
     const { actor, store } = await resolveScope(req, url, body.actor);
@@ -478,7 +527,9 @@ export function decorateBillingServer(server, {
       ? 'billing.sync'
       : url.pathname === '/api/v1/billing/actuals/correct'
         ? 'billing.actuals.correct'
-        : 'billing.manage';
+        : url.pathname === '/api/v1/billing/reports'
+          ? 'billing.read'
+          : 'billing.manage';
     const actionKey = begin(req, body, actor, store, url.pathname, capability);
 
     try {
@@ -891,17 +942,7 @@ export function decorateBillingServer(server, {
       }
 
       // --- Recurring billing endpoints ---
-      if (url.pathname === '/api/v1/billing/recurring' && req.method === 'GET') {
-        const { actor, store } = await resolveScope(req, url);
-        try { assertActorCapability({ state: store.snapshot(), actor, capability: 'billing.read', users }); }
-        catch { throw actorError('forbidden', 403); }
-        const billing = store.snapshot().billing || {};
-        sendJson(res, 200, { version: API_VERSION, recurringInvoices: billing.recurringInvoices || [] });
-        return;
-      }
-
       if (url.pathname === '/api/v1/billing/recurring' && req.method === 'POST') {
-        const actionKey = begin(req, body, actor, store, '/api/v1/billing/recurring');
         let recurring;
         const next = await store.mutate((draft) => {
           const result = createRecurringInvoice(draft.billing, {
@@ -966,7 +1007,6 @@ export function decorateBillingServer(server, {
       }
 
       if (url.pathname === '/api/v1/billing/recurring/tick' && req.method === 'POST') {
-        const actionKey = begin(req, body, actor, store, '/api/v1/billing/recurring/tick');
         let generated;
         const next = await store.mutate((draft) => {
           const result = tickRecurringScheduler(draft.billing, {
@@ -987,50 +1027,7 @@ export function decorateBillingServer(server, {
       }
 
       // ── Reports ──────────────────────────────────────────────────────────
-      if (url.pathname === '/api/v1/billing/reports' && req.method === 'GET') {
-        const { actor, store } = await resolveScope(req, url);
-        try { assertActorCapability({ state: store.snapshot(), actor, capability: 'billing.read', users }); }
-        catch { throw actorError('forbidden', 403); }
-        const params = Object.fromEntries(url.searchParams.entries());
-        const type = params.type;
-        if (!type) {
-          sendJson(res, 422, { error: 'report_type_required' });
-          return;
-        }
-        const snapshot = store.snapshot();
-        const billing = snapshot.billing || {};
-        const report = computeReport({
-          invoices: billing.invoices || [],
-          customers: billing.customers || [],
-          type,
-          dateFrom: params.dateFrom || null,
-          dateTo: params.dateTo || null,
-          granularity: params.granularity || 'month',
-        });
-        if (report.error) {
-          sendJson(res, 422, { error: report.error });
-          return;
-        }
-        // CSV export when Accept header includes text/csv
-        const accept = (req.headers.accept || '').toLowerCase();
-        if (accept.includes('text/csv')) {
-          const csv = reportToCsv(report);
-          res.writeHead(200, {
-            'Content-Type': 'text/csv; charset=utf-8',
-            'Content-Disposition': `attachment; filename="${type}-report.csv"`,
-          });
-          res.end(csv);
-          return;
-        }
-        sendJson(res, 200, { version: API_VERSION, report });
-        return;
-      }
-
       if (url.pathname === '/api/v1/billing/reports' && req.method === 'POST') {
-        const { actor, store } = await resolveScope(req, url);
-        try { assertActorCapability({ state: store.snapshot(), actor, capability: 'billing.read', users }); }
-        catch { throw actorError('forbidden', 403); }
-        const body = await readJson(req);
         const type = body?.type;
         if (!type) {
           sendJson(res, 422, { error: 'report_type_required' });
@@ -1073,22 +1070,39 @@ export function decorateBillingServer(server, {
   });
 
   // ── Recurring scheduler auto-tick ───────────────────────────────────────
+  // ponytail: per-tenant scheduler ticks each registered store independently.
+  // The previous __scheduler__ phantom store wrote drafts nowhere visible.
+  // Now we iterate all live tenant stores; each tick is idempotent via nextRunAt.
+  let schedulerTimer = null;
   const SCHEDULER_INTERVAL_MS = Number.parseInt(process.env.BILLING_SCHEDULER_INTERVAL_MS || '60000', 10);
   if (SCHEDULER_INTERVAL_MS > 0 && !process.env.BILLING_SCHEDULER_DISABLED) {
-    const schedulerTimer = setInterval(async () => {
-      try {
-        const store = storeFor('__scheduler__');
-        await store.mutate((draft) => {
-          const result = tickRecurringScheduler(draft.billing, { actor: 'scheduler' });
-          draft.billing = result.billing;
-          return draft;
-        });
-      } catch (err) {
-        console.error('[scheduler] auto-tick failed:', err?.message || err);
+    schedulerTimer = setInterval(async () => {
+      const tenantStores = server.workspace?.stores;
+      if (!tenantStores || typeof tenantStores.forEach !== 'function') return;
+      for (const [, entry] of tenantStores) {
+        try {
+          await entry.mutate((draft) => {
+            const result = tickRecurringScheduler(draft.billing, { actor: 'scheduler' });
+            draft.billing = result.billing;
+            return draft;
+          });
+        } catch (err) {
+          console.error('[scheduler] auto-tick failed for tenant store:', err?.message || err);
+        }
       }
     }, SCHEDULER_INTERVAL_MS);
     if (schedulerTimer.unref) schedulerTimer.unref();
   }
+
+  // ponytail: clear scheduler timer on close to prevent leaks in test harnesses
+  const originalClose = server.close.bind(server);
+  server.close = (callback) => {
+    if (schedulerTimer) {
+      clearInterval(schedulerTimer);
+      schedulerTimer = null;
+    }
+    return originalClose(callback);
+  };
 
   return server;
 }
