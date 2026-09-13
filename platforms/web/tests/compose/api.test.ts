@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { parseCompileResponse, ComposeProtocolError, ComposeHttpError } from '../../src/compose/api';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { compileIntent, parseCompileResponse, ComposeProtocolError, ComposeHttpError } from '../../src/compose/api';
 
 const validResponse = {
   ir: {
@@ -72,5 +72,54 @@ describe('ComposeProtocolError', () => {
     const err = new ComposeProtocolError();
     expect(err.name).toBe('ComposeProtocolError');
     expect(err.message).toBe('Invalid Compose response');
+  });
+});
+
+describe('compileIntent', () => {
+  const okResponse = () =>
+    Promise.resolve(
+      new Response(JSON.stringify(validResponse), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn(() => okResponse()));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('completes a successful compile', async () => {
+    const result = await compileIntent('hello');
+    expect(result.ir.schema).toBe('aftergraph/intent-ir/v0.1');
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('aborts the request when the caller aborts the signal', async () => {
+    const fetchMock = vi.fn((_url: string, init: RequestInit) => {
+      return new Promise<Response>((_resolve, reject) => {
+        const sig = init.signal;
+        if (!sig) return;
+        sig.addEventListener('abort', () => reject(sig.reason));
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const controller = new AbortController();
+    const promise = compileIntent('hello', 'auto', undefined, controller.signal, 5000);
+    controller.abort(new DOMException('Aborted', 'AbortError'));
+    await expect(promise).rejects.toThrow('Aborted');
+  });
+
+  it('throws ComposeHttpError on a non-ok response', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response('nope', { status: 500 }))),
+    );
+    await expect(compileIntent('hello')).rejects.toMatchObject({ name: 'ComposeHttpError', status: 500 });
   });
 });

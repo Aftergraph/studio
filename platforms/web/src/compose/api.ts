@@ -49,34 +49,36 @@ export async function compileIntent(
   timeout: number = 30000,
 ): Promise<CompileResponse> {
   const controller = new AbortController();
-  const combinedSignal = signal || controller.signal;
-  
-  // Set timeout if provided
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-  }, timeout);
-  
+  const timeoutId = setTimeout(() => controller.abort(new DOMException('Timeout', 'TimeoutError')), timeout);
+
+  const onAbort = () => controller.abort(signal?.reason);
+  if (signal) {
+    if (signal.aborted) {
+      clearTimeout(timeoutId);
+      controller.abort(signal.reason);
+    } else {
+      signal.addEventListener('abort', onAbort, { once: true });
+    }
+  }
+
   try {
     const response = await fetch('/api/v1/intent/compile', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ source, target, refinement: refinement || null }),
-      signal: combinedSignal,
+      signal: controller.signal,
     });
-    
-    clearTimeout(timeoutId);
-    
+
     if (!response.ok) {
-      // Check for rate limiting
       if (response.status === 429) {
         throw new ComposeHttpError(429);
       }
       throw new ComposeHttpError(response.status);
     }
-    
+
     return parseCompileResponse(await response.json());
-  } catch (error) {
+  } finally {
     clearTimeout(timeoutId);
-    throw error;
+    if (signal) signal.removeEventListener('abort', onAbort);
   }
 }
