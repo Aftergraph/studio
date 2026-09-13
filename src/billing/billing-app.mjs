@@ -14,6 +14,7 @@ const VIEWS = Object.freeze({
   waiting: ['Venter', 'Arbejdet er registreret, men faktureringsperioden er ikke afsluttet endnu.'],
   needs_info: ['Mangler oplysninger', 'Ret den manglende oplysning her, så posten kan gå videre.'],
   invoiced: ['Faktureret', 'Arbejdet er allerede bundet til en faktura og kan ikke faktureres igen.'],
+  products: ['Produkter & ydelser', 'Administrer produktkataloget. Varer og tjenesteydelser til fakturalinjer.'],
 });
 
 const REASONS = Object.freeze({
@@ -217,6 +218,9 @@ function createApp() {
     activeItem: null,
     activeInvoice: null,
     dashboard: null,
+    products: [],
+    productsSearch: '',
+    editingProduct: null,
     toastTimer: null,
     returnFocus: null,
     loginRequired: false,
@@ -402,6 +406,145 @@ function createApp() {
     }
   }
 
+  async function fetchProducts() {
+    try {
+      const result = await client.listProducts();
+      state.products = result.products || [];
+    } catch (err) {
+      console.error('fetchProducts failed', err);
+      state.products = [];
+    }
+  }
+
+  function renderProducts() {
+    els.title.textContent = 'Produkter & ydelser';
+    els.context.textContent = 'Administrer produktkataloget. Varer og tjenesteydelser til fakturalinjer.';
+    const search = state.productsSearch.toLowerCase();
+    const filtered = state.products.filter((p) => {
+      if (!search) return true;
+      return (p.name || '').toLowerCase().includes(search)
+        || (p.sku || '').toLowerCase().includes(search)
+        || (p.category || '').toLowerCase().includes(search);
+    });
+    const currency = state.billing?.settings?.currency || 'DKK';
+    const loc = locale();
+    const rows = filtered.length ? filtered.map((p) => `
+      <article class="billing-row" data-product-id="${esc(p.id)}">
+        <div class="billing-row-main">
+          <h3 class="billing-row-name">${esc(p.name)}</h3>
+          <div class="billing-row-subtitle">${esc(p.sku || '')}${p.category ? ' · ' + esc(p.category) : ''}</div>
+        </div>
+        <div class="billing-row-meta">
+          <strong>${esc(formatMoney(p.unitPriceMinor, currency, loc))}</strong>
+          <small>Moms ${esc(String((p.vatRateBps / 100).toFixed(1)))}%</small>
+        </div>
+        <div class="billing-row-reason">${p.active ? '<span class="billing-status-dot is-active"></span>Aktiv' : '<span class="billing-status-dot"></span>Inaktiv'}</div>
+        <div class="billing-row-action"><button type="button" class="billing-secondary-button" data-action="edit-product" data-product-id="${esc(p.id)}">Rediger</button></div>
+      </article>`).join('') : '<div class="billing-empty">Ingen produkter fundet.</div>';
+    els.list.innerHTML = `
+      <div class="billing-form-row" style="margin-bottom:1rem">
+        <div class="billing-field is-flex-grow"><input type="search" id="billing-products-search" placeholder="Søg efter navn, SKU eller kategori…" value="${esc(state.productsSearch)}"></div>
+        <div class="billing-field is-align-end"><button type="button" class="billing-primary-button" data-action="create-product">Nyt produkt</button></div>
+      </div>
+      ${rows}`;
+    const searchInput = $('#billing-products-search');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        state.productsSearch = e.target.value;
+        renderProducts();
+      });
+    }
+  }
+
+  function openProductForm(product = null) {
+    state.editingProduct = product;
+    const isEdit = !!product;
+    const title = isEdit ? 'Rediger produkt' : 'Nyt produkt';
+    els.reviewTitle.textContent = title;
+    els.reviewKicker.textContent = 'Produktkatalog';
+    const p = product || {};
+    const priceDisplay = p.unitPriceMinor !== undefined ? String((p.unitPriceMinor / 100).toFixed(2)) : '';
+    const vatDisplay = p.vatRateBps !== undefined ? String((p.vatRateBps / 100).toFixed(1)) : '25';
+    els.reviewBody.innerHTML = `
+      <form id="billing-product-form" class="billing-form">
+        <div class="billing-form-row">
+          <div class="billing-field is-flex-grow"><label for="pf-name">Navn *</label><input id="pf-name" name="name" required value="${esc(p.name || '')}"></div>
+          <div class="billing-field"><label for="pf-sku">SKU</label><input id="pf-sku" name="sku" value="${esc(p.sku || '')}"></div>
+        </div>
+        <div class="billing-form-row">
+          <div class="billing-field is-flex-grow"><label for="pf-desc">Beskrivelse</label><input id="pf-desc" name="description" value="${esc(p.description || '')}"></div>
+          <div class="billing-field"><label for="pf-category">Kategori</label><input id="pf-category" name="category" value="${esc(p.category || '')}"></div>
+        </div>
+        <div class="billing-form-row">
+          <div class="billing-field"><label for="pf-price">Enhedspris (ekskl. moms) *</label><input id="pf-price" name="unitPrice" type="number" min="0" step="0.01" inputmode="decimal" required value="${esc(priceDisplay)}"></div>
+          <div class="billing-field"><label for="pf-vat">Moms (%)</label><input id="pf-vat" name="vatRate" type="number" min="0" step="0.1" inputmode="decimal" value="${esc(vatDisplay)}"></div>
+        </div>
+        <div class="billing-form-row">
+          <div class="billing-field"><label><input type="checkbox" name="active" ${p.active !== false ? 'checked' : ''}> Aktiv</label></div>
+        </div>
+        ${!isEdit ? '<div class="billing-form-row"><div class="billing-field is-flex-grow"><label for="pf-id">ID (unikt) *</label><input id="pf-id" name="id" required pattern="[\\w-]+" placeholder="f.eks. klipning-standard"></div></div>' : ''}
+        <div class="billing-form-actions">
+          <button type="submit" class="billing-primary-button">${isEdit ? 'Gem ændringer' : 'Opret produkt'}</button>
+          <button type="button" class="billing-secondary-button" data-action="close-review">Annuller</button>
+        </div>
+        <div id="billing-product-error" class="billing-field-error" hidden></div>
+      </form>`;
+    openDialog();
+    setTimeout(() => $('#pf-name', els.review)?.focus(), 0);
+  }
+
+  async function submitProductForm(form) {
+    if (state.busy || !canMutate()) return;
+    const data = new FormData(form);
+    const errorEl = $('#billing-product-error', form);
+    if (errorEl) { errorEl.hidden = true; errorEl.textContent = ''; }
+    const name = String(data.get('name') || '').trim();
+    const priceRaw = String(data.get('unitPrice') || '').replace(',', '.');
+    const vatRaw = String(data.get('vatRate') || '').replace(',', '.');
+    const unitPriceMinor = Math.round(Number(priceRaw) * 100);
+    const vatRateBps = Math.round(Number(vatRaw) * 100);
+    if (!name || !Number.isInteger(unitPriceMinor) || unitPriceMinor < 0) {
+      if (errorEl) { errorEl.hidden = false; errorEl.textContent = 'Udfyld navn og gyldig pris.'; }
+      return;
+    }
+    state.busy = true;
+    try {
+      if (state.editingProduct) {
+        await client.updateProduct(state.editingProduct.id, {
+          name,
+          description: String(data.get('description') || '').trim() || null,
+          unitPriceMinor,
+          vatRateBps,
+          category: String(data.get('category') || '').trim() || null,
+          sku: String(data.get('sku') || '').trim() || null,
+          active: data.get('active') === 'on',
+        });
+        toast('Produkt opdateret');
+      } else {
+        const id = String(data.get('id') || '').trim();
+        if (!id) { if (errorEl) { errorEl.hidden = false; errorEl.textContent = 'ID er påkrævet.'; } state.busy = false; return; }
+        await client.createProduct({
+          id,
+          name,
+          description: String(data.get('description') || '').trim() || null,
+          unitPriceMinor,
+          vatRateBps,
+          category: String(data.get('category') || '').trim() || null,
+          sku: String(data.get('sku') || '').trim() || null,
+          active: data.get('active') === 'on',
+        });
+        toast('Produkt oprettet');
+      }
+      closeDialog();
+      await fetchProducts();
+      renderProducts();
+    } catch (err) {
+      if (errorEl) { errorEl.hidden = false; errorEl.textContent = err?.message || 'Kunne ikke gemme produkt.'; }
+    } finally {
+      state.busy = false;
+    }
+  }
+
   function renderDashboard() {
     const d = state.dashboard;
     if (!d) {
@@ -452,6 +595,10 @@ function createApp() {
     });
     if (state.view === 'dashboard') {
       renderDashboard();
+      return;
+    }
+    if (state.view === 'products') {
+      renderProducts();
       return;
     }
     try {
@@ -781,7 +928,14 @@ function createApp() {
     const qty = esc(String(line.quantity ?? ''));
     const price = line.unitPriceMinor !== undefined ? esc(String(line.unitPriceMinor / 100)) : '';
     const disc = esc(String(line.discountPercent ?? ''));
+    const activeProducts = (state.products || []).filter((p) => p.active !== false);
+    const productOptions = activeProducts.length
+      ? `<option value="">— Vælg produkt —</option>` + activeProducts.map((p) => `<option value="${esc(p.id)}" data-price="${p.unitPriceMinor}" data-vat="${p.vatRateBps}" data-desc="${esc(p.description || '')}">${esc(p.name)}${p.sku ? ' (' + esc(p.sku) + ')' : ''}</option>`).join('')
+      : '';
     return `<div class="billing-manual-line" data-line-index="${index}">
+      <div class="billing-form-row">
+        <div class="billing-field is-flex-grow"><label for="manual-product-${index}">Produkt</label><select id="manual-product-${index}" name="productId" data-action="select-product">${productOptions}</select></div>
+      </div>
       <div class="billing-form-row">
         <div class="billing-field is-flex-grow"><label for="manual-desc-${index}">Beskrivelse</label><input id="manual-desc-${index}" name="description" value="${desc}" required placeholder="Ydelse eller vare"></div>
         <div class="billing-field"><label for="manual-qty-${index}">Antal</label><input id="manual-qty-${index}" name="quantity" type="number" min="1" step="1" inputmode="numeric" value="${qty}" required></div>
@@ -834,8 +988,9 @@ function createApp() {
     renderManualTotals(form);
   }
 
-  function openNewInvoice() {
+  async function openNewInvoice() {
     if (state.busy || !canMutate()) return toast('Kræver online og aktuelle data');
+    await fetchProducts();
     state.activeItem = null;
     state.activeInvoice = null;
     const customers = (state.billing?.customers || []).filter((c) => c.status === 'active');
@@ -861,8 +1016,9 @@ function createApp() {
     setTimeout(() => $('#billing-manual-customer', els.review)?.focus(), 0);
   }
 
-  function openManualDraftEdit(invoiceId) {
+  async function openManualDraftEdit(invoiceId) {
     if (state.busy || !canMutate()) return toast('Kræver online og aktuelle data');
+    await fetchProducts();
     const inv = invoice(invoiceId);
     if (!inv || inv.status !== 'draft' || inv.source !== 'manual') return toast('Kun manuelle kladder kan redigeres');
     const account = customer(inv.customerId);
@@ -1419,6 +1575,8 @@ function createApp() {
       tabs.forEach((t) => t.setAttribute('tabindex', t === tab ? '0' : '-1'));
       if (state.view === 'dashboard') {
         fetchDashboard().then(() => renderList());
+      } else if (state.view === 'products') {
+        fetchProducts().then(() => renderList());
       } else {
         renderList();
       }
@@ -1429,6 +1587,13 @@ function createApp() {
     if (action.dataset.action === 'close-review') return closeDialog();
     if (action.dataset.action === 'new-invoice') return openNewInvoice();
     if (action.dataset.action === 'manage-customers') return openCustomerManager();
+    if (action.dataset.action === 'create-product') return openProductForm();
+    if (action.dataset.action === 'edit-product') {
+      const productId = action.dataset.productId;
+      const product = state.products.find((p) => p.id === productId);
+      if (product) return openProductForm(product);
+      return;
+    }
     if (action.dataset.action === 'create-customer') return openCreateCustomer();
     if (action.dataset.action === 'edit-customer') return openEditCustomer(action.dataset.customerId);
     if (action.dataset.action === 'company-settings') return openCompanySettings();
@@ -1486,6 +1651,39 @@ function createApp() {
       renderManualTotals($('#billing-manual-form', els.review));
       return;
     }
+    if (action.dataset.action === 'select-product') {
+      const select = action.tagName === 'SELECT' ? action : action.closest('select');
+      if (!select) return;
+      const line = select.closest('.billing-manual-line');
+      if (!line) return;
+      const option = select.options[select.selectedIndex];
+      if (!option || !option.value) return;
+      const priceMinor = Number(option.dataset.price) || 0;
+      const desc = option.dataset.desc || '';
+      const descInput = $('input[name="description"]', line);
+      const priceInput = $('input[name="unitPrice"]', line);
+      if (descInput && !descInput.value.trim()) descInput.value = desc || option.textContent.replace(/\s*\([^)]*\)\s*$/, '').trim();
+      if (priceInput) priceInput.value = String((priceMinor / 100).toFixed(2));
+      renderManualTotals($('#billing-manual-form', els.review));
+      return;
+    }
+  });
+
+  // Product selector in manual invoice lines (change event, not click)
+  document.addEventListener('change', (event) => {
+    const select = event.target.closest('select[data-action="select-product"]');
+    if (!select) return;
+    const line = select.closest('.billing-manual-line');
+    if (!line) return;
+    const option = select.options[select.selectedIndex];
+    if (!option || !option.value) return;
+    const priceMinor = Number(option.dataset.price) || 0;
+    const desc = option.dataset.desc || '';
+    const descInput = $('input[name="description"]', line);
+    const priceInput = $('input[name="unitPrice"]', line);
+    if (descInput && !descInput.value.trim()) descInput.value = desc || option.textContent.replace(/\s*\([^)]*\)\s*$/, '').trim();
+    if (priceInput) priceInput.value = String((priceMinor / 100).toFixed(2));
+    renderManualTotals($('#billing-manual-form', els.review));
   });
 
   async function submitPayment(form) {
@@ -1578,6 +1776,9 @@ function createApp() {
     } else if (event.target.id === 'billing-credit-form') {
       event.preventDefault();
       submitCreditNote(event.target);
+    } else if (event.target.id === 'billing-product-form') {
+      event.preventDefault();
+      submitProductForm(event.target);
     }
   });
 

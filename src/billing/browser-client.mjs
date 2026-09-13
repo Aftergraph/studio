@@ -210,5 +210,17 @@ export function createBillingClient({
     remindInvoice(invoiceId) {
       return write(`/api/v1/billing/invoices/${encodeURIComponent(invoiceId)}/remind`, {}, 'billing-remind');
     },
+    listProducts() {
+      const suffix = currentActor ? `?actor=${encodeURIComponent(currentActor)}` : '';
+      return read(`/api/v1/billing/products${suffix}`);
+    },
+    createProduct({ id, name, description, unitPriceMinor, vatRateBps, category, sku, active }) {
+      return write('/api/v1/billing/products', {
+        id, name, description, unitPriceMinor, vatRateBps, category, sku, active,
+      }, 'billing-product');
+    },
+    updateProduct(productId, updates) {
+      return write(`/api/v1/billing/products/${encodeURIComponent(productId)}`, updates, 'billing-product-update', 'PATCH');
+    },
   });
 }

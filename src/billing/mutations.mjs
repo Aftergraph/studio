@@ -645,6 +645,93 @@ export function remindBillingInvoice(billing, { invoiceId, actor } = {}) {
   return { billing: next, invoice: clone(invoice), reminder: clone(reminder) };
 }
 
+export function createBillingProduct(billing, {
+  id,
+  name,
+  description,
+  unitPriceMinor,
+  vatRateBps,
+  category,
+  sku,
+  active,
+  actor,
+} = {}) {
+  const next = clone(billing);
+  next.products ||= [];
+  const cleanId = String(id || '').trim();
+  if (!cleanId) throw codedError('product_id_required');
+  if (!/^[\w-]+$/.test(cleanId)) throw codedError('invalid_product_id_format');
+  const cleanName = String(name || '').trim();
+  if (!cleanName) throw codedError('product_name_required');
+  if (next.products.some((p) => p.id === cleanId)) {
+    const err = codedError('product_id_conflict');
+    err.status = 409;
+    throw err;
+  }
+  const price = Number(unitPriceMinor);
+  if (!Number.isInteger(price) || price < 0) throw codedError('invalid_product_price');
+  const vat = Number(vatRateBps);
+  if (!Number.isInteger(vat) || vat < 0) throw codedError('invalid_product_vat');
+  const product = {
+    id: cleanId,
+    name: cleanName,
+    description: String(description || '').trim() || null,
+    unitPriceMinor: price,
+    vatRateBps: vat,
+    category: String(category || '').trim() || null,
+    sku: String(sku || '').trim() || null,
+    active: active !== false,
+    createdAt: new Date().toISOString(),
+    createdBy: actor ?? null,
+  };
+  next.products.push(product);
+  return { billing: next, product: clone(product) };
+}
+
+export function updateBillingProduct(billing, {
+  id,
+  name,
+  description,
+  unitPriceMinor,
+  vatRateBps,
+  category,
+  sku,
+  active,
+  actor,
+} = {}) {
+  const next = clone(billing);
+  next.products ||= [];
+  const cleanId = String(id || '').trim();
+  if (!cleanId) throw codedError('product_id_required');
+  const index = next.products.findIndex((p) => p.id === cleanId);
+  if (index === -1) throw codedError('product_not_found', 'product not found', 404);
+  const existing = next.products[index];
+  const updated = clone(existing);
+  if (name !== undefined) {
+    const cleanName = String(name).trim();
+    if (!cleanName) throw codedError('product_name_required');
+    updated.name = cleanName;
+  }
+  if (description !== undefined) updated.description = String(description).trim() || null;
+  if (unitPriceMinor !== undefined) {
+    const price = Number(unitPriceMinor);
+    if (!Number.isInteger(price) || price < 0) throw codedError('invalid_product_price');
+    updated.unitPriceMinor = price;
+  }
+  if (vatRateBps !== undefined) {
+    const vat = Number(vatRateBps);
+    if (!Number.isInteger(vat) || vat < 0) throw codedError('invalid_product_vat');
+    updated.vatRateBps = vat;
+  }
+  if (category !== undefined) updated.category = String(category).trim() || null;
+  if (sku !== undefined) updated.sku = String(sku).trim() || null;
+  if (active !== undefined) updated.active = Boolean(active);
+  updated.updatedAt = new Date().toISOString();
+  updated.updatedBy = actor ?? null;
+  next.products[index] = updated;
+  return { billing: next, product: clone(updated) };
+}
+
 export function updateBillingSettings(billing, {
   issuer = undefined,
   defaultServiceLabel = undefined,

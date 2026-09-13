@@ -17,6 +17,8 @@ import {
   updateManualBillingDraft,
   createBillingCustomer,
   updateBillingCustomer,
+  createBillingProduct,
+  updateBillingProduct,
   issueBillingInvoice,
   voidBillingInvoice,
   recordBillingPayment,
@@ -45,7 +47,9 @@ function isBillingPath(pathname) {
     || pathname === '/api/v1/billing/invoices/manual-draft'
     || /^\/api\/v1\/billing\/invoices\/[^/]+\/(issue|artifact|document|peppol-bis3|deliver|void|payment|remind)$/.test(pathname)
     || /^\/api\/v1\/billing\/invoices\/[^/]+$/.test(pathname)
-    || /^\/api\/v1\/billing\/customers\/[^/]+$/.test(pathname);
+    || /^\/api\/v1\/billing\/customers\/[^/]+$/.test(pathname)
+    || pathname === '/api/v1/billing/products'
+    || /^\/api\/v1\/billing\/products\/[^/]+$/.test(pathname);
 }
 
 function projectBillingState(billing) {
@@ -238,6 +242,16 @@ export function decorateBillingServer(server, {
       res.setHeader('content-type', 'application/xml; charset=utf-8');
       res.setHeader('cache-control', 'no-store');
       res.end(xml);
+      return;
+    }
+
+    if (url.pathname === '/api/v1/billing/products' && req.method === 'GET') {
+      const { actor, store } = await resolveScope(req, url);
+      try { assertActorCapability({ state: store.snapshot(), actor, capability: 'billing.read', users }); }
+      catch { throw actorError('forbidden', 403); }
+      const billing = store.snapshot().billing || {};
+      const products = billing.products || [];
+      sendJson(res, 200, { version: API_VERSION, products });
       return;
     }
 
@@ -583,6 +597,62 @@ export function decorateBillingServer(server, {
           version: API_VERSION,
           reminder,
           invoice,
+          billing: projectBillingState(next.billing),
+        });
+        return;
+      }
+
+      if (url.pathname === '/api/v1/billing/products' && req.method === 'POST') {
+        let product;
+        const next = await store.mutate((draft) => {
+          const result = createBillingProduct(draft.billing, {
+            id: body.id,
+            name: body.name,
+            description: body.description,
+            unitPriceMinor: body.unitPriceMinor,
+            vatRateBps: body.vatRateBps,
+            category: body.category,
+            sku: body.sku,
+            active: body.active,
+            actor,
+          });
+          draft.billing = result.billing;
+          product = result.product;
+          return draft;
+        });
+        actionGuard.complete(actionKey, { status: 'accepted', productId: product.id });
+        sendJson(res, 201, {
+          version: API_VERSION,
+          product,
+          billing: projectBillingState(next.billing),
+        });
+        return;
+      }
+
+      const productMatch = url.pathname.match(/^\/api\/v1\/billing\/products\/([^/]+)$/);
+      if (productMatch && req.method === 'PATCH') {
+        const productId = decodeURIComponent(productMatch[1]);
+        let product;
+        const next = await store.mutate((draft) => {
+          const result = updateBillingProduct(draft.billing, {
+            id: productId,
+            name: body.name,
+            description: body.description,
+            unitPriceMinor: body.unitPriceMinor,
+            vatRateBps: body.vatRateBps,
+            category: body.category,
+            sku: body.sku,
+            active: body.active,
+            actor,
+          });
+          draft.billing = result.billing;
+          product = result.product;
+          return draft;
+        });
+        actionGuard.complete(actionKey, { status: 'accepted', productId: product.id });
+        sendJson(res, 200, {
+          version: API_VERSION,
+          product,
           billing: projectBillingState(next.billing),
         });
         return;
