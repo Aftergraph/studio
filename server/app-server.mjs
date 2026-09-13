@@ -58,7 +58,7 @@ export function upstreamConfigFromEnv(env=process.env) {
   };
 }
 
-export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, upstreamConfig = null, federation = null, fixtures = true, authSecret = null, requireAuth = process.env.AFTERGRAPH_REQUIRE_AUTH === 'true', maxUserStores = 100 } = {}) {
+export function createAppServer({ root, stateFile, runtimeIntervalMs = 2500, upstreamConfig = null, federation = null, fixtures = true, authSecret = null, requireAuth = process.env.AFTERGRAPH_REQUIRE_AUTH === 'true', maxUserStores = 100 } = {}) {
   const rootDir = resolveRoot(root);
   const secret = authSecret || authSecretFromEnv();
   // ponytail: requireAuth turns Bearer binding into enforcement. The operator
