@@ -91,6 +91,20 @@ export function createBillingClient({
         issueDate,
       }, 'billing-draft');
     },
+    createManualDraft({ customerId, lines, number, issueDate }) {
+      return write('/api/v1/billing/invoices/manual-draft', {
+        customerId,
+        lines,
+        number,
+        issueDate,
+      }, 'billing-manual-draft');
+    },
+    updateDraft(invoiceId, { lines, issueDate }) {
+      return write(`/api/v1/billing/invoices/${encodeURIComponent(invoiceId)}`, {
+        lines,
+        issueDate,
+      }, 'billing-draft-update', 'PATCH');
+    },
     issueInvoice(invoiceId) {
       return write(`/api/v1/billing/invoices/${encodeURIComponent(invoiceId)}/issue`, {}, 'billing-issue');
     },

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { evaluateBilling } from './readiness.mjs';
-import { projectInvoice } from './money.mjs';
+import { projectInvoice, projectManualInvoice } from './money.mjs';
 
 function codedError(code, message = code, status = 422) {
   const error = new Error(message);
@@ -466,6 +466,120 @@ export function updateBillingCustomer(billing, {
   updated.updatedBy = actor ?? null;
   next.customers[index] = updated;
   return { billing: next, customer: clone(updated) };
+}
+
+export function createManualBillingDraft(billing, {
+  customerId,
+  lines,
+  number,
+  issueDate,
+  actor,
+} = {}) {
+  const next = clone(billing);
+  if (!customerId) throw codedError('customer_required');
+  assertDateOnly(issueDate, 'issueDate');
+  const customer = next.customers.find((entry) => entry.id === customerId);
+  if (!customer) throw codedError('customer_not_found', 'customer not found', 404);
+  if (!customer.billing?.currency) throw codedError('invalid_currency');
+
+  const suppliedNumber = String(number || '').trim();
+  const sequence = next.settings?.invoiceSequence;
+  let resolvedNumber = suppliedNumber;
+  if (!resolvedNumber) {
+    if (!Number.isInteger(sequence?.nextNumber) || sequence.nextNumber < 1) throw codedError('invoice_number_sequence_required');
+    resolvedNumber = String(sequence.nextNumber);
+  }
+  if (next.invoices.some((invoice) => invoice.status !== 'void' && String(invoice.number) === resolvedNumber)) {
+    throw codedError('invoice_number_conflict', 'invoice number already reserved', 409);
+  }
+
+  const money = projectManualInvoice({
+    currency: customer.billing.currency,
+    lines,
+    taxRateBps: next.settings?.taxRateBps ?? 0,
+  });
+  const terms = Number.isInteger(customer.billing.paymentTermsDays)
+    ? customer.billing.paymentTermsDays
+    : 0;
+  const id = `invoice-${resolvedNumber}`;
+  const invoice = {
+    id,
+    number: resolvedNumber,
+    customerId,
+    visitIds: [],
+    manualLines: money.lines.map((line) => ({
+      description: line.description,
+      quantity: line.quantity,
+      unitPriceMinor: line.unitPriceMinor,
+      discountPercent: line.discountPercent,
+    })),
+    issueDate,
+    dueDate: addDays(issueDate, terms),
+    status: 'draft',
+    source: 'manual',
+    createdBy: actor ?? null,
+    issuerSnapshot: clone(next.settings?.issuer),
+    customerSnapshot: {
+      name: customer.name, address: customer.address, email: customer.email || null,
+      countryCode: customer.countryCode || null,
+      registrationId: customer.registrationId || customer.cvr || null,
+      registrationScheme: customer.registrationScheme || null,
+      endpoint: customer.endpoint ? clone(customer.endpoint) : null,
+    },
+    serviceLabel: String(next.settings?.defaultServiceLabel || 'Service'),
+    ...money,
+  };
+  next.invoices.push(invoice);
+  if (!suppliedNumber && sequence) sequence.nextNumber += 1;
+  else if (sequence && /^\d+$/.test(resolvedNumber) && Number(resolvedNumber) >= sequence.nextNumber) sequence.nextNumber = Number(resolvedNumber) + 1;
+  return { billing: next, invoice: clone(invoice) };
+}
+
+export function updateManualBillingDraft(billing, {
+  invoiceId,
+  lines,
+  issueDate,
+  actor,
+} = {}) {
+  const next = clone(billing);
+  const invoice = next.invoices.find((entry) => entry.id === invoiceId);
+  if (!invoice) throw codedError('invoice_not_found', 'invoice not found', 404);
+  if (invoice.status !== 'draft') throw codedError('invoice_not_editable', 'only draft invoices can be edited');
+  if (invoice.source !== 'manual') throw codedError('invoice_not_manual', 'only manual drafts can be edited this way');
+  if (issueDate !== undefined) assertDateOnly(issueDate, 'issueDate');
+
+  const customer = next.customers.find((entry) => entry.id === invoice.customerId);
+  if (!customer) throw codedError('customer_not_found', 'customer not found', 404);
+
+  const money = projectManualInvoice({
+    currency: customer.billing.currency,
+    lines,
+    taxRateBps: next.settings?.taxRateBps ?? 0,
+  });
+
+  invoice.manualLines = money.lines.map((line) => ({
+    description: line.description,
+    quantity: line.quantity,
+    unitPriceMinor: line.unitPriceMinor,
+    discountPercent: line.discountPercent,
+  }));
+  invoice.currency = money.currency;
+  invoice.taxRateBps = money.taxRateBps;
+  invoice.subtotalGrossMinor = money.subtotalGrossMinor;
+  invoice.discountMinor = money.discountMinor;
+  invoice.totalGrossMinor = money.totalGrossMinor;
+  invoice.totalNetMinor = money.totalNetMinor;
+  invoice.taxMinor = money.taxMinor;
+  invoice.updatedAt = new Date().toISOString();
+  invoice.updatedBy = actor ?? null;
+  if (issueDate !== undefined) {
+    invoice.issueDate = issueDate;
+    const terms = Number.isInteger(customer.billing.paymentTermsDays)
+      ? customer.billing.paymentTermsDays
+      : 0;
+    invoice.dueDate = addDays(issueDate, terms);
+  }
+  return { billing: next, invoice: clone(invoice) };
 }
 
 export function updateBillingSettings(billing, {
