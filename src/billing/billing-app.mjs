@@ -1,5 +1,5 @@
 import { createBillingClient } from './browser-client.mjs';
-import { projectInvoice } from './money.mjs';
+import { projectInvoice, projectManualInvoice } from './money.mjs';
 import { canFinanciallyMutate, itemsForBillingView } from './app-state.mjs';
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -577,7 +577,8 @@ function createApp() {
       const artifact = issued ? `<button type="button" class="billing-secondary-button" data-action="download" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>Download faktura</button>` : '';
       const deliver = issued && !emailed ? `<button type="button" class="billing-primary-button" data-action="deliver" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>${deliveryFailed ? 'Prøv levering igen' : 'Send faktura'}</button>` : '';
       const issue = issued ? '' : `<button type="button" class="billing-primary-button" data-action="issue" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>Udsted faktura</button>`;
-      return `<div class="billing-draft-status"><strong>${status}</strong><p>Nr. ${esc(state.activeInvoice.number)} · forfalder ${esc(formatDate(state.activeInvoice.dueDate, locale()))}</p>${deliveryDetail}</div><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Luk</button>${artifact}${issue}${deliver}</div>`;
+      const editManual = !issued && state.activeInvoice.source === 'manual' ? `<button type="button" class="billing-secondary-button" data-action="edit-manual-draft" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>Redigér kladde</button>` : '';
+      return `<div class="billing-draft-status"><strong>${status}</strong><p>Nr. ${esc(state.activeInvoice.number)} · forfalder ${esc(formatDate(state.activeInvoice.dueDate, locale()))}</p>${deliveryDetail}</div><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Luk</button>${artifact}${editManual}${issue}${deliver}</div>`;
     }
     const nextNumber = state.billing?.settings?.invoiceSequence?.nextNumber ?? '—';
     const correctionVisit = state.activeItem?.visitIds?.length === 1 ? visit(state.activeItem.visitIds[0]) : null;
@@ -631,30 +632,62 @@ function createApp() {
     setTimeout(() => $('#billing-issue-date', els.review)?.focus(), 0);
   }
 
-  function handleNewInvoiceSelect(form) {
-    const data = new FormData(form);
-    const customerId = String(data.get('customerId') || '').trim();
-    if (!customerId) {
-      showFormError(form, 'Vælg en kunde.');
-      return;
-    }
-    const account = customer(customerId);
-    if (!account) {
-      showFormError(form, 'Kunden findes ikke.');
-      return;
-    }
-    // Find projection items for this customer that are ready
-    const readyItems = projection().items.filter(
-      (item) => item.customerId === customerId && item.status === 'ready',
-    );
-    if (!readyItems.length) {
-      showFormError(form, 'Ingen besøg klar til fakturering for denne kunde. Registrér actuals først.');
-      return;
-    }
-    // Use the first ready item to enter the existing review/draft flow
-    showFormError(form);
-    closeDialog();
-    openReview(readyItems[0]);
+  function manualLineHtml(index, line = {}) {
+    const desc = esc(line.description || '');
+    const qty = esc(String(line.quantity ?? ''));
+    const price = line.unitPriceMinor !== undefined ? esc(String(line.unitPriceMinor / 100)) : '';
+    const disc = esc(String(line.discountPercent ?? ''));
+    return `<div class="billing-manual-line" data-line-index="${index}">
+      <div class="billing-form-row">
+        <div class="billing-field is-flex-grow"><label for="manual-desc-${index}">Beskrivelse</label><input id="manual-desc-${index}" name="description" value="${desc}" required placeholder="Ydelse eller vare"></div>
+        <div class="billing-field"><label for="manual-qty-${index}">Antal</label><input id="manual-qty-${index}" name="quantity" type="number" min="1" step="1" inputmode="numeric" value="${qty}" required></div>
+      </div>
+      <div class="billing-form-row">
+        <div class="billing-field"><label for="manual-price-${index}">Enhedspris (ekskl. moms)</label><input id="manual-price-${index}" name="unitPrice" type="number" min="0" step="0.01" inputmode="decimal" value="${price}" required></div>
+        <div class="billing-field"><label for="manual-disc-${index}">Rabat (%)</label><input id="manual-disc-${index}" name="discountPercent" type="number" min="0" max="100" step="0.01" inputmode="decimal" value="${disc}" placeholder="0"></div>
+        <div class="billing-field is-align-end"><button type="button" class="billing-secondary-button" data-action="remove-manual-line" data-line-index="${index}" aria-label="Fjern linje ${index + 1}">Fjern</button></div>
+      </div>
+    </div>`;
+  }
+
+  function collectManualLines(form) {
+    const containers = $$('.billing-manual-line', form);
+    if (!containers.length) return [];
+    return containers.map((row) => {
+      const description = String($('input[name="description"]', row)?.value || '').trim();
+      const quantityRaw = String($('input[name="quantity"]', row)?.value || '').replace(',', '.');
+      const priceRaw = String($('input[name="unitPrice"]', row)?.value || '').replace(',', '.');
+      const discRaw = String($('input[name="discountPercent"]', row)?.value || '').replace(',', '.');
+      const quantity = Number(quantityRaw);
+      const unitPriceMinor = Math.round(Number(priceRaw) * 100);
+      const discountPercent = Number(discRaw) || 0;
+      return { description, quantity, unitPriceMinor, discountPercent };
+    });
+  }
+
+  function renderManualTotals(form) {
+    const customerId = $('select[name="customerId"]', form)?.value;
+    const account = customerId ? customer(customerId) : null;
+    const currency = account?.billing?.currency || 'DKK';
+    const taxRateBps = state.billing?.settings?.taxRateBps ?? account?.billing?.taxRateBps ?? 0;
+    const lines = collectManualLines(form).filter((l) => l.description && Number.isInteger(l.quantity) && l.quantity > 0 && Number.isInteger(l.unitPriceMinor) && l.unitPriceMinor >= 0);
+    let proj = null;
+    try {
+      if (lines.length) proj = projectManualInvoice({ currency, lines, taxRateBps });
+    } catch { proj = null; }
+    const sub = $('#billing-manual-subtotal', form);
+    const tax = $('#billing-manual-tax', form);
+    const tot = $('#billing-manual-total', form);
+    if (sub) sub.textContent = proj ? formatMoney(proj.subtotalGrossMinor - proj.discountMinor, currency, locale()) : '—';
+    if (tax) tax.textContent = proj ? formatMoney(proj.taxMinor, currency, locale()) : '—';
+    if (tot) tot.textContent = proj ? formatMoney(proj.totalGrossMinor, currency, locale()) : '—';
+  }
+
+  function wireManualLiveTotals(form) {
+    const handler = () => renderManualTotals(form);
+    form.addEventListener('input', handler);
+    form.addEventListener('change', handler);
+    renderManualTotals(form);
   }
 
   function openNewInvoice() {
@@ -662,17 +695,114 @@ function createApp() {
     state.activeItem = null;
     state.activeInvoice = null;
     const customers = (state.billing?.customers || []).filter((c) => c.status === 'active');
+    if (!customers.length) return toast('Opret en kunde før du laver en manuel faktura');
     const options = customers.map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
     els.reviewKicker.textContent = 'Ny faktura';
-    els.reviewTitle.textContent = 'Opret ny faktura';
-    els.reviewBody.innerHTML = `<form id="billing-new-invoice-form" class="billing-form" aria-describedby="billing-new-invoice-error">
-      <div class="billing-field"><label for="billing-new-customer">Vælg kunde</label><select id="billing-new-customer" name="customerId" required>${options}</select></div>
-      <p class="billing-form-help">Vælg en eksisterende kunde for at oprette en fakturakladde. Besøg uden actuals vises ikke.</p>
-      <p id="billing-new-invoice-error" class="billing-form-error" role="alert" hidden></p>
-      <div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Annuller</button><button type="submit" class="billing-primary-button">Fortsæt</button></div>
+    els.reviewTitle.textContent = 'Manuel faktura';
+    els.reviewBody.innerHTML = `<form id="billing-manual-form" class="billing-form" aria-describedby="billing-manual-error">
+      <div class="billing-field"><label for="billing-manual-customer">Kunde</label><select id="billing-manual-customer" name="customerId" required>${options}</select></div>
+      <div class="billing-field"><label for="billing-manual-issue-date">Fakturadato</label><input id="billing-manual-issue-date" name="issueDate" type="date" value="${today()}" required></div>
+      <fieldset class="billing-manual-lines"><legend>Fakturalinjer</legend><div id="billing-manual-lines-container">${manualLineHtml(0)}</div><button type="button" class="billing-secondary-button" data-action="add-manual-line">Tilføj linje</button></fieldset>
+      <section class="billing-totals" aria-label="Fakturatotaler">
+        <div class="billing-total-row"><span>Ekskl. moms</span><span id="billing-manual-subtotal">—</span></div>
+        <div class="billing-total-row"><span>Moms</span><span id="billing-manual-tax">—</span></div>
+        <div class="billing-total-row is-total"><span>I alt</span><span id="billing-manual-total">—</span></div>
+      </section>
+      <p id="billing-manual-error" class="billing-form-error" role="alert" hidden></p>
+      <div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Annuller</button><button type="submit" class="billing-primary-button">Opret kladde</button></div>
     </form>`;
     openDialog();
-    setTimeout(() => $('#billing-new-customer', els.review)?.focus(), 0);
+    const form = $('#billing-manual-form', els.review);
+    wireManualLiveTotals(form);
+    setTimeout(() => $('#billing-manual-customer', els.review)?.focus(), 0);
+  }
+
+  function openManualDraftEdit(invoiceId) {
+    if (state.busy || !canMutate()) return toast('Kræver online og aktuelle data');
+    const inv = invoice(invoiceId);
+    if (!inv || inv.status !== 'draft' || inv.source !== 'manual') return toast('Kun manuelle kladder kan redigeres');
+    const account = customer(inv.customerId);
+    if (!account) return toast('Kunden findes ikke');
+    state.activeItem = null;
+    state.activeInvoice = structuredClone(inv);
+    const customers = (state.billing?.customers || []).filter((c) => c.status === 'active');
+    const options = customers.map((c) => `<option value="${esc(c.id)}"${c.id === inv.customerId ? ' selected disabled' : ''}>${esc(c.name)}</option>`).join('');
+    const lines = (inv.manualLines || []).map((l, i) => manualLineHtml(i, l)).join('') || manualLineHtml(0);
+    els.reviewKicker.textContent = 'Redigér kladde';
+    els.reviewTitle.textContent = `Redigér faktura ${esc(inv.number)}`;
+    els.reviewBody.innerHTML = `<form id="billing-manual-form" class="billing-form" aria-describedby="billing-manual-error">
+      <input type="hidden" name="invoiceId" value="${esc(inv.id)}">
+      <div class="billing-field"><label for="billing-manual-customer">Kunde</label><select id="billing-manual-customer" name="customerId" required>${options}</select></div>
+      <div class="billing-field"><label for="billing-manual-issue-date">Fakturadato</label><input id="billing-manual-issue-date" name="issueDate" type="date" value="${esc(inv.issueDate || today())}" required></div>
+      <fieldset class="billing-manual-lines"><legend>Fakturalinjer</legend><div id="billing-manual-lines-container">${lines}</div><button type="button" class="billing-secondary-button" data-action="add-manual-line">Tilføj linje</button></fieldset>
+      <section class="billing-totals" aria-label="Fakturatotaler">
+        <div class="billing-total-row"><span>Ekskl. moms</span><span id="billing-manual-subtotal">—</span></div>
+        <div class="billing-total-row"><span>Moms</span><span id="billing-manual-tax">—</span></div>
+        <div class="billing-total-row is-total"><span>I alt</span><span id="billing-manual-total">—</span></div>
+      </section>
+      <p id="billing-manual-error" class="billing-form-error" role="alert" hidden></p>
+      <div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Annuller</button><button type="submit" class="billing-primary-button">Gem ændringer</button></div>
+    </form>`;
+    openDialog();
+    const form = $('#billing-manual-form', els.review);
+    wireManualLiveTotals(form);
+    setTimeout(() => $('input[name="description"]', form)?.focus(), 0);
+  }
+
+  function handleManualFormSubmit(form) {
+    const invoiceId = $('input[name="invoiceId"]', form)?.value || null;
+    const customerId = String($('select[name="customerId"]', form)?.value || '').trim();
+    const issueDate = String($('input[name="issueDate"]', form)?.value || '').trim();
+    if (!customerId) return showFormError(form, 'Vælg en kunde');
+    if (!issueDate) return showFormError(form, 'Angiv fakturadato');
+    const lines = collectManualLines(form);
+    const validLines = lines.filter((l) => l.description);
+    if (!validLines.length) return showFormError(form, 'Tilføj mindst én fakturalinje');
+    for (let i = 0; i < lines.length; i += 1) {
+      const l = lines[i];
+      if (!l.description) return showFormError(form, `Beskrivelse er påkrævet (linje ${i + 1})`);
+      if (!Number.isInteger(l.quantity) || l.quantity < 1) return showFormError(form, `Antal skal være et positivt heltal (linje ${i + 1})`);
+      if (!Number.isInteger(l.unitPriceMinor) || l.unitPriceMinor < 0) return showFormError(form, `Enhedspris skal være et ikke-negativt tal (linje ${i + 1})`);
+    }
+    showFormError(form);
+    const payload = { customerId, issueDate, lines: validLines };
+    if (invoiceId) {
+      updateManualDraft(invoiceId, payload, form);
+    } else {
+      saveManualDraft(payload, form);
+    }
+  }
+
+  async function saveManualDraft(payload, form) {
+    state.busy = true;
+    render();
+    try {
+      await client.createManualDraft(payload);
+      toast('Fakturakladde oprettet');
+      closeDialog();
+      await refresh();
+    } catch (err) {
+      showFormError(form, `Kunne ikke oprette fakturakladde: ${err?.message || err}`);
+    } finally {
+      state.busy = false;
+      render();
+    }
+  }
+
+  async function updateManualDraft(invoiceId, payload, form) {
+    state.busy = true;
+    render();
+    try {
+      await client.updateDraft({ invoiceId, ...payload });
+      toast('Fakturakladde opdateret');
+      closeDialog();
+      await refresh();
+    } catch (err) {
+      showFormError(form, `Kunne ikke opdatere fakturakladde: ${err?.message || err}`);
+    } finally {
+      state.busy = false;
+      render();
+    }
   }
 
   function openCustomerManager() {
@@ -1145,6 +1275,41 @@ function createApp() {
     if (action.dataset.action === 'download') return downloadInvoice(action.dataset.invoiceId, action);
     if (action.dataset.action === 'peppol') return downloadPeppolInvoice(action.dataset.invoiceId, action);
     if (action.dataset.action === 'deliver') return deliverInvoice(action.dataset.invoiceId, action);
+    if (action.dataset.action === 'edit-manual-draft') return openManualDraftEdit(action.dataset.invoiceId);
+    if (action.dataset.action === 'add-manual-line') {
+      const container = $('#billing-manual-lines-container', els.review);
+      if (!container) return;
+      const existing = $$('.billing-manual-line', container);
+      const nextIndex = existing.length;
+      container.insertAdjacentHTML('beforeend', manualLineHtml(nextIndex));
+      renderManualTotals($('#billing-manual-form', els.review));
+      $(`#manual-desc-${nextIndex}`, container)?.focus();
+      return;
+    }
+    if (action.dataset.action === 'remove-manual-line') {
+      const line = action.closest('.billing-manual-line');
+      if (!line) return;
+      const container = $('#billing-manual-lines-container', els.review);
+      const remaining = $$('.billing-manual-line', container);
+      if (remaining.length <= 1) return toast('Mindst én linje er påkrævet');
+      line.remove();
+      // Re-index remaining lines
+      $$('.billing-manual-line', container).forEach((el, i) => {
+        el.dataset.lineIndex = String(i);
+        const descInput = $('input[name="description"]', el);
+        const qtyInput = $('input[name="quantity"]', el);
+        const priceInput = $('input[name="unitPrice"]', el);
+        const discInput = $('input[name="discountPercent"]', el);
+        const removeBtn = $('[data-action="remove-manual-line"]', el);
+        if (descInput) { descInput.id = `manual-desc-${i}`; $('label[for]', el.closest('.billing-form-row'))?.setAttribute('for', `manual-desc-${i}`); }
+        if (qtyInput) qtyInput.id = `manual-qty-${i}`;
+        if (priceInput) priceInput.id = `manual-price-${i}`;
+        if (discInput) discInput.id = `manual-disc-${i}`;
+        if (removeBtn) { removeBtn.dataset.lineIndex = String(i); removeBtn.setAttribute('aria-label', `Fjern linje ${i + 1}`); }
+      });
+      renderManualTotals($('#billing-manual-form', els.review));
+      return;
+    }
   });
 
   document.addEventListener('submit', (event) => {
@@ -1160,9 +1325,9 @@ function createApp() {
     } else if (event.target.id === 'billing-company-form') {
       event.preventDefault();
       saveCompanySettings(event.target);
-    } else if (event.target.id === 'billing-new-invoice-form') {
+    } else if (event.target.id === 'billing-manual-form') {
       event.preventDefault();
-      handleNewInvoiceSelect(event.target);
+      handleManualFormSubmit(event.target);
     } else if (event.target.id === 'billing-customer-form') {
       event.preventDefault();
       saveCustomer(event.target);
