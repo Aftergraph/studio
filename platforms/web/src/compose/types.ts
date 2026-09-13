@@ -38,4 +38,32 @@ export type ConversationItem = {
   createdAt: number;
   activeVersion: number;
   artifacts: InstructionArtifactModel[];
+  title?: string;
+};
+
+// Toast types
+export type ToastType = 'success' | 'error' | 'info' | 'warning';
+
+export type ToastState = {
+  id: string;
+  message: string;
+  type: ToastType;
+  duration?: number;
+  dismissible?: boolean;
+};
+
+// Compile status types
+export type CompileStatus = 
+  | 'idle'
+  | 'working'
+  | 'aborting'
+  | 'aborted'
+  | 'error'
+  | 'queueing';
+
+// Rate limit status
+export type RateLimitStatus = {
+  remaining: number;
+  resetAt: number;
+  limited: boolean;
 };

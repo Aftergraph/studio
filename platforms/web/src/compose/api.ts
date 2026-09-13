@@ -45,14 +45,38 @@ export async function compileIntent(
   source: string,
   target: ComposeTarget = 'auto',
   refinement?: string,
-  signal: AbortSignal | null = null,
+  signal?: AbortSignal | null,
+  timeout: number = 30000,
 ): Promise<CompileResponse> {
-  const response = await fetch('/api/v1/intent/compile', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ source, target, refinement: refinement || null }),
-    signal,
-  });
-  if (!response.ok) throw new ComposeHttpError(response.status);
-  return parseCompileResponse(await response.json());
+  const controller = new AbortController();
+  const combinedSignal = signal || controller.signal;
+  
+  // Set timeout if provided
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, timeout);
+  
+  try {
+    const response = await fetch('/api/v1/intent/compile', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ source, target, refinement: refinement || null }),
+      signal: combinedSignal,
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      // Check for rate limiting
+      if (response.status === 429) {
+        throw new ComposeHttpError(429);
+      }
+      throw new ComposeHttpError(response.status);
+    }
+    
+    return parseCompileResponse(await response.json());
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
 }
