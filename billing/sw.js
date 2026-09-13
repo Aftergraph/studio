@@ -1,6 +1,8 @@
-const CACHE = 'aftergraph-billing-shell-v2';
+const CACHE = 'aftergraph-billing-shell-v3';
+const OFFLINE_URL = '/billing/offline.html';
 const SHELL = [
   '/billing/',
+  '/billing/offline.html',
   '/billing/manifest.webmanifest',
   '/billing/icons/icon-192.svg',
   '/billing/icons/icon-512.svg',
@@ -39,22 +41,31 @@ self.addEventListener('fetch', (event) => {
       event.respondWith(fetch(request));
       return;
     }
-    event.respondWith(fetch(request));
-    return;
-  }
-
-  if (request.mode === 'navigate' && url.pathname.startsWith('/billing/')) {
+    // API GET: network-first with cache fallback for offline reads
     event.respondWith(
-      fetch(request).catch(async () => (await caches.open(CACHE)).match('/billing/'))
+      fetch(request).catch(() => caches.match(request))
     );
     return;
   }
 
+  // Navigation: network-first with offline fallback
+  if (request.mode === 'navigate' && url.pathname.startsWith('/billing/')) {
+    event.respondWith(
+      fetch(request).catch(async () => {
+        const cache = await caches.open(CACHE);
+        return (await cache.match(request)) || (await cache.match(OFFLINE_URL));
+      })
+    );
+    return;
+  }
+
+  // Non-GET: pass through
   if (request.method !== 'GET') {
     event.respondWith(fetch(request));
     return;
   }
 
+  // Static assets: cache-first
   if (url.pathname.startsWith('/billing/') || url.pathname.startsWith('/src/billing/') || url.pathname === '/styles/billing.css' || url.pathname === '/styles/tokens.css' || url.pathname === '/styles/reset.css') {
     event.respondWith(
       caches.match(request).then((cached) => cached || fetch(request).then((response) => {

@@ -871,3 +871,52 @@ button {
     animation: none;
   }
 }
+
+/* PWA Install Banner */
+.billing-install-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #0b0f16;
+  border-top: 1px solid rgba(89, 212, 255, 0.3);
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  z-index: 1000;
+  animation: billing-install-slide-up 0.3s ease-out;
+}
+@keyframes billing-install-slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.billing-install-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.billing-install-content strong {
+  color: #f5f7fa;
+  font-size: 0.95rem;
+}
+.billing-install-content span {
+  color: rgba(245, 247, 250, 0.7);
+  font-size: 0.85rem;
+}
+.billing-install-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+@media (max-width: 480px) {
+  .billing-install-banner {
+    flex-direction: column;
+    text-align: center;
+  }
+  .billing-install-actions {
+    width: 100%;
+    justify-content: center;
+  }
+}
