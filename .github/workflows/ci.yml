@@ -33,6 +33,10 @@ jobs:
           pip install playwright pillow numpy
           python -m playwright install --with-deps chromium
 
+      - name: Install Compose Expo dependencies
+        working-directory: platforms/expo
+        run: npm ci
+
       - name: Run Node Unit & Invariant Tests
         run: |
           npm test
