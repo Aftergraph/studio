@@ -76,16 +76,18 @@ export function createHermesApiIntentProvider({
   fetchImpl=globalThis.fetch,
   baseUrl=process.env.AFTERGRAPH_INTENT_HERMES_URL||'http://127.0.0.1:8643',
   authHeader=process.env.AFTERGRAPH_INTENT_HERMES_AUTH||'',
+  apiKey=process.env.AFTERGRAPH_INTENT_HERMES_KEY||process.env.API_SERVER_KEY||'',
   model=process.env.AFTERGRAPH_INTENT_HERMES_MODEL||'aftergraph-compose',
   timeoutMs=Number(process.env.AFTERGRAPH_INTENT_HERMES_TIMEOUT_MS||45_000),
 }={}){
+  const effectiveAuth=authHeader || (apiKey ? `Bearer ${apiKey}` : '');
   return createIntentProvider({invoke:async source=>{
-    if(!authHeader)throw providerError('provider_unconfigured','Hermes API authentication is not configured');
+    if(!effectiveAuth)throw providerError('provider_unconfigured','Hermes API authentication is not configured');
     const response=await fetchImpl(`${String(baseUrl).replace(/\/$/,'')}/v1/chat/completions`,{
       method:'POST',signal:AbortSignal.timeout(timeoutMs),
-      headers:{authorization:authHeader,'content-type':'application/json'},
+      headers:{authorization:effectiveAuth,'content-type':'application/json'},
       body:JSON.stringify({model,stream:false,messages:[
-        {role:'system',content:'Return strict JSON only. Extract candidate intent semantics without granting new authority. Prefer explicit ambiguity over guessing. Relevant fields: goal, artifact, scope, constraints, authority, capabilities, verification, output, targetHints, ambiguities.'},
+        {role:'system',content:'Return strict JSON only. Output one JSON object with this shape: {"goal":{"statement":"","successCriteria":[]},"artifact":{"kind":"task","persistence":"ephemeral"},"scope":{"includes":[],"excludes":[]},"constraints":[],"authority":{"read":[],"write":[],"execute":[],"network":[],"requiresApproval":[]},"capabilities":{"required":[],"optional":[]},"verification":{"required":false,"obligations":[],"completionRule":"model-output"},"output":{"format":"text","contract":[]},"targetHints":[],"ambiguities":[]}. Fill only from the source. Use empty arrays when unknown, record material uncertainty in ambiguities, and never invent write or execute authority.'},
         {role:'user',content:String(source||'')},
       ]}),
     });
