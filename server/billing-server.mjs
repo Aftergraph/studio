@@ -13,6 +13,8 @@ import {
   recordBillingActual,
   correctBillingActual,
   createBillingDraft,
+  createManualBillingDraft,
+  updateManualBillingDraft,
   createBillingCustomer,
   updateBillingCustomer,
   issueBillingInvoice,
@@ -38,7 +40,9 @@ function isBillingPath(pathname) {
     || pathname === '/api/v1/billing/actuals/correct'
     || pathname === '/api/v1/billing/invoices/draft'
     || pathname === '/api/v1/billing/audit'
+    || pathname === '/api/v1/billing/invoices/manual-draft'
     || /^\/api\/v1\/billing\/invoices\/[^/]+\/(issue|artifact|document|peppol-bis3|deliver|void|payment)$/.test(pathname)
+    || /^\/api\/v1\/billing\/invoices\/[^/]+$/.test(pathname)
     || /^\/api\/v1\/billing\/customers\/[^/]+$/.test(pathname);
 }
 
@@ -342,6 +346,53 @@ export function decorateBillingServer(server, {
         });
         actionGuard.complete(actionKey, { status: 'accepted', invoiceId: invoice.id });
         sendJson(res, 201, {
+          version: API_VERSION,
+          invoice,
+          billing: projectBillingState(next.billing),
+        });
+        return;
+      }
+
+      if (url.pathname === '/api/v1/billing/invoices/manual-draft' && req.method === 'POST') {
+        let invoice;
+        const next = await store.mutate((draft) => {
+          const result = createManualBillingDraft(draft.billing, {
+            customerId: body.customerId,
+            lines: body.lines,
+            number: body.number,
+            issueDate: body.issueDate,
+            actor,
+          });
+          draft.billing = result.billing;
+          invoice = result.invoice;
+          return draft;
+        });
+        actionGuard.complete(actionKey, { status: 'accepted', invoiceId: invoice.id });
+        sendJson(res, 201, {
+          version: API_VERSION,
+          invoice,
+          billing: projectBillingState(next.billing),
+        });
+        return;
+      }
+
+      const invoiceUpdateMatch = url.pathname.match(/^\/api\/v1\/billing\/invoices\/([^/]+)$/);
+      if (invoiceUpdateMatch && req.method === 'PATCH') {
+        const invoiceId = decodeURIComponent(invoiceUpdateMatch[1]);
+        let invoice;
+        const next = await store.mutate((draft) => {
+          const result = updateManualBillingDraft(draft.billing, {
+            invoiceId,
+            lines: body.lines,
+            issueDate: body.issueDate,
+            actor,
+          });
+          draft.billing = result.billing;
+          invoice = result.invoice;
+          return draft;
+        });
+        actionGuard.complete(actionKey, { status: 'accepted', invoiceId: invoice.id });
+        sendJson(res, 200, {
           version: API_VERSION,
           invoice,
           billing: projectBillingState(next.billing),
