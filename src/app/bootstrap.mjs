@@ -670,8 +670,11 @@ export function bootstrapAftergraph(){
       return;
     }
     liveRuntime=createLiveRuntime(state,missionId);liveRuntime.status='running';
-    liveTimer=setInterval(()=>{liveRuntime=stepMission(liveRuntime);state=liveRuntime.state;saveState();render();if(['verified','awaiting_approval'].includes(liveRuntime.status)){stopRuntimeTimer();if(liveRuntime.status==='verified')toast('Outcome verified and settled')}},1250);
-    render();
+    // ponytail: increased from 1250ms to 2500ms to match backend tick rate
+    // and avoid double-ticking overhead. Fire an immediate first step so the
+    // live strip shows progress without waiting a full cadence interval.
+    liveRuntime=stepMission(liveRuntime);state=liveRuntime.state;saveState();render();if(['verified','awaiting_approval'].includes(liveRuntime.status)){stopRuntimeTimer();if(liveRuntime.status==='verified')toast('Outcome verified and settled')}
+    liveTimer=setInterval(()=>{liveRuntime=stepMission(liveRuntime);state=liveRuntime.state;saveState();render();if(['verified','awaiting_approval'].includes(liveRuntime.status)){stopRuntimeTimer();if(liveRuntime.status==='verified')toast('Outcome verified and settled')}},2500);
   }
   function stopRuntimeTimer(){if(liveTimer){clearInterval(liveTimer);liveTimer=null}}
 

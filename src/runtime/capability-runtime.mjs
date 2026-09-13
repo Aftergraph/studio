@@ -64,8 +64,8 @@ export function createCapabilityRuntime({
           payload: {
             capabilityId,
             subject,
-            inputs: structuredClone(inputs),
-            outputs: structuredClone(outputs),
+            inputs: {...inputs},
+            outputs: {...outputs},
             approvalId: authorization?.approvalId || null
           }
         });
@@ -75,7 +75,7 @@ export function createCapabilityRuntime({
         ok: true,
         capabilityId,
         subject,
-        outputs: Object.freeze(structuredClone(outputs)),
+        outputs: Object.freeze(outputs),
         evidenceRef,
         executedAt: new Date().toISOString()
       });

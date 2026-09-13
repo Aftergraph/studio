@@ -5,8 +5,10 @@
 
 const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 
+// ponytail: shallow clone for temporal events - they're plain data objects
 function clone(value) {
-  return structuredClone(value);
+  if (!value || typeof value !== 'object') return value;
+  return Array.isArray(value) ? [...value] : { ...value };
 }
 
 function freeze(value) {

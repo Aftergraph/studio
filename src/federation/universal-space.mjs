@@ -4,6 +4,6 @@ export function createUniversalSpace({objectGraph,surfaceRegistry,space=createSp
  move(surfaceInstanceId,regionId){if(!bindings.has(surfaceInstanceId))throw new Error(`unknown surface instance ${surfaceInstanceId}`);state=reduceSpatialState(state,{type:'surface.move',surfaceId:surfaceInstanceId,regionId});return state},
  close(surfaceInstanceId){state=reduceSpatialState(state,{type:'surface.close',surfaceId:surfaceInstanceId});bindings.delete(surfaceInstanceId);return state},
  focus(surfaceInstanceId){state=reduceSpatialState(state,{type:'surface.focus',surfaceId:surfaceInstanceId});return state},
- snapshot(){return structuredClone(state)},
+ snapshot(){return state},
  resolve(surfaceInstanceId){const b=bindings.get(surfaceInstanceId);if(!b)return null;return Object.freeze({binding:Object.freeze({...b}),object:objectGraph.get(b.graphId),surface:surfaceRegistry.get(b.surfaceId)})},
 });}

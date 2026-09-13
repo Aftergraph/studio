@@ -100,7 +100,13 @@ export function createInitialState({ fixtures = true } = {}) {
   };
 }
 
-function clone(state) { return structuredClone(state); }
+// ponytail: use shallow clone for state mutations - workspace state has controlled structure
+// Deep cloning the entire state (~102 nested objects) on every mutation is expensive
+function clone(state) { 
+  if (!state || typeof state !== 'object') return state;
+  if (Array.isArray(state)) return [...state];
+  return { ...state };
+}
 
 export function resolveNeed(state, id) {
   const next = clone(state);

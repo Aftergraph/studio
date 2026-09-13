@@ -1,6 +1,6 @@
 const ALLOWED=new Set(['observed_from','suggests','promoted_to','fulfills','executes','assigned_to','requires','authorized_by','approved_by','produces','supported_by','derived_from','verifies','contradicts','supersedes','belongs_to','uses_capability','uses_skill','related_to']);
 function freeze(v){if(!v||typeof v!=='object'||Object.isFrozen(v))return v;for(const child of Object.values(v))freeze(child);return Object.freeze(v)}
-export function validateRelation(r){if(!r||typeof r!=='object')throw new TypeError('relation object required');if(!ALLOWED.has(r.type))throw new TypeError(`unknown relation ${r.type}`);if(!r.sourceIntegration)throw new TypeError('relation sourceIntegration required');if(!r.from||!r.to)throw new TypeError('relation from/to required');return freeze(structuredClone(r))}
+export function validateRelation(r){if(!r||typeof r!=='object')throw new TypeError('relation object required');if(!ALLOWED.has(r.type))throw new TypeError(`unknown relation ${r.type}`);if(!r.sourceIntegration)throw new TypeError('relation sourceIntegration required');if(!r.from||!r.to)throw new TypeError('relation from/to required');return freeze({...r})}
 export function createObjectGraph(){const objects=new Map();const relations=[];return Object.freeze({
   upsert(envelope){if(!envelope?.graphId)throw new TypeError('envelope.graphId required');objects.set(envelope.graphId,envelope);return envelope},
   relate(input){
