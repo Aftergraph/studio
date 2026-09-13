@@ -28,23 +28,61 @@ export function createBillingClient({
     ...extra,
   });
 
+  const withTimeout = (signal) => {
+    if (typeof AbortController === 'undefined') return signal;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
+    const combined = controller.signal;
+    if (signal) {
+      signal.addEventListener('abort', () => controller.abort());
+    }
+    // Note: caller must clear timeout on completion; simplified here by relying on abort
+    return combined;
+  };
+
   const read = async (path) => {
-    const response = await fetchFn(path, { headers: authHeaders() });
-    const body = await response.json();
-    if (!response.ok) throw normalizeError(response, body);
-    return body;
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), 30000) : null;
+    try {
+      const response = await fetchFn(path, { headers: authHeaders(), signal: controller?.signal });
+      const body = await response.json();
+      if (!response.ok) throw normalizeError(response, body);
+      return body;
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        const timeoutErr = new Error('billing request timeout');
+        timeoutErr.code = 'billing_request_timeout';
+        throw timeoutErr;
+      }
+      throw err;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   };
 
   const readBlob = async (path) => {
-    const response = await fetchFn(path, { headers: authHeaders() });
-    if (!response.ok) {
-      let body = null;
-      try { body = await response.json(); } catch {}
-      throw normalizeError(response, body);
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), 30000) : null;
+    try {
+      const response = await fetchFn(path, { headers: authHeaders(), signal: controller?.signal });
+      if (!response.ok) {
+        let body = null;
+        try { body = await response.json(); } catch {}
+        throw normalizeError(response, body);
+      }
+      const disposition = response.headers.get('content-disposition') || '';
+      const filename = disposition.match(/filename=\"?([^\";]+)\"?/i)?.[1] || 'invoice.pdf';
+      return { blob: await response.blob(), contentType: response.headers.get('content-type') || 'application/octet-stream', filename };
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        const timeoutErr = new Error('billing request timeout');
+        timeoutErr.code = 'billing_request_timeout';
+        throw timeoutErr;
+      }
+      throw err;
+    } finally {
+      if (timer) clearTimeout(timer);
     }
-    const disposition = response.headers.get('content-disposition') || '';
-    const filename = disposition.match(/filename=\"?([^\";]+)\"?/i)?.[1] || 'invoice.pdf';
-    return { blob: await response.blob(), contentType: response.headers.get('content-type') || 'application/octet-stream', filename };
   };
 
   const write = async (path, payload, prefix, method = 'POST') => {
@@ -54,14 +92,28 @@ export function createBillingClient({
       throw error;
     }
     const key = requestKey(prefix);
-    const response = await fetchFn(path, {
-      method,
-      headers: headers({ 'idempotency-key': key }),
-      body: JSON.stringify({ actor: currentActor, idempotencyKey: key, ...payload }),
-    });
-    const body = await response.json();
-    if (!response.ok) throw normalizeError(response, body);
-    return body;
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), 30000) : null;
+    try {
+      const response = await fetchFn(path, {
+        method,
+        headers: headers({ 'idempotency-key': key }),
+        body: JSON.stringify({ actor: currentActor, idempotencyKey: key, ...payload }),
+        signal: controller?.signal,
+      });
+      const body = await response.json();
+      if (!response.ok) throw normalizeError(response, body);
+      return body;
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        const timeoutErr = new Error('billing request timeout');
+        timeoutErr.code = 'billing_request_timeout';
+        throw timeoutErr;
+      }
+      throw err;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   };
 
   return Object.freeze({
