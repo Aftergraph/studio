@@ -45,7 +45,7 @@ export async function compileIntent(
   source: string,
   target: ComposeTarget = 'auto',
   refinement?: string,
-  signal?: AbortSignal,
+  signal: AbortSignal | null = null,
 ): Promise<CompileResponse> {
   const response = await fetch('/api/v1/intent/compile', {
     method: 'POST',
