@@ -13,7 +13,11 @@ import {
   recordBillingActual,
   correctBillingActual,
   createBillingDraft,
+  createBillingCustomer,
+  updateBillingCustomer,
   issueBillingInvoice,
+  voidBillingInvoice,
+  recordBillingPayment,
   beginBillingDelivery,
   deliverBillingInvoice,
   failBillingDelivery,
@@ -29,11 +33,13 @@ function isBillingPath(pathname) {
   return pathname === '/api/v1/billing'
     || pathname === '/api/v1/billing/settings'
     || pathname === '/api/v1/billing/sync'
+    || pathname === '/api/v1/billing/customers'
     || pathname === '/api/v1/billing/actuals'
     || pathname === '/api/v1/billing/actuals/correct'
     || pathname === '/api/v1/billing/invoices/draft'
     || pathname === '/api/v1/billing/audit'
-    || /^\/api\/v1\/billing\/invoices\/[^/]+\/(issue|artifact|document|peppol-bis3|deliver)$/.test(pathname);
+    || /^\/api\/v1\/billing\/invoices\/[^/]+\/(issue|artifact|document|peppol-bis3|deliver|void|payment)$/.test(pathname)
+    || /^\/api\/v1\/billing\/customers\/[^/]+$/.test(pathname);
 }
 
 function projectBillingState(billing) {
@@ -235,6 +241,33 @@ export function decorateBillingServer(server, {
         return;
       }
 
+      if (url.pathname === '/api/v1/billing/customers' && req.method === 'POST') {
+        let customer;
+        const next = await store.mutate((draft) => {
+          const result = createBillingCustomer(draft.billing, {
+            id: body.id,
+            name: body.name,
+            address: body.address,
+            email: body.email,
+            countryCode: body.countryCode,
+            registrationId: body.registrationId,
+            registrationScheme: body.registrationScheme,
+            billing: body.billing,
+            actor,
+          });
+          draft.billing = result.billing;
+          customer = result.customer;
+          return draft;
+        });
+        actionGuard.complete(actionKey, { status: 'accepted', customerId: customer.id });
+        sendJson(res, 201, {
+          version: API_VERSION,
+          customer,
+          billing: projectBillingState(next.billing),
+        });
+        return;
+      }
+
       if (url.pathname === '/api/v1/billing/settings' && req.method === 'POST') {
         let settings;
         const next = await store.mutate((draft) => {
@@ -349,6 +382,83 @@ export function decorateBillingServer(server, {
           actionKey,
           actionGuard,
           res,
+        });
+        return;
+      }
+
+      const customerUpdateMatch = url.pathname.match(/^\/api\/v1\/billing\/customers\/([^/]+)$/);
+      if (customerUpdateMatch && req.method === 'PATCH') {
+        const customerId = decodeURIComponent(customerUpdateMatch[1]);
+        let customer;
+        const next = await store.mutate((draft) => {
+          const result = updateBillingCustomer(draft.billing, {
+            id: customerId,
+            name: body.name,
+            address: body.address,
+            email: body.email,
+            countryCode: body.countryCode,
+            registrationId: body.registrationId,
+            registrationScheme: body.registrationScheme,
+            billing: body.billing,
+            actor,
+          });
+          draft.billing = result.billing;
+          customer = result.customer;
+          return draft;
+        });
+        actionGuard.complete(actionKey, { status: 'accepted', customerId: customer.id });
+        sendJson(res, 200, {
+          version: API_VERSION,
+          customer,
+          billing: projectBillingState(next.billing),
+        });
+        return;
+      }
+
+      const voidMatch = url.pathname.match(/^\/api\/v1\/billing\/invoices\/([^/]+)\/void$/);
+      if (voidMatch && req.method === 'POST') {
+        const invoiceId = decodeURIComponent(voidMatch[1]);
+        let invoice;
+        const next = await store.mutate((draft) => {
+          const result = voidBillingInvoice(draft.billing, { invoiceId, actor, reason: body.reason });
+          draft.billing = result.billing;
+          invoice = result.invoice;
+          return draft;
+        });
+        actionGuard.complete(actionKey, { status: 'accepted', invoiceId: invoice.id, voided: true });
+        sendJson(res, 200, {
+          version: API_VERSION,
+          invoice,
+          billing: projectBillingState(next.billing),
+        });
+        return;
+      }
+
+      const paymentMatch = url.pathname.match(/^\/api\/v1\/billing\/invoices\/([^/]+)\/payment$/);
+      if (paymentMatch && req.method === 'POST') {
+        const invoiceId = decodeURIComponent(paymentMatch[1]);
+        let invoice;
+        let payment;
+        const next = await store.mutate((draft) => {
+          const result = recordBillingPayment(draft.billing, {
+            invoiceId,
+            amountMinor: body.amountMinor,
+            method: body.method,
+            reference: body.reference,
+            paidAt: body.paidAt,
+            actor,
+          });
+          draft.billing = result.billing;
+          invoice = result.invoice;
+          payment = result.payment;
+          return draft;
+        });
+        actionGuard.complete(actionKey, { status: 'accepted', invoiceId: invoice.id, paymentId: payment.id });
+        sendJson(res, 201, {
+          version: API_VERSION,
+          payment,
+          invoice,
+          billing: projectBillingState(next.billing),
         });
         return;
       }

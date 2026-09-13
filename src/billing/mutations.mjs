@@ -283,6 +283,191 @@ export function failBillingDelivery(billing, { invoiceId, errorCode, failedAt } 
   return { billing: next, invoice: clone(invoice) };
 }
 
+export function createBillingCustomer(billing, {
+  id,
+  name,
+  address,
+  email,
+  countryCode,
+  registrationId,
+  registrationScheme,
+  billing: billingInput,
+  actor,
+} = {}) {
+  const next = clone(billing);
+  const cleanId = String(id || '').trim();
+  if (!cleanId) throw codedError('customer_id_required');
+  if (!/^[\w-]+$/.test(cleanId)) throw codedError('invalid_customer_id_format');
+  const cleanName = String(name || '').trim();
+  if (!cleanName) throw codedError('customer_name_required');
+  if (next.customers.some((c) => c.id === cleanId)) {
+    const err = codedError('customer_id_conflict');
+    err.status = 409;
+    throw err;
+  }
+  const mode = billingInput?.mode;
+  if (!['per_visit', 'monthly_batch'].includes(mode)) throw codedError('invalid_billing_mode');
+  const rateMinor = Number(billingInput?.rateMinor);
+  if (!Number.isInteger(rateMinor) || rateMinor < 0) throw codedError('invalid_rate');
+  const currency = String(billingInput?.currency || '').trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(currency)) throw codedError('invalid_currency');
+  const paymentTermsDays = Number(billingInput?.paymentTermsDays);
+  if (!Number.isInteger(paymentTermsDays) || paymentTermsDays < 0) throw codedError('invalid_payment_terms');
+  const discountPercent = billingInput?.discountPercent;
+  if (discountPercent !== undefined
+    && (!Number.isFinite(discountPercent) || discountPercent < 0 || discountPercent > 100)) {
+    throw codedError('invalid_discount');
+  }
+  const customer = {
+    id: cleanId,
+    name: cleanName,
+    address: String(address || '').trim() || null,
+    email: String(email || '').trim() || null,
+    status: 'active',
+    billing: {
+      mode,
+      paymentTermsDays,
+      rateMinor,
+      currency,
+      ...(discountPercent !== undefined ? { discountPercent } : {}),
+    },
+    countryCode: String(countryCode || '').trim().toUpperCase() || null,
+    registrationId: String(registrationId || '').trim() || null,
+    registrationScheme: String(registrationScheme || '').trim() || null,
+    createdAt: new Date().toISOString(),
+    createdBy: actor ?? null,
+  };
+  next.customers.push(customer);
+  return { billing: next, customer: clone(customer) };
+}
+
+export function voidBillingInvoice(billing, { invoiceId, actor, reason } = {}) {
+  const next = clone(billing);
+  const invoice = next.invoices.find((entry) => entry.id === invoiceId);
+  if (!invoice) throw codedError('invoice_not_found', 'invoice not found', 404);
+  if (invoice.status === 'void') return { billing: next, invoice: clone(invoice), replayed: true };
+  const cleanReason = String(reason || '').trim();
+  if (!cleanReason) throw codedError('void_reason_required');
+  if (cleanReason.length > 1000) throw codedError('void_reason_too_long');
+  invoice.status = 'void';
+  invoice.voidedAt = new Date().toISOString();
+  invoice.voidedBy = actor ?? null;
+  invoice.voidReason = cleanReason;
+  next.auditLog ||= [];
+  next.auditLog.push({
+    id: `void-${randomUUID()}`,
+    type: 'billing.invoice.voided',
+    invoiceId,
+    actor: actor ?? null,
+    reason: cleanReason,
+    at: invoice.voidedAt,
+  });
+  return { billing: next, invoice: clone(invoice), replayed: false };
+}
+
+export function recordBillingPayment(billing, { invoiceId, amountMinor, method, reference, paidAt, actor } = {}) {
+  const next = clone(billing);
+  const invoice = next.invoices.find((entry) => entry.id === invoiceId);
+  if (!invoice) throw codedError('invoice_not_found', 'invoice not found', 404);
+  if (invoice.status === 'void') throw codedError('invoice_voided');
+  if (!Number.isInteger(amountMinor) || amountMinor <= 0) throw codedError('invalid_payment_amount');
+  const existingPayments = invoice.payments || [];
+  const totalPaid = existingPayments.reduce((sum, p) => sum + p.amountMinor, 0);
+  const outstanding = invoice.totalGrossMinor - totalPaid;
+  if (outstanding <= 0) throw codedError('invoice_fully_paid');
+  if (amountMinor > outstanding) throw codedError('payment_exceeds_outstanding');
+  const cleanMethod = String(method || '').trim();
+  if (!cleanMethod) throw codedError('payment_method_required');
+  const at = new Date(paidAt || new Date().toISOString());
+  if (Number.isNaN(at.getTime())) throw codedError('invalid_payment_date');
+  const payment = {
+    id: `pay-${randomUUID()}`,
+    amountMinor,
+    method: cleanMethod,
+    reference: String(reference || '').trim() || null,
+    paidAt: at.toISOString(),
+    recordedBy: actor ?? null,
+  };
+  invoice.payments = [...existingPayments, payment];
+  const newTotalPaid = totalPaid + amountMinor;
+  if (newTotalPaid >= invoice.totalGrossMinor) {
+    invoice.paidAt = at.toISOString();
+  }
+  next.auditLog ||= [];
+  next.auditLog.push({
+    id: `payment-${randomUUID()}`,
+    type: 'billing.payment.recorded',
+    invoiceId,
+    paymentId: payment.id,
+    amountMinor,
+    method: cleanMethod,
+    actor: actor ?? null,
+    at: payment.paidAt,
+  });
+  return { billing: next, invoice: clone(invoice), payment: clone(payment), replayed: false };
+}
+
+export function updateBillingCustomer(billing, {
+  id,
+  name,
+  address,
+  email,
+  countryCode,
+  registrationId,
+  registrationScheme,
+  billing: billingInput,
+  actor,
+} = {}) {
+  const next = clone(billing);
+  const cleanId = String(id || '').trim();
+  if (!cleanId) throw codedError('customer_id_required');
+  const index = next.customers.findIndex((c) => c.id === cleanId);
+  if (index === -1) throw codedError('customer_not_found', 'customer not found', 404);
+  const existing = next.customers[index];
+  const updated = clone(existing);
+  if (name !== undefined) {
+    const cleanName = String(name).trim();
+    if (!cleanName) throw codedError('customer_name_required');
+    updated.name = cleanName;
+  }
+  if (address !== undefined) updated.address = String(address).trim() || null;
+  if (email !== undefined) updated.email = String(email).trim() || null;
+  if (countryCode !== undefined) updated.countryCode = String(countryCode).trim().toUpperCase() || null;
+  if (registrationId !== undefined) updated.registrationId = String(registrationId).trim() || null;
+  if (registrationScheme !== undefined) updated.registrationScheme = String(registrationScheme).trim() || null;
+  if (billingInput !== undefined) {
+    if (billingInput.mode !== undefined) {
+      if (!['per_visit', 'monthly_batch'].includes(billingInput.mode)) throw codedError('invalid_billing_mode');
+      updated.billing.mode = billingInput.mode;
+    }
+    if (billingInput.rateMinor !== undefined) {
+      const rateMinor = Number(billingInput.rateMinor);
+      if (!Number.isInteger(rateMinor) || rateMinor < 0) throw codedError('invalid_rate');
+      updated.billing.rateMinor = rateMinor;
+    }
+    if (billingInput.currency !== undefined) {
+      const currency = String(billingInput.currency).trim().toUpperCase();
+      if (!/^[A-Z]{3}$/.test(currency)) throw codedError('invalid_currency');
+      updated.billing.currency = currency;
+    }
+    if (billingInput.paymentTermsDays !== undefined) {
+      const days = Number(billingInput.paymentTermsDays);
+      if (!Number.isInteger(days) || days < 0) throw codedError('invalid_payment_terms');
+      updated.billing.paymentTermsDays = days;
+    }
+    if (billingInput.discountPercent !== undefined) {
+      const disc = billingInput.discountPercent;
+      if (disc !== null && (!Number.isFinite(disc) || disc < 0 || disc > 100)) throw codedError('invalid_discount');
+      if (disc === null) delete updated.billing.discountPercent;
+      else updated.billing.discountPercent = disc;
+    }
+  }
+  updated.updatedAt = new Date().toISOString();
+  updated.updatedBy = actor ?? null;
+  next.customers[index] = updated;
+  return { billing: next, customer: clone(updated) };
+}
+
 export function updateBillingSettings(billing, {
   issuer = undefined,
   defaultServiceLabel = undefined,

@@ -631,6 +631,50 @@ function createApp() {
     setTimeout(() => $('#billing-issue-date', els.review)?.focus(), 0);
   }
 
+  function handleNewInvoiceSelect(form) {
+    const data = new FormData(form);
+    const customerId = String(data.get('customerId') || '').trim();
+    if (!customerId) {
+      showFormError(form, 'Vælg en kunde.');
+      return;
+    }
+    const account = customer(customerId);
+    if (!account) {
+      showFormError(form, 'Kunden findes ikke.');
+      return;
+    }
+    // Find projection items for this customer that are ready
+    const readyItems = projection().items.filter(
+      (item) => item.customerId === customerId && item.status === 'ready',
+    );
+    if (!readyItems.length) {
+      showFormError(form, 'Ingen besøg klar til fakturering for denne kunde. Registrér actuals først.');
+      return;
+    }
+    // Use the first ready item to enter the existing review/draft flow
+    showFormError(form);
+    closeDialog();
+    openReview(readyItems[0]);
+  }
+
+  function openNewInvoice() {
+    if (state.busy || !canMutate()) return toast('Kræver online og aktuelle data');
+    state.activeItem = null;
+    state.activeInvoice = null;
+    const customers = (state.billing?.customers || []).filter((c) => c.status === 'active');
+    const options = customers.map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
+    els.reviewKicker.textContent = 'Ny faktura';
+    els.reviewTitle.textContent = 'Opret ny faktura';
+    els.reviewBody.innerHTML = `<form id="billing-new-invoice-form" class="billing-form" aria-describedby="billing-new-invoice-error">
+      <div class="billing-field"><label for="billing-new-customer">Vælg kunde</label><select id="billing-new-customer" name="customerId" required>${options}</select></div>
+      <p class="billing-form-help">Vælg en eksisterende kunde for at oprette en fakturakladde. Besøg uden actuals vises ikke.</p>
+      <p id="billing-new-invoice-error" class="billing-form-error" role="alert" hidden></p>
+      <div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Annuller</button><button type="submit" class="billing-primary-button">Fortsæt</button></div>
+    </form>`;
+    openDialog();
+    setTimeout(() => $('#billing-new-customer', els.review)?.focus(), 0);
+  }
+
   function openCompanySettings() {
     if (state.busy || !canMutate()) return toast('Kræver online og aktuelle data');
     const settings = state.billing?.settings || {};
@@ -958,6 +1002,7 @@ function createApp() {
     const action = event.target.closest('[data-action]');
     if (!action) return;
     if (action.dataset.action === 'close-review') return closeDialog();
+    if (action.dataset.action === 'new-invoice') return openNewInvoice();
     if (action.dataset.action === 'company-settings') return openCompanySettings();
     if (action.dataset.action === 'review') {
       const item = findItem(action.dataset.key);
@@ -992,6 +1037,9 @@ function createApp() {
     } else if (event.target.id === 'billing-company-form') {
       event.preventDefault();
       saveCompanySettings(event.target);
+    } else if (event.target.id === 'billing-new-invoice-form') {
+      event.preventDefault();
+      handleNewInvoiceSelect(event.target);
     }
   });
 

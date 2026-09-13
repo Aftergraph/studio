@@ -47,7 +47,7 @@ export function createBillingClient({
     return { blob: await response.blob(), contentType: response.headers.get('content-type') || 'application/octet-stream', filename };
   };
 
-  const write = async (path, payload, prefix) => {
+  const write = async (path, payload, prefix, method = 'POST') => {
     if (!currentActor) {
       const error = new Error('billing session actor required');
       error.code = 'authentication_required';
@@ -55,7 +55,7 @@ export function createBillingClient({
     }
     const key = requestKey(prefix);
     const response = await fetchFn(path, {
-      method: 'POST',
+      method,
       headers: headers({ 'idempotency-key': key }),
       body: JSON.stringify({ actor: currentActor, idempotencyKey: key, ...payload }),
     });
@@ -100,6 +100,32 @@ export function createBillingClient({
     },
     deliverInvoice(invoiceId) {
       return write(`/api/v1/billing/invoices/${encodeURIComponent(invoiceId)}/deliver`, {}, 'billing-deliver');
+    },
+    createCustomer({ id, name, address, email, countryCode, registrationId, registrationScheme, billing }) {
+      return write('/api/v1/billing/customers', {
+        id,
+        name,
+        address,
+        email,
+        countryCode,
+        registrationId,
+        registrationScheme,
+        billing,
+      }, 'billing-customer');
+    },
+    updateCustomer(customerId, updates) {
+      return write(`/api/v1/billing/customers/${encodeURIComponent(customerId)}`, updates, 'billing-customer-update', 'PATCH');
+    },
+    voidInvoice(invoiceId, reason) {
+      return write(`/api/v1/billing/invoices/${encodeURIComponent(invoiceId)}/void`, { reason }, 'billing-void');
+    },
+    recordPayment(invoiceId, { amountMinor, method, reference, paidAt }) {
+      return write(`/api/v1/billing/invoices/${encodeURIComponent(invoiceId)}/payment`, {
+        amountMinor,
+        method,
+        reference,
+        paidAt,
+      }, 'billing-payment');
     },
     updateSettings(settings) {
       return write('/api/v1/billing/settings', settings, 'billing-settings');
