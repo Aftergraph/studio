@@ -92,6 +92,24 @@ http://127.0.0.1:8000
 
 No `npm install` is required for the core web/runtime reference.
 
+## Compose device stack
+
+The device command validates the dedicated local Hermes Compose API, starts only the Studio and Expo children owned by this command, and cleans up only those children on exit. With no `--host`, it discovers the current Tailscale IPv4 address:
+
+```bash
+npm run compose:dev
+```
+
+Use a deterministic plan without starting anything:
+
+```bash
+npm run compose:dev -- --dry-run --host 100.64.0.7
+```
+
+Defaults are Hermes `8643`, Studio `8000`, and Expo `8081`; override them with `--hermes-port`, `--studio-port`, and `--expo-port`. Hermes remains loopback-only at `http://127.0.0.1:8643`. The mobile child receives only `EXPO_PUBLIC_AFTERGRAPH_API_URL`; provider credentials stay backend-only and are never printed.
+
+The command checks for duplicate ports and refuses ports occupied by unrelated processes before starting a child.
+
 ## Verification
 
 ```bash
