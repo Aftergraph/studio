@@ -32,6 +32,7 @@ function isBillingPath(pathname) {
     || pathname === '/api/v1/billing/actuals'
     || pathname === '/api/v1/billing/actuals/correct'
     || pathname === '/api/v1/billing/invoices/draft'
+    || pathname === '/api/v1/billing/audit'
     || /^\/api\/v1\/billing\/invoices\/[^/]+\/(issue|artifact|document|peppol-bis3|deliver)$/.test(pathname);
 }
 
@@ -184,6 +185,35 @@ export function decorateBillingServer(server, {
     const body = await readJson(req);
     if (!body?.actor) throw actorError('actor_required', 422);
     const { actor, store } = await resolveScope(req, url, body.actor);
+
+    // Audit log endpoint: fire-and-forget logging of destructive actions
+    if (url.pathname === '/api/v1/billing/audit' && req.method === 'POST') {
+      const capability = 'billing.manage';
+      try { assertActorCapability({ state: store.snapshot(), actor, capability, users }); }
+      catch { throw actorError('forbidden', 403); }
+      const entry = {
+        actor,
+        action: body.action || 'unknown',
+        timestamp: new Date().toISOString(),
+        details: body.details || {},
+        invoiceId: body.invoiceId || null,
+        invoiceNumber: body.invoiceNumber || null,
+      };
+      // Append to billing.auditLog array in store
+      await store.mutate((draft) => {
+        if (!draft.billing) draft.billing = {};
+        if (!Array.isArray(draft.billing.auditLog)) draft.billing.auditLog = [];
+        draft.billing.auditLog.push(entry);
+        // Keep last 1000 entries to prevent unbounded growth
+        if (draft.billing.auditLog.length > 1000) {
+          draft.billing.auditLog = draft.billing.auditLog.slice(-1000);
+        }
+        return draft;
+      });
+      sendJson(res, 200, { ok: true });
+      return;
+    }
+
     const capability = url.pathname === '/api/v1/billing/sync'
       ? 'billing.sync'
       : url.pathname === '/api/v1/billing/actuals/correct'

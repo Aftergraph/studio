@@ -440,8 +440,9 @@ button {
 }
 
 .billing-icon-button {
-  width: 40px;
-  min-width: 40px;
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
   padding: 0;
   background: transparent;
   color: var(--text-2);
@@ -764,7 +765,7 @@ button {
   }
 
   .billing-review {
-    width: 100vw;
+    width: 100%;
     max-width: none;
     height: min(88vh, 780px);
     max-height: none;

@@ -112,5 +112,8 @@ export function createBillingClient({
       const suffix = currentActor ? `?actor=${encodeURIComponent(currentActor)}` : '';
       return readBlob(`/api/v1/billing/invoices/${encodeURIComponent(invoiceId)}/peppol-bis3${suffix}`);
     },
+    logAudit(payload) {
+      return write('/api/v1/billing/audit', payload, 'billing-audit');
+    },
   });
 }

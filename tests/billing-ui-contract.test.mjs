@@ -216,3 +216,32 @@ test('issued invoice review exposes structured e-invoice export without replacin
   assert.match(source, /dataset\.action = 'peppol'/);
   assert.match(source, /Peppol/);
 });
+
+test('R-014: form fields bind aria-invalid and aria-describedby when validation errors exist', async () => {
+  const source = await text('src/billing/billing-app.mjs');
+  assert.match(source, /aria-invalid/);
+  assert.match(source, /setAttribute\('aria-invalid',\s*'true'\)/);
+  assert.match(source, /removeAttribute\('aria-invalid'\)/);
+  assert.match(source, /setAttribute\('aria-describedby',\s*error\.id\)/);
+  assert.match(source, /R-014.*aria-invalid/i);
+});
+
+test('R-015: toast auto-dismiss pauses on hover/focus and resumes on leave/blur', async () => {
+  const source = await text('src/billing/billing-app.mjs');
+  assert.match(source, /mouseenter.*pauseToast|pauseToast.*mouseenter/s);
+  assert.match(source, /mouseleave.*resumeToast|resumeToast.*mouseleave/s);
+  assert.match(source, /focusin.*pauseToast|pauseToast.*focusin/s);
+  assert.match(source, /focusout.*resumeToast|resumeToast.*focusout/s);
+  assert.match(source, /toastPaused/);
+  assert.match(source, /toastRemainingMs/);
+  assert.match(source, /R-015.*pause.*toast/i);
+});
+
+test('R-016: offline indicator persists via native online/offline event listeners', async () => {
+  const source = await text('src/billing/billing-app.mjs');
+  assert.match(source, /addEventListener\('online'/);
+  assert.match(source, /addEventListener\('offline'/);
+  assert.match(source, /navigator\.onLine/);
+  assert.match(source, /renderConnection/);
+  assert.match(source, /R-016.*online.*offline/i);
+});

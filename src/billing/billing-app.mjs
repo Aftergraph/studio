@@ -210,9 +210,44 @@ function createApp() {
 
   function toast(message) {
     clearTimeout(state.toastTimer);
+    toastPaused = false;
+    toastRemainingMs = 2400;
+    toastStartedAt = Date.now();
     els.toast.textContent = message;
     els.toast.classList.add('is-visible');
-    state.toastTimer = setTimeout(() => els.toast.classList.remove('is-visible'), 2400);
+    state.toastTimer = setTimeout(() => {
+      els.toast.classList.remove('is-visible');
+      toastRemainingMs = 2400;
+    }, 2400);
+  }
+
+  // R-015: Pause toast auto-dismiss on hover/focus, resume on leave/blur
+  let toastPaused = false;
+  let toastRemainingMs = 2400;
+  let toastStartedAt = 0;
+
+  function pauseToast() {
+    if (!els.toast.classList.contains('is-visible') || toastPaused) return;
+    toastPaused = true;
+    clearTimeout(state.toastTimer);
+    toastRemainingMs = Math.max(0, toastRemainingMs - (Date.now() - toastStartedAt));
+  }
+
+  function resumeToast() {
+    if (!toastPaused || !els.toast.classList.contains('is-visible')) return;
+    toastPaused = false;
+    toastStartedAt = Date.now();
+    state.toastTimer = setTimeout(() => {
+      els.toast.classList.remove('is-visible');
+      toastRemainingMs = 2400;
+    }, toastRemainingMs);
+  }
+
+  if (els.toast) {
+    els.toast.addEventListener('mouseenter', pauseToast);
+    els.toast.addEventListener('mouseleave', resumeToast);
+    els.toast.addEventListener('focusin', pauseToast);
+    els.toast.addEventListener('focusout', resumeToast);
   }
 
   function showFormError(form, message = '') {
@@ -220,6 +255,20 @@ function createApp() {
     if (!error) return;
     error.textContent = message;
     error.hidden = !message;
+    // R-014: Bind aria-invalid and aria-describedby to form fields when errors exist
+    const fields = form.querySelectorAll('input, textarea, select');
+    fields.forEach((field) => {
+      if (message) {
+        field.setAttribute('aria-invalid', 'true');
+        field.setAttribute('aria-describedby', error.id);
+      } else {
+        field.removeAttribute('aria-invalid');
+        // Only remove aria-describedby if it points to this error element
+        if (field.getAttribute('aria-describedby') === error.id) {
+          field.removeAttribute('aria-describedby');
+        }
+      }
+    });
   }
 
   function connection(text, kind = '') {
@@ -287,48 +336,58 @@ function createApp() {
   }
 
   function renderSummary() {
-    const summary = projection().summary || {};
-    const readyItems = projection().items.filter((item) => item.status === 'ready');
-    const readyTotal = readyItems.reduce((sum, item) => sum + (preview(item)?.totalGrossMinor || 0), 0);
-    const currency = readyItems.length ? customer(readyItems[0].customerId)?.billing?.currency || 'DKK' : 'DKK';
-    els.summary.innerHTML = `
-      <article class="billing-summary-item is-primary"><span class="billing-summary-label">Klar nu</span><strong class="billing-summary-value">${esc(formatMoney(readyTotal, currency, locale()))}</strong><span class="billing-summary-detail">${summary.ready || 0} klar</span></article>
-      <article class="billing-summary-item"><span class="billing-summary-label">Venter</span><strong class="billing-summary-value">${summary.waiting || 0}</strong><span class="billing-summary-detail">senere i perioden</span></article>
-      <article class="billing-summary-item"><span class="billing-summary-label">Mangler</span><strong class="billing-summary-value">${summary.needsInfo || 0}</strong><span class="billing-summary-detail">kræver handling</span></article>
-      <article class="billing-summary-item"><span class="billing-summary-label">Faktureret</span><strong class="billing-summary-value">${summary.invoiced || 0}</strong><span class="billing-summary-detail">dubletbeskyttet</span></article>`;
+    try {
+      const summary = projection().summary || {};
+      const readyItems = projection().items.filter((item) => item.status === 'ready');
+      const readyTotal = readyItems.reduce((sum, item) => sum + (preview(item)?.totalGrossMinor || 0), 0);
+      const currency = readyItems.length ? customer(readyItems[0].customerId)?.billing?.currency || 'DKK' : 'DKK';
+      els.summary.innerHTML = `
+        <article class="billing-summary-item is-primary"><span class="billing-summary-label">Klar nu</span><strong class="billing-summary-value">${esc(formatMoney(readyTotal, currency, locale()))}</strong><span class="billing-summary-detail">${summary.ready || 0} klar</span></article>
+        <article class="billing-summary-item"><span class="billing-summary-label">Venter</span><strong class="billing-summary-value">${summary.waiting || 0}</strong><span class="billing-summary-detail">senere i perioden</span></article>
+        <article class="billing-summary-item"><span class="billing-summary-label">Mangler</span><strong class="billing-summary-value">${summary.needsInfo || 0}</strong><span class="billing-summary-detail">kræver handling</span></article>
+        <article class="billing-summary-item"><span class="billing-summary-label">Faktureret</span><strong class="billing-summary-value">${summary.invoiced || 0}</strong><span class="billing-summary-detail">dubletbeskyttet</span></article>`;
+    } catch (err) {
+      console.error('renderSummary failed', err);
+      els.summary.innerHTML = '<div class="billing-error"><strong>Fejl i oversigt.</strong><br>Kunne ikke vise faktureringsoversigten.</div>';
+    }
   }
 
   function renderList() {
-    const [label, contextText] = VIEWS[state.view];
-    els.title.textContent = label;
-    els.context.textContent = contextText;
-    $$('.billing-tab').forEach((tab) => {
-      const selected = tab.dataset.view === state.view;
-      tab.classList.toggle('is-active', selected);
-      tab.setAttribute('aria-selected', String(selected));
-    });
-    const summary = projection().summary || {};
-    const counts = {
-      inbox: (summary.needsInfo || 0) + (summary.ready || 0) + (summary.waiting || 0),
-      ready: summary.ready || 0, waiting: summary.waiting || 0,
-      needs_info: summary.needsInfo || 0, invoiced: summary.invoiced || 0,
-    };
-    Object.entries(counts).forEach(([key, value]) => {
-      const node = $(`[data-count="${key}"]`);
-      if (node) node.textContent = String(value);
-    });
-    const items = itemsForBillingView(projection().items || [], state.view);
-    if (!items.length) {
-      els.list.innerHTML = '<div class="billing-empty">Ingen poster i denne visning.</div>';
-      return;
+    try {
+      const [label, contextText] = VIEWS[state.view];
+      els.title.textContent = label;
+      els.context.textContent = contextText;
+      $$('.billing-tab').forEach((tab) => {
+        const selected = tab.dataset.view === state.view;
+        tab.classList.toggle('is-active', selected);
+        tab.setAttribute('aria-selected', String(selected));
+      });
+      const summary = projection().summary || {};
+      const counts = {
+        inbox: (summary.needsInfo || 0) + (summary.ready || 0) + (summary.waiting || 0),
+        ready: summary.ready || 0, waiting: summary.waiting || 0,
+        needs_info: summary.needsInfo || 0, invoiced: summary.invoiced || 0,
+      };
+      Object.entries(counts).forEach(([key, value]) => {
+        const node = $(`[data-count="${key}"]`);
+        if (node) node.textContent = String(value);
+      });
+      const items = itemsForBillingView(projection().items || [], state.view);
+      if (!items.length) {
+        els.list.innerHTML = '<div class="billing-empty">Ingen poster i denne visning.</div>';
+        return;
+      }
+      els.list.innerHTML = items.map((item) => `
+        <article class="billing-row" data-status="${esc(item.status)}">
+          <div class="billing-row-main"><h3 class="billing-row-name"><span class="billing-status-dot" aria-hidden="true"></span>${esc(item.customerName)}</h3><div class="billing-row-subtitle">${esc(subtitleFor(item))}</div></div>
+          <div class="billing-row-meta"><strong>${esc(amountFor(item))}</strong><small>${item.visitIds?.length || 0} besøg</small></div>
+          <div class="billing-row-reason"><strong>${esc(REASONS[item.reasonCode] || 'Kræver gennemgang')}</strong>${esc(detailFor(item))}</div>
+          <div class="billing-row-action">${actionFor(item)}</div>
+        </article>`).join('');
+    } catch (err) {
+      console.error('renderList failed', err);
+      els.list.innerHTML = '<div class="billing-error"><strong>Fejl i listen.</strong><br>Kunne ikke vise faktureringsposterne.</div>';
     }
-    els.list.innerHTML = items.map((item) => `
-      <article class="billing-row" data-status="${esc(item.status)}">
-        <div class="billing-row-main"><h3 class="billing-row-name"><span class="billing-status-dot" aria-hidden="true"></span>${esc(item.customerName)}</h3><div class="billing-row-subtitle">${esc(subtitleFor(item))}</div></div>
-        <div class="billing-row-meta"><strong>${esc(amountFor(item))}</strong><small>${item.visitIds?.length || 0} besøg</small></div>
-        <div class="billing-row-reason"><strong>${esc(REASONS[item.reasonCode] || 'Kræver gennemgang')}</strong>${esc(detailFor(item))}</div>
-        <div class="billing-row-action">${actionFor(item)}</div>
-      </article>`).join('');
   }
 
   function render() {
@@ -529,17 +588,22 @@ function createApp() {
   }
 
   function renderReview() {
-    const item = state.activeItem;
-    const projected = item ? preview(item) : null;
-    const account = item ? customer(item.customerId) : null;
-    if (!item || !projected || !account) {
-      els.reviewBody.innerHTML = '<div class="billing-error"><strong>Kan ikke danne fakturakladde.</strong><br>Nødvendige actuals eller prisoplysninger mangler.</div>';
-      return;
+    try {
+      const item = state.activeItem;
+      const projected = item ? preview(item) : null;
+      const account = item ? customer(item.customerId) : null;
+      if (!item || !projected || !account) {
+        els.reviewBody.innerHTML = '<div class="billing-error"><strong>Kan ikke danne fakturakladde.</strong><br>Nødvendige actuals eller prisoplysninger mangler.</div>';
+        return;
+      }
+      els.reviewKicker.textContent = state.activeInvoice ? 'Faktura' : 'Fakturakladde';
+      els.reviewTitle.textContent = state.activeInvoice?.status === 'emailed' ? 'Faktura sendt' : state.activeInvoice?.status === 'issued' ? 'Faktura udstedt' : 'Gennemgå faktura';
+      els.reviewBody.innerHTML = `<section class="billing-review-customer"><h3>${esc(account.name)}</h3><p>${item.visitIds.length} besøg</p></section><section class="billing-review-lines" aria-label="Fakturalinjer">${lineHtml(item, projected)}</section><section class="billing-totals" aria-label="Fakturatotaler">${projected.discountMinor ? `<div class="billing-total-row"><span>Rabat</span><span>−${esc(formatMoney(projected.discountMinor, projected.currency, locale()))}</span></div>` : ''}<div class="billing-total-row"><span>Ekskl. moms</span><span>${esc(formatMoney(projected.totalNetMinor, projected.currency, locale()))}</span></div><div class="billing-total-row"><span>Moms</span><span>${esc(formatMoney(projected.taxMinor, projected.currency, locale()))}</span></div><div class="billing-total-row is-total"><span>I alt</span><span>${esc(formatMoney(projected.totalGrossMinor, projected.currency, locale()))}</span></div></section>${controlsHtml()}`;
+      appendPeppolControl();
+    } catch (err) {
+      console.error('renderReview failed', err);
+      els.reviewBody.innerHTML = '<div class="billing-error"><strong>Fejl i fakturagennemgang.</strong><br>Kunne ikke vise fakturadetaljerne.</div>';
     }
-    els.reviewKicker.textContent = state.activeInvoice ? 'Faktura' : 'Fakturakladde';
-    els.reviewTitle.textContent = state.activeInvoice?.status === 'emailed' ? 'Faktura sendt' : state.activeInvoice?.status === 'issued' ? 'Faktura udstedt' : 'Gennemgå faktura';
-    els.reviewBody.innerHTML = `<section class="billing-review-customer"><h3>${esc(account.name)}</h3><p>${item.visitIds.length} besøg</p></section><section class="billing-review-lines" aria-label="Fakturalinjer">${lineHtml(item, projected)}</section><section class="billing-totals" aria-label="Fakturatotaler">${projected.discountMinor ? `<div class="billing-total-row"><span>Rabat</span><span>−${esc(formatMoney(projected.discountMinor, projected.currency, locale()))}</span></div>` : ''}<div class="billing-total-row"><span>Ekskl. moms</span><span>${esc(formatMoney(projected.totalNetMinor, projected.currency, locale()))}</span></div><div class="billing-total-row"><span>Moms</span><span>${esc(formatMoney(projected.taxMinor, projected.currency, locale()))}</span></div><div class="billing-total-row is-total"><span>I alt</span><span>${esc(formatMoney(projected.totalGrossMinor, projected.currency, locale()))}</span></div></section>${controlsHtml()}`;
-    appendPeppolControl();
   }
 
   function appendPeppolControl() {
@@ -648,6 +712,14 @@ function createApp() {
     }
   }
 
+  async function logAudit(action, details = {}) {
+    try {
+      await client.logAudit({ action, ...details });
+    } catch (err) {
+      console.warn('billing audit log failed', action, err);
+    }
+  }
+
   async function issueInvoice(id, button) {
     if (!id || state.busy || !canMutate()) return;
     const confirmed = await showConfirmDialog('Udsted faktura? Denne handling kan ikke fortrydes.');
@@ -663,6 +735,7 @@ function createApp() {
       render();
       renderReview();
       toast(`Faktura ${body.invoice.number} er udstedt`);
+      void logAudit('issue_invoice', { invoiceId: id, invoiceNumber: body.invoice.number });
     } catch {
       button.disabled = false;
       toast('Kunne ikke udstede faktura');
@@ -732,6 +805,7 @@ function createApp() {
       render();
       renderReview();
       toast(`Faktura ${body.invoice.number} er sendt`);
+      void logAudit('deliver_invoice', { invoiceId: id, invoiceNumber: body.invoice.number });
     } catch (error) {
       toast(error.code === 'delivery_provider_unavailable' ? 'Ingen leveringsprovider er konfigureret' : 'Levering fejlede. Fakturaen er ikke markeret som sendt.');
       await refresh();
@@ -927,6 +1001,18 @@ function createApp() {
     render();
     if (state.online !== wasOnline) void refresh();
   });
+
+  // R-016: Native online/offline event listeners for persistent offline indicator
+  if (typeof navigator !== 'undefined') {
+    const handleConnectivityChange = () => {
+      const wasOnline = state.online;
+      state.online = navigator.onLine !== false;
+      renderConnection();
+      if (state.online !== wasOnline) void refresh();
+    };
+    window.addEventListener('online', handleConnectivityChange);
+    window.addEventListener('offline', handleConnectivityChange);
+  }
 
   window.addEventListener('storage', (event) => {
     if (event.key !== AUTH_TOKEN_KEY) return;
