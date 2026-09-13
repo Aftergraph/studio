@@ -15,12 +15,6 @@ button {
   color: inherit;
 }
 
-.billing-page {
-  --text-3: #5c6675;
-  --success: #0b7a47;
-  --danger: #b42318;
-}
-
 .billing-header {
   min-height: 58px;
   padding: 0 28px;

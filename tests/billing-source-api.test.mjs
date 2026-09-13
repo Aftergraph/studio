@@ -101,7 +101,7 @@ test('billing.manage alone cannot perform source sync', async () => {
 test('billing.sync producer can target its assigned company workspace without gaining billing.manage', async () => {
   const owner = `billing-owner-${Date.now()}`;
   const worker = `${owner}-renos`;
-  createUser({ id: owner, name: owner, role: 'owner', capabilities: ['billing.manage'] });
+  createUser({ id: owner, name: owner, role: 'owner', capabilities: ['billing.manage', 'billing.read'] });
   createUser({ id: worker, name: worker, role: 'integration', workspaceId: owner, capabilities: ['billing.sync'] });
   await withProductionServer(async (base, secret) => {
     const workerToken = issueMagicToken({ userId: worker, secret });

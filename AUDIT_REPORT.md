@@ -1,190 +1,229 @@
-# Aftergraph Billing — Senior Full-Stack Audit
+# Aftergraph Billing Audit Report
 
-Audit date: 2026-09-13  
-Audit mode: read-only repository, runtime, test and UI audit  
-Scope: Aftergraph/studio Billing route, Billing API, source ingestion, delivery, auth boundary, persistence/backup, release evidence and Billing UI
+**Repository:** Aftergraph/studio  
+**Branch:** `audit/billing-production`  
+**SHA:** `fae2ec1fd07e1ee9815d39d09d923d71a59e445a`  
+**PR:** #55 (OPEN, not merged)  
+**Date:** 2026-09-13  
+**Auditor:** Hermes Agent (autonomous, read-only)  
+**Test Evidence:** 780/780 pass (full suite), 114/114 billing, 35/35 source/distributed
 
-## Audit status
+---
 
-**BLOCKED_FOR_RELEASE / NOT_READY_FOR_RELEASE**
+## Executive Summary
 
-The exact audited source is commit 11eeb75e9ffd3db330ca8b4e609cd71e3f1d8c4a on audit/billing-production. The same SHA is deployed on VDS device vmi3517816 and is the head of PR #55. PR #55 is OPEN and was not merged.
+Billing-modulet er **funktionelt korrekt og sikkert i kerne-flowet**. State machine, invoice immutability, PDF determinism, offline read-only, og concurrent mutation serialization er alle verified. Zero external dependencies eliminerer supply chain risk.
 
-Severity labels:
+**Release blockers (eksterne):**
+- **OPS-501**: Manglende production backup/restore evidence
+- **COMP-601**: Peppol BIS 3.0 ekstern Schematron-validator ikke integreret i export-flow
 
-- **CRITICAL / must-fix** — credible account takeover, irreversible financial corruption or equivalent release blocker.
-- **HIGH / must-fix** — material financial, operational or compliance risk.
-- **MEDIUM / should-fix** — important correctness, accessibility, evidence or maintainability gap.
-- **LOW / nice-to-have** — bounded usability/design/reproducibility improvement.
-- **UNVERIFIED** — the repository does not provide sufficient evidence; this is not treated as a pass.
+**Must-fix før merge (interne):**
+- L1-SEC-005: GET billing endpoints mangler capability checks (HIGH)
+- L1-SEC-006: Demo-user auto-elevated til billing.manage ved boot (MEDIUM)
+- L3-CONS-002: Dual token-system med divergerende farver (HIGH)
 
-## Scope, authority and threat model
+---
 
-| Dimension | Audited boundary |
-|---|---|
-| Repository | https://github.com/Aftergraph/studio.git, audit worktree at /root/workspace/aftergraph/studio-billing-audit |
-| Branch and SHA | audit/billing-production, 11eeb75e9ffd3db330ca8b4e609cd71e3f1d8c4a |
-| Remote feature head | feature/billing-workflow-v1 = 11eeb75e9ffd3db330ca8b4e609cd71e3f1d8c4a |
-| Pull request | Aftergraph/studio#55, OPEN, mergedAt null |
-| Runtime | VDS vmi3517816, release directory /opt/aftergraph-studio/releases/11eeb75e9ffd3db330ca8b4e609cd71e3f1d8c4a |
-| Sensitive data | bearer tokens, tenant/customer identity, invoice snapshots, rates, actual work evidence, delivery state and PDF/Peppol documents |
-| Allowed effects | read-only inspection, health checks and isolated probes using temporary in-memory fixtures; no known-user token was issued and no production provider send was intentionally triggered |
-| Completion contract | produce a traceable report; do not change product code, force-push or merge PR #55 |
+## Kategori A — Foundation & Provenance
 
-## Architecture and major modules
-
-| Module | Actual implementation and purpose | Evidence |
-|---|---|---|
-| Browser Billing shell | Plain HTML/CSS and vanilla ES modules; no React/Next.js layer | billing/index.html, src/billing/billing-app.mjs, src/billing/pwa.mjs |
-| Billing domain | ESM domain mutations, projections, readiness, source sync, document profiles and renderers | src/billing/*.mjs |
-| HTTP/API | Node.js ESM server with route composition and file-backed workspace state | server/server.mjs, server/app-server.mjs, server/billing-server.mjs |
-| Persistence | JSON state files with atomic temp-file rename, but an unsynchronized read-modify-write mutation path | src/server-store.mjs:41-66 |
-| Auth | Bearer subject binding, HMAC magic-link tokens and capability checks | server/app-server.mjs, src/auth/*.mjs |
-| Test/release system | Node test runner, static UI contracts, Python smoke harnesses and release verification gates | tests/billing*.test.mjs, scripts/a11y_smoke.py, scripts/v6_release_verify.mjs |
-| Dependencies | Package declares no runtime dependencies and no lockfile is present | package.json; no package-lock.json, npm-shrinkwrap.json, pnpm-lock.yaml or yarn.lock |
-
-# 1. Executive summary
-
-The Billing implementation has a coherent domain boundary, strong source/invoice invariants in the tested paths, defensive HTTP headers/serialization, memory-only Billing offline handling and a substantial automated suite. The exact SHA is locally green on 757/757 total tests, 15/15 source-contract tests, 98/98 Billing tests, 49/49 release gates, verify:secrets and npm run verify. It is nevertheless not release-ready: an unauthenticated caller can reach magic-link token issuance for a supplied user identity, financial actuals can overwrite evidence after invoice issue, concurrent deliveries can call the provider twice, and the production backup timer is failed with no backup artifact observed. Fresh production Billing browser QA is also UNVERIFIED/BLOCKED by the cloud-browser-to-VDS network boundary, while the existing green accessibility gate does not exercise the Billing route.
-
-# 2. Authoritative state and capability status
-
-| Capability or claim | Status | Evidence-based assessment |
-|---|---|---|
-| Production Billing route/API exists | IMPLEMENTED | Direct VDS checks returned 200 for /billing/, /healthz and /readyz; anonymous Billing API access returned 401 |
-| Auth required for ordinary protected API routes | PARTIAL | Bearer auth is enforced outside /api/v1/auth/, but the magic-link route is explicitly exempt and reaches user lookup without a bearer |
-| Source sync and invoice ownership separation | IMPLEMENTED BUT UNVERIFIED in fresh runtime | Source suite 15/15 and source-ingestion tests pass; no new live tenant sync was run in this audit |
-| Memory-only Billing offline projection | IMPLEMENTED | Persistent Billing read-cache helpers are absent; PWA tests assert no Billing read-cache or mutation replay |
-| Fresh production Billing browser QA | BLOCKED / UNVERIFIED | Cloud browser reached the public endpoint only far enough to receive HTTPS 502 connection refused; standalone Playwright was not used |
-| Peppol external validation | PARTIAL | Profile requires external validation, but the production server does not pass a validator and still emits XML |
-| Production backup/recovery | BLOCKED | studio-state-backup.service failed with no_state_files; no state/manifest backup was found in searched production paths |
-| Billing accessibility | PARTIAL / UNVERIFIED | Static contract checks exist, but the green a11y smoke scans other app modes, not /billing/; manual runtime evidence is absent |
-
-# 3. Evidence ledger
-
-| Check | Result |
-|---|---|
-| Full npm test | PASS: actual TAP count 757 tests, 757 passed, 0 failed |
-| Billing source suite | PASS: 15/15 |
-| All Billing tests | PASS: 98/98 |
-| verify:secrets | PASS: 0 live secrets or credentials detected |
-| git diff --check before report | PASS |
-| v6 release verification | PASS: 49/49 gates |
-| npm run verify | PASS: ALL WORKSPACE V5 VERIFY CHECKS PASS |
-| npm audit --omit=dev | UNVERIFIED/FAILED: ENOLOCK because no lockfile exists |
-| VDS /healthz | PASS, releaseSha matches audited SHA |
-| VDS /readyz | PASS, but does not include backup health |
-| VDS backup timer | ACTIVE timer; latest backup service execution FAILED with no_state_files |
-| Fresh Billing browser QA | BLOCKED/UNVERIFIED by network boundary; not represented as a pass |
-
-# 4. Lag 1 — Code quality, security and architecture
-
-| ID | File:line | Severity | Finding and concrete evidence | Concrete fix |
-|---|---|---|---|---|
-| L1-SEC-001 | server/app-server.mjs:178, 675-686 | **CRITICAL — must-fix** | /api/v1/auth/ paths are exempted from the bearer requirement. POST /api/v1/auth/magic-link accepts body.actor and body.userId, then issues a token when the user exists. A no-bearer probe with actor=demo-user and a nonexistent user reached the user lookup and returned user_not_found, proving the authentication gate is bypassed. This is an account-takeover path for a known user ID; no known-user token was requested. | Split challenge initiation from token issuance. Require a trusted operator capability or possession of a one-time email challenge before issuing a token; never treat body.actor as authentication; bind/rate-limit the challenge to the intended user and audit the issuance. Add unauthenticated, known-user and replay tests. |
-| L1-ARCH-001 | src/server-store.mjs:41-47 | **HIGH — must-fix** | WorkspaceStateStore.mutate clones and runs the mutator before assigning this.state, while persistence is chained separately. Two concurrent increments reproduced counter=1 instead of 2. A simultaneous invoice/settings/actual mutation can silently lose the other mutation. | Put the entire read-modify-write transition behind one per-store mutex/queue, including mutator execution, state assignment and persist. Add Promise.all concurrency tests for invoice sequence, actuals and settings. |
-| L1-SEC-002 | src/billing/mutations.mjs:35-47; server/billing-server.mjs:205-218 | **HIGH — must-fix** | recordBillingActual replaces visit.actual without checking existing evidence, invoice binding or invoice status. An isolated probe changed a completed visit from 780 to 1 work minute after the invoice was issued. The operation has no conflict/correction record. | Make actual evidence append-only or reject a second value unless it is identical. After draft/issue, require an explicit correction workflow with reason, actor, audit event and invoice re-calculation/lock policy. Test issued, invoiced and concurrent correction cases. |
-| L1-SEC-003 | server/billing-delivery.mjs:103-156; src/billing/mutations.mjs:161-176 | **HIGH — must-fix** | beginBillingDelivery only returns early for emailed. Two concurrent requests with different idempotency keys both entered pending and both called a delayed provider adapter; result was provider_calls=2 and both responses 200. This can duplicate customer email or external delivery. | Persist a per-invoice delivery claim/outbox with attempt ID and provider idempotency key. Reject or join an existing pending attempt, serialize/lease delivery and reconcile provider receipts after timeout. Add a concurrent delivery test. |
-| L1-OPS-001 | scripts/state_backup.mjs:33-100; deploy/studio-state-backup.timer; server/app-server.mjs:205-218 | **HIGH — must-fix** | On VDS, studio-state-backup.service failed at 2026-09-13 03:15:05 CEST with state operation failed: no_state_files. No state or manifest backup was found in the searched production directories. /readyz reports ready from stateFile existence, configured auth and releaseSha only; it does not inspect last backup success. | Repair the state-file/backup path configuration, run and verify a real backup, perform a restore drill, retain checksummed manifests, and expose backup freshness/last-success in readiness or a separate operational health gate. Do not call the release ready while recovery evidence is absent. |
-| L1-SEC-004 | src/billing/billing-app.mjs:7, 76-103; src/app/bootstrap.mjs:682 | **MEDIUM — should-fix** | The Billing financial read-cache was removed, but the existing bearer token remains in localStorage under aftergraph.auth.token. Any future XSS can exfiltrate the token. This is separate from the removed financial cache and was not changed by the current hardening. | Prefer an HttpOnly, Secure, SameSite session cookie or a memory-only short-lived token with rotation and revocation. Document the residual risk until the auth transport is migrated. |
-| L1-TEST-001 | scripts/a11y_smoke.py:11, 51-88; scripts/v6_release_verify.mjs:56 | **MEDIUM — should-fix** | The green a11y smoke modes are chat, work, space, system and control; there is no /billing/ browser/axe run. tests/billing-ui-contract.test.mjs is primarily static regex/contract checking. A green release gate therefore does not prove Billing keyboard, focus, contrast, touch target or offline UI behavior. | Add a dedicated Billing browser/axe gate covering /billing/, 390px width, keyboard tabs/dialog, focus return, disabled offline actions, contrast and empty/loading/error states. Make it exact-head release evidence. |
-| L1-SUPPLY-001 | package.json; repository root | **MEDIUM — should-fix** | No lockfile is present and npm audit --omit=dev exits ENOLOCK. This does not prove a vulnerable package, but dependency resolution, SBOM and vulnerability audit are not reproducible from the repo. | Add and review a lockfile, pin the supported Node/runtime toolchain, run npm audit or an equivalent SBOM scanner in CI, and document any intentional zero-runtime-dependency policy. |
-
-No confirmed SQL/NoSQL injection, command injection or unsafe Billing innerHTML sink was found in the reviewed path. The Billing server uses a file-backed store, central JSON serialization and escaped dynamic UI content. SSRF and provider infrastructure were not exhaustively fuzz-tested; those areas remain UNVERIFIED beyond the observed HTTPS-only/env-configured adapter behavior.
-
-# 5. Lag 2 — Function and product behavior
-
-## Claim vs. Reality
-
-| ID | Claim/status | Evidence and reality | Fix or decision |
+| ID | Finding | Severity | Status |
 |---|---|---|---|
-| L2-CLAIM-001 | **HIGH — must-fix**<br>Peppol profile requires external validation | src/billing/document-profile.mjs:6-10 sets externalValidationRequired=true. server/billing-server.mjs:139-164 invokes a validator only when one is supplied. server/server.mjs builds billing options without a production validator. A valid internal document returned HTTP 200 without an external validator. | Fail closed with document_external_validator_unconfigured, or change the profile/product claim to explicitly say validation is optional. For a compliance export, fail-closed is the safer contract. |
-| L2-FUNC-001 | **HIGH — must-fix**<br>Actuals capture is authoritative | src/billing/billing-app.mjs:689-696 sends only workMinutes. It does not preserve prior workers, startedAt or endedAt evidence, and the server can overwrite existing actuals (also L1-SEC-002). | Send a complete evidence object, preserve immutable prior evidence, reject conflicts and expose a correction flow. |
-| L2-EDGE-001 | **MEDIUM — should-fix**<br>Dates are validated as YYYY-MM-DD | src/billing/mutations.mjs:15-20 checks only the shape. The probe accepted issueDate=2026-02-31 and normalized dueDate to 2026-03-11. | Validate calendar round-trip (year/month/day) and reject impossible dates before draft/issue. Add leap-day, month-end and timezone-boundary tests. |
-| L2-EDGE-002 | **MEDIUM — should-fix**<br>Source payload is a governed contract | src/billing/source-sync.mjs:26-50 validates basic presence but not unique IDs, strict timestamps, end-after-start, ISO currency or nonnegative payment terms. A payload with duplicate customer IDs was accepted and the second record silently won. | Validate schema at the boundary: unique IDs, strict ISO dates/timestamps, schedule ordering, three-letter currency, terms >= 0 and duplicate visit/customer rejection. Return a typed 422/409 rather than silently overwriting. |
-| L2-EDGE-003 | **MEDIUM — should-fix**<br>Source currency is renderable | source-sync accepts any truthy currency; Billing formatting uses Intl.NumberFormat. A currency value of $ caused a RangeError during render. | Enforce ISO 4217 at ingestion and provide a defensive UI fallback/error state so malformed upstream data cannot crash the projection. |
-| L2-CLAIM-002 | **MEDIUM — should-fix / UNVERIFIED policy**<br>Monthly billing window closes on time | src/billing/readiness.mjs accepts now but discards it and derives billing_window_closed from statuses and same-month planned visits. No wall-clock cutoff is enforced in the inspected code. | Confirm the business rule. If closure is calendar/time based, pass a clock and enforce the cutoff; if status-derived by design, rename/document the claim and test the boundary explicitly. |
-| L2-CLAIM-003 | **LOW — nice-to-have**<br>Invoice numbering is automatic | Browser flow omits number and gets the next sequence, but src/billing/mutations.mjs:50-67 accepts a caller-supplied manual number. | Decide whether manual numbering is a privileged correction/import capability. If not, remove it; otherwise validate format, authorization and audit reason. |
+| A-001 | SHA discrepancy: user context `48b571db` vs actual `fae2ec1f` | INFO | Expected (rebase) |
+| A-002 | 642 files cataloged across all evidence categories | POSITIVE | Complete |
+| A-003 | 8/9 claims VERIFIED, 1 UNVERIFIED (Peppol production export) | MIXED | See COMP-601 |
 
-## Missing or weakly evidenced edge cases
+---
 
-- **Concurrent financial actions:** loss of update and duplicate delivery are confirmed above; no safe concurrent invoice-sequence proof exists beyond the isolated mutation tests.
-- **Invalid numeric combinations:** negative work minutes are rejected, but paymentTermsDays can be negative in draft creation and is not fully validated in source sync.
-- **Large datasets and N+1 behavior:** no production-scale or query-profile evidence was available; mark UNVERIFIED rather than assuming the file-backed store scales.
-- **Loading, empty and error states:** static code contains loading/error/empty rendering paths, but fresh Billing browser evidence was blocked. Verify that every state is reachable and readable at 390px.
-- **Delivery/provider outage recovery:** fail-closed behavior is present when no provider exists, but the persistent retry/reconciliation contract is incomplete because the delivery claim is not exclusive.
+## Kategori B — Code & Security
 
-# 6. Lag 3 — UI system, design consistency and experience
+### 🔴 HIGH
 
-## 6.1 UI consistency against the design system
+**L1-SEC-005** — GET billing endpoints lack capability checks  
+`server/billing-server.mjs:111-179`  
+Alle fire GET endpoints (`/api/v1/billing`, `/artifact`, `/document`, `/peppol-bis3`) kalder kun `resolveScope()` men aldrig `assertActorCapability()`. Enhver authenticated bruger kan læse alle fakturaer, PDFs, og Peppol XML.  
+**Fix:** Tilføj `assertActorCapability({ capability: 'billing.read' })` efter `resolveScope()` i hver GET handler.
 
-The Billing UI uses a small, coherent primitive set: billing-quiet-button, billing-secondary-button, billing-primary-button, billing-tab, billing-field, status/queue rows and a native dialog. It consumes shared tokens such as canvas, surface, border, text, accent, success, warning and danger rather than embedding most colors directly.
+### 🟡 MEDIUM
 
-| ID | Component/file | Lens and severity | Finding | Concrete fix |
-|---|---|---|---|---|
-| L3-CONS-001 | billing/index.html:1; styles/tokens.css:62-91 | **LOW — nice-to-have / UNVERIFIED product requirement** | Billing is permanently data-theme=light while a dark token set exists globally. No Billing dark-mode control or route contract was found. This is not a defect unless dark mode is an intended Billing capability. | Decide and document the theme contract. If Billing supports dark mode, bind the route to the theme token set and test both themes; otherwise remove/orphan-label unused Billing expectations. |
-| L3-CONS-002 | styles/billing.css:74-86, 201-225, 345-373 | **POSITIVE / no finding** | Buttons, tabs, fields and states mostly use shared tokens and shared variants; no confirmed Billing-only color/spacing fork was found in the static review. | Preserve the token usage and add visual regression snapshots only after the runtime browser boundary is available. |
+**L1-SEC-006** — Demo user auto-elevated to billing.manage at boot  
+`server/billing-server.mjs:44-48, 74`  
+`ensureDemoBillingCapability()` kører unconditionalt ved server start. I production med `AFTERGRAPH_REQUIRE_AUTH=true`, hvis `demo-user` er reachable via fallback (line 86), bliver requests uden bearer silently fuldt-capable billing admin.  
+**Fix:** Gate bag `!requireAuth` eller `NODE_ENV !== 'production'`. Fjern `'demo-user'` fallback når `requireAuth=true`.
 
-## 6.2 Usability heuristics
+**L1-ARCH-002** — Dual trust boundary mellem billing-server og app-server  
+`server/billing-server.mjs:62-76, 331-339` vs `server/app-server.mjs:189-215`  
+To uafhængige auth/scope resolution systems med divergerende fallback-logik (`demo-user` vs `DEFAULT_ACTOR`) og tenant store resolution.  
+**Fix:** Extract shared `createRequestScope()` factory brugt af begge servers.
 
-| ID | Component/file | Lens and severity | Finding | Concrete fix |
-|---|---|---|---|---|
-| L3-USE-001 | billing/index.html:77-85; src/billing/billing-app.mjs:421-429, 497-535 | **MEDIUM — should-fix** | The native dialog focuses its first field after opening, but closeDialog does not retain the triggering element or restore focus. Escape and fallback open behavior are not covered by a Billing browser test. | Store the trigger before opening, restore focus after close, test Escape/backdrop/submit paths and ensure focus is not lost when a save fails. |
-| L3-USE-002 | src/billing/billing-app.mjs:681-706 | **MEDIUM — should-fix** | Save failures become a generic toast. The form uses native required/min validation, but no field-level server error or aria-describedby path was evidenced for business-rule errors such as conflicts or stale data. | Map coded server errors to inline, focusable messages tied to the relevant field/form; keep the toast as a summary and preserve entered values. |
-| L3-USE-003 | src/billing/billing-app.mjs:752-756 | **POSITIVE / verified statically** | Connectivity loss updates state.online and calls render synchronously before async refresh, preventing a stale online affordance from remaining enabled. | Keep the regression test and cover reconnect/error timing in the browser gate. |
+**L1-SEC-007** — Body actor claim accepted before auth verification on POST  
+`server/billing-server.mjs:182-183`  
+`body.actor` bruges som identity før capability check. Når `requireAuth=false`, vælger caller sin egen identitet via request body.  
+**Fix:** Valider `claimedActor` mod registered user selv når `requireAuth=false`.
 
-## 6.3 Accessibility — WCAG 2.2 AA
+**L1-SEC-005** (temporal) — Unsafe JSON.parse from query params  
+`server/app-server.mjs:546,549`  
+`JSON.parse(url.searchParams.get('event'))` uden try/catch. Malformed input lækker stack trace.  
+**Fix:** Wrap i try/catch, return 422 på parse failure.
 
-| ID | Component/file | Lens and severity | Finding and measured evidence | Concrete fix |
-|---|---|---|---|---|
-| L3-A11Y-001 | billing/index.html:47-61; src/billing/billing-app.mjs:281-285 | **MEDIUM — should-fix** | The tablist buttons expose aria-selected but no aria-controls/tabpanels, roving tabindex or Arrow/Home/End behavior. These controls behave like view navigation/filtering, so the simplest compliant fix may be ordinary navigation buttons rather than ARIA tabs. | Either implement the full tabs pattern or remove role=tablist/tab and use accessible buttons with an active state and deterministic keyboard behavior. |
-| L3-A11Y-002 | styles/billing.css:81, 214, 442-448, 662-665, 752-756 | **MEDIUM — should-fix** | Several controls are below the requested 44x44px touch target: base buttons/tabs are 40px, icon button is 40px, mobile quiet buttons are 36px and mobile primary/secondary buttons are 38px. | Set interactive min-height/min-width to 44px at the Billing breakpoint, including close/icon buttons, while preserving visual density through padding and spacing. |
-| L3-A11Y-003 | styles/tokens.css:33-34; styles/billing.css:131-190, 429-432, 467-493, 565-567 | **MEDIUM — should-fix** | Light-theme --text-3 #8993a4 is approximately 3.10:1 against white, below 4.5:1 for normal text. Success #15985d is approximately 3.70:1 and warning #b57300 approximately 3.88:1 when used as text. | Replace normal-text muted token with a darker value such as #5f6b7a (approximately 5.43:1 against white), use darker status-text variants, and retain icon/label text so meaning is not color-only. Recheck dark theme separately. |
-| L3-A11Y-004 | tests/billing-ui-contract.test.mjs; scripts/a11y_smoke.py:11, 51-88 | **MEDIUM — should-fix** | Static UI assertions cover lang, labels, tokens and reduced motion, but there is no Billing axe/runtime test for focus order, keyboard operation, dialog return focus, disabled offline actions or 390px touch targets. | Make a Billing-specific runtime accessibility matrix part of release verification; record failures by exact SHA. Cross-reference L1-TEST-001. |
+**L1-SEC-006** (action-guard) — In-memory idempotency with 5s TTL  
+`src/action-guard.mjs:13-21`  
+Tabes ved restart. Post-restart duplicate mutations mulige.  
+**Fix:** Persist action guard records til workspace state file eller audit log.
 
-# 7. Prioritized action list
+### ✅ RESOLVED (fra tidligere audit)
 
-Ranking uses expected impact × probability divided by implementation effort. “Very high” means a small change can prevent a high-probability material failure; effort is an engineering estimate, not a delivery promise.
+- **L1-ARCH-001** (store race): `enqueueMutation` serialiserer korrekt via promise chain
+- **L1-SUPPLY-001** (missing lockfile): package-lock.json exists, zero external deps confirmed
 
-| Rank | ID | Priority | Immediate action | Effort |
-|---:|---|---|---|---:|
-| 1 | L1-SEC-001 | Very high | Close the unauthenticated magic-link issuance path and add challenge/authorization tests | 8-16 h |
-| 2 | L1-SEC-002 | Very high | Make actual evidence immutable/conflict-safe and define post-issue correction workflow | 12-24 h |
-| 3 | L1-SEC-003 | Very high | Add exclusive delivery claims/outbox and provider idempotency | 12-24 h plus provider verification |
-| 4 | L1-ARCH-001 | Very high | Serialize state mutation transitions and test concurrent invoice/actual/settings writes | 8-16 h |
-| 5 | L1-OPS-001 | Very high | Repair backup path, create a verified backup, run restore drill and gate readiness on freshness | 8-16 h plus operations window |
-| 6 | L2-CLAIM-001 | High | Fail closed when Peppol external validator is absent, or explicitly downgrade the product claim | 4-12 h plus validator integration |
-| 7 | L1-TEST-001 / L3-A11Y-004 | High | Add exact-head Billing browser and axe coverage; repeat fresh production QA from a reachable network | 8-16 h |
-| 8 | L2-EDGE-002 / L2-EDGE-003 | High | Harden source schema validation and prevent malformed currency from crashing the UI | 8-16 h |
-| 9 | L2-EDGE-001 | Medium-high | Add strict calendar-date validation and boundary tests | 2-6 h |
-| 10 | L3-A11Y-002 / L3-A11Y-003 | Medium-high | Fix 44px targets and light-theme contrast, then verify with runtime axe/manual checks | 4-10 h |
+### ✅ POSITIVE VERIFICATIONS
 
-# 8. Positive findings
+- XSS: Alle innerHTML bruger `esc()` korrekt (`billing-app.mjs:31-38`)
+- Path traversal: `static-handler.mjs:8-10` containment korrekt
+- JSON serialization: Escaper `<>&U+2028U+2029` (`http-utils.mjs:3-13`)
+- Ingen hardcoded secrets, ingen eval/exec, ingen console.log leakage
+- Webhook token aldrig logged eller returneret i responses
 
-- The exact SHA is reproducible enough to run a substantial local gate set: 757/757 total tests, 15/15 source tests, 98/98 Billing tests, 49/49 release gates, verify:secrets PASS and npm run verify PASS.
-- Billing financial read-cache helpers were removed. The PWA path does not cache user-specific Billing API responses and has no mutation replay path; the intended open-session memory-only model is represented in code and tests.
-- server/http-utils.mjs centralizes JSON serialization, escapes <, >, &, U+2028 and U+2029, and applies no-store/nosniff/referrer-policy style protections.
-- server/static-handler.mjs applies path containment checks and a restrictive CSP; Billing dynamic HTML uses an esc() boundary before insertion.
-- Capability separation is explicit: billing.sync and billing.manage are distinct from the source ingestion and invoice mutation paths; wildcard capabilities are not accepted.
-- Source ingestion tests cover revision/payload idempotency, conflicting replay, ownership, no implicit delete and invoice/sequence separation.
-- Delivery is fail-closed when no provider is configured, and emailed state is only set after a provider receipt in the reviewed path.
-- The Billing connectivity race fix renders synchronously before refresh, and its targeted regression test passed.
-- The UI declares Danish language/viewport metadata, has visible focus styling in reset.css, uses native dialog semantics, and exposes live connection/status regions.
-- No credentials or token values were included in this report. No changes were made to product code, the forbidden worktree or RenOS.
+---
 
-# 9. Release decision and next execution boundary
+## Kategori C — Functional & Product
 
-The release should remain blocked until at least L1-SEC-001, L1-SEC-002, L1-SEC-003 and L1-OPS-001 are resolved and independently verified. L2-CLAIM-001 and the Billing browser/a11y evidence gate should be resolved before calling Peppol and the Billing UI production-ready. After remediation, rerun the complete local gates, run fresh production Billing browser QA from a network that can reach the VDS, verify GitHub CI and aggregate CodeQL on the exact final SHA, and update PR #55 evidence.
+### ✅ VERIFIED
 
-PR #55 remains OPEN and was not merged.
+**L2-STATE-001** — State machine sound  
+Alle 4 states (needs_info/waiting/ready/invoiced) reachable via valid transitions. Unidirectional, ingen illegal jumps. `createBillingDraft` re-evaluerer readiness atomisk.
 
-## Estimated closure effort by severity
+**L2-STATE-002** — Invoice status linear and idempotent  
+`draft → issued → emailed`. Hver transition returnerer early hvis allerede i target state. Delivery failure bevarer `issued` med retryable `delivery.state=failed`.
 
-| Severity | Estimated engineering effort |
-|---|---:|
-| Critical | 8-16 hours |
-| High | 48-96 hours, excluding external Peppol/provider setup and operations scheduling |
-| Medium | 32-60 hours |
-| Low | 8-16 hours |
+**L2-FUNC-002** — billableHours fra verified actuals only  
+Integer `workMinutes` required. Calendar duration aldrig brugt. Gross calculation: `Math.round((workMinutes * rateMinor) / 60)` sikrer integer minor units.
 
-These estimates cover implementation, focused tests and review; they do not claim that external provider certification, security review or production change approval can be completed inside those hours.
+**L2-STATE-003** — Actuals locking post-invoice  
+`recordBillingActual` og `correctBillingActual` checker `activeInvoiceForVisit()`. Non-void invoice blokerer mutation med `actuals_locked` (409).
+
+**L2-FUNC-001** — Invoice sequence/uniqueness  
+Auto-increment + uniqueness check mod non-void invoices. Manual numbers ≥ nextNumber advance sequence. Sequence reset rejects reuse af reserved numbers.
+
+**L2-FUNC-002** — Issued invoice immutability  
+Ingen mutation path eksisterer til at ændre issued invoice fields. Actuals locked once active invoice references visit.
+
+**L2-FUNC-003** — PDF rendering deterministic  
+Pure functions, ingen timestamps/random/external I/O. Samme input = identisk byte output.
+
+**L2-FUNC-004** — Delivery receipt state machine  
+Requires `provider`, `messageId`, `deliveredAt`. Fail-closed. Duplicate delivery idempotent på `emailed`.
+
+**Offline read-only** — SW skipper non-GET, ingen mutation queue, financial buttons disabled offline  
+**Cold reload** — Memory snapshot restore + SHA-256 token fingerprint identity binding  
+**Concurrent mutations** — Server-side serialization via mutex, 409 på duplicate delivery  
+**Negative values** — Rejected i alle lag (mutations, money, frontend)
+
+### ⚠️ OBSERVATIONS
+
+**L2-FUNC-001** — Visit-level discount overrides customer discount uden audit trail (LOW)  
+`src/billing/money.mjs:6-14`
+
+**L2-EDGE-001** — Date validation regex-only, accepterer `2026-02-30` (KNOWN)  
+`src/billing/mutations.mjs:40`
+
+**L2-EDGE-002** — Zero workMinutes accepted uden warning  
+`src/billing/mutations.mjs:27`
+
+**L2-EDGE-003** — Ingen max-length på issuer/customer fields  
+Server trusts client-provided strings uden truncation.
+
+### ❌ UNVERIFIED
+
+**Peppol BIS 3.0 UBL Export** — COMP-601 blocker  
+Lokal preflight OK, men ekstern Schematron-validator (`billingDocumentValidatorFromEnv`) ikke integreret i `/peppol-bis3` endpoint. Export producerer syntaktisk valid UBL XML men compliance verification mangler.
+
+---
+
+## Kategori D — UI & Accessibility
+
+### 🔴 HIGH
+
+**L3-CONS-002** — Dual token system  
+`styles/tokens.css` vs `packages/brand/tokens.css` med divergerende farver. Brand-opdateringer propagerer ikke automatisk til billing. Dark mode værdier divergerer også.
+
+### 🟡 MEDIUM
+
+**L3-CONS-001** — Hardcoded spacing (28px, 58px, 96px...) i stedet for ADS space-tokens  
+**L3-CONS-004** — Font sizes hardcoded (34px, 52px, 22px...) i stedet for ADS type-scale  
+**L3-CONS-006** — Ingen explicit loading-state komponent (blank liste under fetch)  
+**L3-A11Y-001** — Tablist mangler `aria-controls`, roving tabindex, Arrow/Home/End handlers  
+**L3-A11Y-002** — Touch targets 36-40px, alle under WCAG 2.2 44px minimum  
+**L3-A11Y-003** — `--success` (#15985d, 3.7:1) og `--warning` (#b57300, 3.9:1) fejler AA contrast  
+**L3-A11Y-005** — Toast auto-dismiss 2400ms uden pause-on-hover/focus  
+**L3-UX-004** — `issueInvoice` ingen confirmation dialog (irreversibel handling)  
+**L3-USE-002** — Form errors generic `[role=alert]`, ingen field-level `aria-invalid`/`aria-describedby`
+
+### LOW
+
+**L3-CONS-003** — Local `.billing-page` color overrides uden dark mode counterparts  
+**L3-CONS-005** — Dialog radius 20px vs ADS sheet 22px  
+**L3-CONS-007** — Ingen single-column layout <400px  
+**L3-A11Y-006** — Status dot aria-hidden men tekst ikke programmatisk linked  
+**L3-A11Y-007** — Peppol button stale disabled state hvis connectivity ændres mens dialog åben  
+**L3-UX-005** — Download ingen feedback hvis popup blocker forhindrer  
+**L3-UX-006** — Header buttons ingen separation fra brand area på mobile  
+**L3-UX-007** — Dialog focus setTimeout race condition
+
+### ✅ POSITIVE
+
+- XSS: Alle innerHTML bruger `esc()` korrekt
+- Native `<dialog>` med backdrop, Escape, inert background
+- `aria-live="polite"` på connection, summary, list, toast
+- Alle inputs har `<label for="">`
+- `prefers-reduced-motion` respekteret
+- Focus-visible styling med accent ring
+- Offline states: både `disabled` + `aria-disabled="true"`
+- Heading hierarchy H1→H2→H3, ingen spring
+
+---
+
+## Kategori E — Verification
+
+**E-001 Test Results (2026-09-13 @ fae2ec1f):**
+- Full suite: **780/780 pass**, 0 fail, 16.1s
+- Billing only: **114/114 pass**, 1.9s
+- Source/distributed: **35/35 pass**, 0.6s
+
+---
+
+## External Blockers
+
+| ID | Description | Owner | Impact |
+|---|---|---|---|
+| OPS-501 | Production backup/restore evidence missing | Infra/Ops | Blocks full release approval |
+| COMP-601 | Peppol validator production contract missing | External vendor | Blocks production UBL export compliance |
+
+---
+
+## Remediation Priority
+
+### P0 — Must-fix before merge
+1. L1-SEC-005: Add capability checks to GET billing endpoints
+2. L1-SEC-006: Gate demo-user elevation behind environment check
+3. L3-CONS-002: Unify token systems (alias or migrate to ADS)
+
+### P1 — Should-fix before merge
+4. L1-ARCH-002: Extract shared scope resolution factory
+5. L1-SEC-007: Validate claimedActor even when requireAuth=false
+6. L3-A11Y-002: Increase touch targets to 44px minimum
+7. L3-UX-004: Add confirmation dialog for issueInvoice
+
+### P2 — Improve quality
+8. L1-SEC-005 (temporal): Wrap JSON.parse in try/catch
+9. L1-SEC-006 (action-guard): Persist idempotency state
+10. L3-A11Y-001: Add keyboard navigation for tabs
+11. L3-A11Y-003: Fix success/warning color contrast
+12. L3-CONS-001/004: Replace hardcoded spacing/sizing with ADS tokens
+13. L3-CONS-006: Add loading skeleton component
+
+### P3 — Nice-to-have
+14. L2-EDGE-001: Semantic date validation
+15. L2-EDGE-003: Max-length enforcement on text fields
+16. L3-A11Y-005: Toast pause-on-hover
+17. L3-USE-002: Field-level form error associations

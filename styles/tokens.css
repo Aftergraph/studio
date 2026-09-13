@@ -1,4 +1,6 @@
 /* Aftergraph Institutional Brand Design System Tokens */
+@import '../packages/brand/tokens.css';
+
 :root {
   color-scheme: light;
 
@@ -23,30 +25,30 @@
   --ag-brand-decision-amber: #f0a64a;
   --ag-brand-system-blue: #4c8bd8;
 
-  /* Shell Surface & Color Mapping (Light Mode) */
-  --bg: #f5f7fa;
-  --canvas: #ffffff;
+  /* Shell Surface & Color Mapping (Light Mode) — aliased to ADS primitives */
+  --bg: var(--ag-brand-canvas);
+  --canvas: var(--ag-brand-canvas-raised);
   --canvas-soft: #fbfcfd;
-  --surface: #ffffff;
-  --surface-strong: #eceff3;
-  --text: #080c14;
-  --text-2: #4f5868;
-  --text-3: #8993a4;
+  --surface: var(--ag-brand-surface);
+  --surface-strong: var(--ag-brand-surface-strong);
+  --text: var(--ag-brand-text);
+  --text-2: var(--ag-brand-text-muted);
+  --text-3: var(--ag-brand-text-subtle);
   --text-emphasis: #0e1630;
-  --border: #e5e8ed;
-  --border-strong: #d7dce3;
-  --accent: #0c52ef;
-  --accent-soft: #eaf1ff;
+  --border: var(--ag-brand-border);
+  --border-strong: var(--ag-brand-border-strong);
+  --accent: var(--ag-brand-control);
+  --accent-soft: var(--ag-brand-control-soft);
   --accent-strong: #003ebd;
   --text-active: #0c52ef;
-  --success: #15985d;
-  --success-soft: #e8f7ef;
-  --warning: #b57300;
-  --warning-soft: #fff5df;
-  --danger: #d24242;
-  --danger-soft: #fff0f0;
-  --purple: #7759e8;
-  --purple-soft: #f2edff;
+  --success: var(--ag-brand-evidence);
+  --success-soft: var(--ag-brand-evidence-soft);
+  --warning: var(--ag-brand-decision);
+  --warning-soft: var(--ag-brand-decision-soft);
+  --danger: var(--ag-brand-danger-tone);
+  --danger-soft: var(--ag-brand-danger-soft);
+  --purple: var(--ag-brand-authority);
+  --purple-soft: var(--ag-brand-authority-soft);
   --shadow-float: 0 22px 70px rgba(8, 12, 20, 0.12), 0 2px 10px rgba(8, 12, 20, 0.06);
   --shadow-soft: 0 10px 28px rgba(8, 12, 20, 0.06);
   --radius-sm: 8px;
@@ -62,30 +64,30 @@
 html[data-theme="dark"] {
   color-scheme: dark;
 
-  /* Shell Surface & Color Mapping (Dark Mode — Institutional Primary) */
-  --bg: #080c14;
-  --canvas: #0e1630;
+  /* Shell Surface & Color Mapping (Dark Mode — Institutional Primary) — aliased to ADS primitives */
+  --bg: var(--ag-brand-canvas);
+  --canvas: var(--ag-brand-canvas-raised);
   --canvas-soft: #121c3b;
-  --surface: rgba(14, 22, 48, 0.78);
-  --surface-strong: rgba(20, 31, 64, 0.92);
-  --text: #f5f7fa;
-  --text-2: #8993a4;
-  --text-3: #6c7687;
+  --surface: var(--ag-brand-surface);
+  --surface-strong: var(--ag-brand-surface-strong);
+  --text: var(--ag-brand-text);
+  --text-2: var(--ag-brand-text-muted);
+  --text-3: var(--ag-brand-text-subtle);
   --text-emphasis: #dce8f6;
-  --border: rgba(137, 147, 164, 0.20);
-  --border-strong: rgba(66, 199, 232, 0.35);
-  --accent: #42c7e8;
-  --accent-soft: rgba(66, 199, 232, 0.14);
+  --border: var(--ag-brand-border);
+  --border-strong: var(--ag-brand-border-strong);
+  --accent: var(--ag-brand-control);
+  --accent-soft: var(--ag-brand-control-soft);
   --accent-strong: #70d8f0;
   --text-active: #dcecff;
-  --success: #24c4ad;
-  --success-soft: rgba(36, 196, 173, 0.14);
-  --warning: #f0a64a;
-  --warning-soft: rgba(240, 166, 74, 0.15);
-  --danger: #ff6b7a;
-  --danger-soft: rgba(255, 107, 122, 0.16);
-  --purple: #7759e8;
-  --purple-soft: rgba(119, 89, 232, 0.16);
+  --success: var(--ag-brand-evidence);
+  --success-soft: var(--ag-brand-evidence-soft);
+  --warning: var(--ag-brand-decision);
+  --warning-soft: var(--ag-brand-decision-soft);
+  --danger: var(--ag-brand-danger-tone);
+  --danger-soft: var(--ag-brand-danger-soft);
+  --purple: var(--ag-brand-authority);
+  --purple-soft: var(--ag-brand-authority-soft);
   --shadow-float: 0 24px 80px rgba(0, 0, 0, 0.60), 0 2px 12px rgba(0, 0, 0, 0.35);
   --shadow-soft: 0 10px 32px rgba(0, 0, 0, 0.30);
 }

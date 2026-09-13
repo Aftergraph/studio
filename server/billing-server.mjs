@@ -43,8 +43,12 @@ function projectBillingState(billing) {
 
 function ensureDemoBillingCapability() {
   const demo = getUser('demo-user');
-  if (!demo || demo.capabilities.includes('billing.manage')) return;
-  updateCapabilities('demo-user', [...demo.capabilities, 'billing.manage']);
+  if (!demo) return;
+  const caps = new Set(demo.capabilities);
+  let changed = false;
+  if (!caps.has('billing.read')) { caps.add('billing.read'); changed = true; }
+  if (!caps.has('billing.manage')) { caps.add('billing.manage'); changed = true; }
+  if (changed) updateCapabilities('demo-user', [...caps]);
 }
 
 function actorError(code, status, message = code) {
@@ -71,7 +75,7 @@ export function decorateBillingServer(server, {
   const actionGuard = createActionGuard();
   const users = { getUser };
 
-  ensureDemoBillingCapability();
+  if (!requireAuth) ensureDemoBillingCapability();
   server.removeAllListeners('request');
 
   const resolveScope = async (req, url, claimedActor = undefined) => {
@@ -83,7 +87,8 @@ export function decorateBillingServer(server, {
     const queryActor = url.searchParams.get('actor') || undefined;
     const claimed = claimedActor || queryActor;
     if (bearer && claimed && bearer !== claimed) throw actorError('forbidden', 403);
-    const actor = bearer || claimed || 'demo-user';
+    const actor = bearer || claimed || (requireAuth ? null : 'demo-user');
+    if (!actor) throw actorError('authentication_required', 401);
     const user = getUser(actor);
     if (!user) throw actorError('forbidden', 403);
     const workspaceId = user.workspaceId || actor;
@@ -109,7 +114,9 @@ export function decorateBillingServer(server, {
 
   const handle = async (req, res, url) => {
     if (url.pathname === '/api/v1/billing' && req.method === 'GET') {
-      const { store } = await resolveScope(req, url);
+      const { actor, store } = await resolveScope(req, url);
+      try { assertActorCapability({ state: store.snapshot(), actor, capability: 'billing.read', users }); }
+      catch { throw actorError('forbidden', 403); }
       sendJson(res, 200, {
         version: API_VERSION,
         billing: projectBillingState(store.snapshot().billing),
@@ -119,7 +126,9 @@ export function decorateBillingServer(server, {
 
     const artifactMatch = url.pathname.match(/^\/api\/v1\/billing\/invoices\/([^/]+)\/artifact$/);
     if (artifactMatch && req.method === 'GET') {
-      const { store } = await resolveScope(req, url);
+      const { actor, store } = await resolveScope(req, url);
+      try { assertActorCapability({ state: store.snapshot(), actor, capability: 'billing.read', users }); }
+      catch { throw actorError('forbidden', 403); }
       const artifact = renderInvoicePdf({ billing: store.snapshot().billing, invoiceId: decodeURIComponent(artifactMatch[1]) });
       res.statusCode = 200;
       res.setHeader('content-type', artifact.contentType);
@@ -132,7 +141,9 @@ export function decorateBillingServer(server, {
 
     const documentMatch = url.pathname.match(/^\/api\/v1\/billing\/invoices\/([^/]+)\/document$/);
     if (documentMatch && req.method === 'GET') {
-      const { store } = await resolveScope(req, url);
+      const { actor, store } = await resolveScope(req, url);
+      try { assertActorCapability({ state: store.snapshot(), actor, capability: 'billing.read', users }); }
+      catch { throw actorError('forbidden', 403); }
       const document = buildInvoiceDocument({ billing: store.snapshot().billing, invoiceId: decodeURIComponent(documentMatch[1]) });
       sendJson(res, 200, { version: API_VERSION, document });
       return;
@@ -140,7 +151,9 @@ export function decorateBillingServer(server, {
 
     const peppolMatch = url.pathname.match(/^\/api\/v1\/billing\/invoices\/([^/]+)\/peppol-bis3$/);
     if (peppolMatch && req.method === 'GET') {
-      const { store } = await resolveScope(req, url);
+      const { actor, store } = await resolveScope(req, url);
+      try { assertActorCapability({ state: store.snapshot(), actor, capability: 'billing.read', users }); }
+      catch { throw actorError('forbidden', 403); }
       const document = buildInvoiceDocument({ billing: store.snapshot().billing, invoiceId: decodeURIComponent(peppolMatch[1]) });
       const profile = 'peppol-bis-3.0-2026-05';
       const preflight = validateInvoiceDocument(document, { profile });

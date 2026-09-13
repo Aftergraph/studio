@@ -249,9 +249,22 @@ test('consequential billing writes require actor and idempotency key', async () 
 });
 
 
+test('requireAuth mode returns authentication_required instead of silently using demo-user when no bearer is present', async () => {
+  const secret = 'billing-require-auth-test-secret';
+  await withServer(async (base) => {
+    const anonymous = await json(`${base}/api/v1/billing`);
+    assert.equal(anonymous.response.status, 401);
+    assert.equal(anonymous.body.error, 'authentication_required');
+  }, { requireAuth: true, authSecret: secret });
+});
+
 test('production auth mode rejects anonymous billing reads and accepts the canonical Studio bearer', async () => {
   const secret = 'billing-auth-test-secret';
-  await withServer(async (base) => {
+  await withServer(async (base, server) => {
+    // Provision demo-user billing capabilities explicitly since requireAuth gates auto-elevation
+    const { updateCapabilities } = await import('../src/user/user-store.mjs');
+    updateCapabilities('demo-user', ['billing.read', 'billing.manage']);
+
     const anonymous = await json(`${base}/api/v1/billing`);
     assert.equal(anonymous.response.status, 401);
     assert.equal(anonymous.body.error, 'authentication_required');
@@ -459,6 +472,49 @@ test('Peppol export emits UBL only after internal and external validation pass',
       return { ok: true, source: 'test-validator' };
     },
   });
+});
+
+test('GET billing endpoints reject authenticated users without billing.read capability', async () => {
+  const secret = 'billing-read-capability-test-secret';
+  const actor = `billing-read-denied-${Date.now()}`;
+  createUser({ id: actor, name: actor, role: 'operator', capabilities: ['billing.manage'] });
+
+  await withServer(async (base) => {
+    const token = issueMagicToken({ userId: actor, secret });
+    const authHeaders = { authorization: `Bearer ${token}` };
+
+    // First create an issued invoice so artifact/document/peppol endpoints have something to serve
+    const draft = await json(`${base}/api/v1/billing/invoices/draft`, {
+      ...postAs(actor, {
+        customerId: 'customer-katrine',
+        visitIds: ['katrine-2026-09-07'],
+        number: '1399',
+        issueDate: '2026-09-11',
+      }, 'billing-read-denied-draft'),
+      headers: { ...postAs(actor, {}, '_').headers, ...authHeaders },
+    });
+    assert.equal(draft.response.status, 201);
+    const id = draft.body.invoice.id;
+    await json(`${base}/api/v1/billing/invoices/${encodeURIComponent(id)}/issue`, {
+      ...postAs(actor, {}, 'billing-read-denied-issue'),
+      headers: { ...postAs(actor, {}, '_').headers, ...authHeaders },
+    });
+
+    const endpoints = [
+      `/api/v1/billing?actor=${actor}`,
+      `/api/v1/billing/invoices/${encodeURIComponent(id)}/artifact`,
+      `/api/v1/billing/invoices/${encodeURIComponent(id)}/document`,
+      `/api/v1/billing/invoices/${encodeURIComponent(id)}/peppol-bis3`,
+    ];
+
+    for (const path of endpoints) {
+      const result = await json(`${base}${path}`, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      assert.equal(result.response.status, 403, `Expected 403 on ${path}, got ${result.response.status}`);
+      assert.equal(result.body.error, 'forbidden');
+    }
+  }, { requireAuth: true, authSecret: secret });
 });
 
 test('company settings update persists per billing workspace and protects invoice sequence', async () => {
