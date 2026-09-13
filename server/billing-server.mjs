@@ -44,12 +44,137 @@ function isBillingPath(pathname) {
     || pathname === '/api/v1/billing/invoices/draft'
     || pathname === '/api/v1/billing/dashboard'
     || pathname === '/api/v1/billing/audit'
+    || pathname === '/api/v1/billing/query'
     || pathname === '/api/v1/billing/invoices/manual-draft'
     || /^\/api\/v1\/billing\/invoices\/[^/]+\/(issue|artifact|document|peppol-bis3|deliver|void|payment|remind)$/.test(pathname)
     || /^\/api\/v1\/billing\/invoices\/[^/]+$/.test(pathname)
     || /^\/api\/v1\/billing\/customers\/[^/]+$/.test(pathname)
     || pathname === '/api/v1/billing/products'
     || /^\/api\/v1\/billing\/products\/[^/]+$/.test(pathname);
+}
+
+function queryBilling(billing, params = {}) {
+  const type = params.type === 'customer' ? 'customer' : 'invoice';
+  const search = (params.search || '').trim().toLowerCase();
+  const status = params.status || null;
+  const dateFrom = params.dateFrom || null;
+  const dateTo = params.dateTo || null;
+  const customerId = params.customerId || null;
+  const sortBy = params.sortBy || (type === 'invoice' ? 'issuedAt' : 'name');
+  const sortOrder = params.sortOrder === 'asc' ? 'asc' : 'desc';
+  const limit = Math.min(Math.max(Number.parseInt(params.limit, 10) || 25, 1), 200);
+  const offset = Math.max(Number.parseInt(params.offset, 10) || 0, 0);
+
+  const invoices = billing.invoices || [];
+  const customers = billing.customers || [];
+  const customersById = new Map(customers.map((c) => [c.id, c]));
+
+  let items = [];
+  if (type === 'invoice') {
+    for (const inv of invoices) {
+      if (!inv || inv.status === 'void') continue;
+      const customer = customersById.get(inv.customerId);
+      const paid = (inv.payments || []).reduce((s, p) => s + (p.amountMinor || 0), 0);
+      const outstanding = (inv.totalGrossMinor || 0) - paid;
+      const derivedStatus = inv.status === 'draft' ? 'draft'
+        : outstanding <= 0 ? 'paid'
+        : inv.dueDate && new Date(inv.dueDate) < new Date() ? 'overdue'
+        : 'issued';
+      items.push({
+        id: inv.id,
+        number: inv.number || null,
+        customerId: inv.customerId,
+        customerName: customer?.name || inv.customerId,
+        status: derivedStatus,
+        issuedAt: inv.issuedAt || inv.createdAt || null,
+        dueDate: inv.dueDate || null,
+        totalGrossMinor: inv.totalGrossMinor || 0,
+        outstandingMinor: outstanding,
+        currency: inv.currency || customer?.billing?.currency || 'DKK',
+      });
+    }
+  } else {
+    for (const cust of customers) {
+      if (!cust) continue;
+      const invoiceCount = invoices.filter((i) => i.customerId === cust.id && i.status !== 'void').length;
+      const totalBilled = invoices
+        .filter((i) => i.customerId === cust.id && i.status !== 'void')
+        .reduce((s, i) => s + (i.totalGrossMinor || 0), 0);
+      items.push({
+        id: cust.id,
+        name: cust.name || '',
+        email: cust.email || '',
+        address: cust.address || '',
+        status: cust.status || 'active',
+        billingMode: cust.billing?.mode || null,
+        rateMinor: cust.billing?.rateMinor || null,
+        currency: cust.billing?.currency || 'DKK',
+        invoiceCount,
+        totalBilledMinor: totalBilled,
+        createdAt: cust.createdAt || null,
+      });
+    }
+  }
+
+  // Filter by status
+  if (status) {
+    items = items.filter((item) => item.status === status);
+  }
+
+  // Filter by customerId (invoices only)
+  if (customerId && type === 'invoice') {
+    items = items.filter((item) => item.customerId === customerId);
+  }
+
+  // Filter by date range
+  if (dateFrom || dateTo) {
+    const from = dateFrom ? new Date(dateFrom).getTime() : -Infinity;
+    const to = dateTo ? new Date(dateTo).setHours(23, 59, 59, 999) : Infinity;
+    items = items.filter((item) => {
+      const d = new Date(type === 'invoice' ? item.issuedAt : item.createdAt).getTime();
+      return Number.isFinite(d) && d >= from && d <= to;
+    });
+  }
+
+  // Text search
+  if (search) {
+    items = items.filter((item) => {
+      if (type === 'invoice') {
+        return (item.number || '').toLowerCase().includes(search)
+          || item.customerName.toLowerCase().includes(search)
+          || item.id.toLowerCase().includes(search);
+      }
+      return item.name.toLowerCase().includes(search)
+        || item.email.toLowerCase().includes(search)
+        || item.id.toLowerCase().includes(search);
+    });
+  }
+
+  // Sort
+  items.sort((a, b) => {
+    let va = a[sortBy];
+    let vb = b[sortBy];
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    if (typeof va === 'string') va = va.toLowerCase();
+    if (typeof vb === 'string') vb = vb.toLowerCase();
+    if (va < vb) return sortOrder === 'asc' ? -1 : 1;
+    if (va > vb) return sortOrder === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const total = items.length;
+  const sliced = items.slice(offset, offset + limit);
+
+  return {
+    type,
+    items: sliced,
+    total,
+    limit,
+    offset,
+    hasMore: offset + limit < total,
+  };
 }
 
 function projectBillingState(billing) {
@@ -175,6 +300,17 @@ export function decorateBillingServer(server, {
           generatedAt: now.toISOString(),
         },
       });
+      return;
+    }
+
+    if (url.pathname === '/api/v1/billing/query' && req.method === 'GET') {
+      const { actor, store } = await resolveScope(req, url);
+      try { assertActorCapability({ state: store.snapshot(), actor, capability: 'billing.read', users }); }
+      catch { throw actorError('forbidden', 403); }
+      const billing = store.snapshot().billing || {};
+      const params = Object.fromEntries(url.searchParams.entries());
+      const result = queryBilling(billing, params);
+      sendJson(res, 200, { version: API_VERSION, ...result });
       return;
     }
 

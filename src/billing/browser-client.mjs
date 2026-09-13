@@ -222,5 +222,13 @@ export function createBillingClient({
     updateProduct(productId, updates) {
       return write(`/api/v1/billing/products/${encodeURIComponent(productId)}`, updates, 'billing-product-update', 'PATCH');
     },
+    queryBilling(params = {}) {
+      const qs = new URLSearchParams();
+      for (const [key, value] of Object.entries(params)) {
+        if (value != null && value !== '') qs.set(key, String(value));
+      }
+      const suffix = currentActor ? `&actor=${encodeURIComponent(currentActor)}` : '';
+      return read(`/api/v1/billing/query?${qs.toString()}${suffix}`);
+    },
   });
 }

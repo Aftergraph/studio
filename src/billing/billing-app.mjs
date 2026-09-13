@@ -224,6 +224,10 @@ function createApp() {
     toastTimer: null,
     returnFocus: null,
     loginRequired: false,
+    searchQuery: { type: 'invoice', search: '', status: '', dateFrom: '', dateTo: '', customerId: '', sortBy: 'issuedAt', sortOrder: 'desc', limit: 25, offset: 0 },
+    searchResults: null,
+    searchLoading: false,
+    savedViews: [],
   };
 
   const els = {
@@ -601,6 +605,10 @@ function createApp() {
       renderProducts();
       return;
     }
+    if (state.view === 'search-invoices' || state.view === 'search-customers') {
+      renderSearchView();
+      return;
+    }
     try {
       const [label, contextText] = VIEWS[state.view];
       els.title.textContent = label;
@@ -630,6 +638,219 @@ function createApp() {
     } catch (err) {
       console.error('renderList failed', err);
       els.list.innerHTML = '<div class="billing-error"><strong>Fejl i listen.</strong><br>Kunne ikke vise faktureringsposterne.</div>';
+    }
+  }
+
+  // --- Search, Filter, Sort, Pagination & Saved Views ---
+
+  function getSavedViews() {
+    return state.billing?.settings?.savedViews || [];
+  }
+
+  async function persistSavedViews(views) {
+    const currentSettings = state.billing?.settings || {};
+    const updated = { ...currentSettings, savedViews: views };
+    try {
+      await client.updateSettings(updated);
+      if (state.billing) state.billing.settings = updated;
+    } catch (err) {
+      console.error('Failed to save views', err);
+      toast('Kunne ikke gemme visning');
+    }
+  }
+
+  async function saveCurrentView(name) {
+    if (!name) return;
+    const view = { name, ...state.searchQuery, savedAt: new Date().toISOString() };
+    const views = [...getSavedViews()];
+    const idx = views.findIndex((v) => v.name === name && v.type === state.searchQuery.type);
+    if (idx >= 0) views[idx] = view; else views.push(view);
+    state.savedViews = views;
+    await persistSavedViews(views);
+    toast(`Visning "${name}" gemt`);
+    renderSearchView();
+  }
+
+  function loadSavedView(view) {
+    if (!view) return;
+    state.searchQuery = { type: view.type || 'invoice', search: view.search || '', status: view.status || '', dateFrom: view.dateFrom || '', dateTo: view.dateTo || '', customerId: view.customerId || '', sortBy: view.sortBy || 'issuedAt', sortOrder: view.sortOrder || 'desc', limit: view.limit || 25, offset: 0 };
+    runSearch();
+  }
+
+  async function deleteSavedView(name, type) {
+    const views = getSavedViews().filter((v) => !(v.name === name && v.type === type));
+    state.savedViews = views;
+    await persistSavedViews(views);
+    toast(`Visning "${name}" slettet`);
+    renderSearchView();
+  }
+
+  async function runSearch() {
+    state.searchLoading = true;
+    renderSearchView();
+    try {
+      const result = await client.queryBilling(state.searchQuery);
+      state.searchResults = result;
+    } catch (err) {
+      console.error('runSearch failed', err);
+      state.searchResults = { error: err?.message || 'Søgning mislykkedes' };
+    } finally {
+      state.searchLoading = false;
+      renderSearchView();
+    }
+  }
+
+  function searchControlsHtml(type) {
+    const q = state.searchQuery;
+    const isInvoice = type === 'invoice';
+    const statusOptions = isInvoice
+      ? [['', 'Alle statusser'], ['draft', 'Kladde'], ['issued', 'Udstedt'], ['overdue', 'Forfalden'], ['paid', 'Betalt']]
+      : [['', 'Alle statusser'], ['active', 'Aktiv'], ['inactive', 'Inaktiv']];
+    const sortOptions = isInvoice
+      ? [['issuedAt', 'Dato'], ['customerName', 'Kunde'], ['totalGrossMinor', 'Beløb'], ['number', 'Nummer']]
+      : [['name', 'Navn'], ['email', 'E-mail'], ['invoiceCount', 'Fakturaer'], ['totalBilledMinor', 'Omsætning']];
+    const viewsForType = getSavedViews().filter((v) => v.type === type);
+    const viewsHtml = viewsForType.length
+      ? `<div class="billing-saved-views"><label>Gemte visninger</label><select data-search-action="load-view"><option value="">Vælg visning…</option>${viewsForType.map((v) => `<option value="${esc(v.name)}">${esc(v.name)}</option>`).join('')}</select></div>`
+      : '';
+    return `<div class="billing-search-controls">
+      <div class="billing-search-bar">
+        <input type="search" data-search-field="search" placeholder="${isInvoice ? 'Søg fakturanummer, kunde…' : 'Søg navn, e-mail…'}" value="${esc(q.search)}" aria-label="Søgetekst">
+        <button type="button" class="billing-primary-button" data-search-action="run">Søg</button>
+      </div>
+      <div class="billing-filter-chips">
+        <select data-search-field="status" aria-label="Statusfilter">${statusOptions.map(([val, label]) => `<option value="${val}"${q.status === val ? ' selected' : ''}>${label}</option>`).join('')}</select>
+        ${isInvoice ? `<input type="text" data-search-field="customerId" placeholder="Kunde-ID" value="${esc(q.customerId)}" aria-label="Kunde-ID filter" style="max-width:8rem">` : ''}
+        <input type="date" data-search-field="dateFrom" value="${esc(q.dateFrom)}" aria-label="Fra dato" title="Fra dato">
+        <input type="date" data-search-field="dateTo" value="${esc(q.dateTo)}" aria-label="Til dato" title="Til dato">
+        <select data-search-field="sortBy" aria-label="Sortér efter">${sortOptions.map(([val, label]) => `<option value="${val}"${q.sortBy === val ? ' selected' : ''}>${label}</option>`).join('')}</select>
+        <button type="button" class="billing-secondary-button" data-search-action="toggle-sort" aria-label="Skift sorteringsretning">${q.sortOrder === 'asc' ? '↑ Stigende' : '↓ Faldende'}</button>
+      </div>
+      <div class="billing-search-actions">
+        ${viewsHtml}
+        <input type="text" data-search-field="save-name" placeholder="Navn på visning" aria-label="Gem visningsnavn" style="max-width:10rem">
+        <button type="button" class="billing-secondary-button" data-search-action="save-view">Gem visning</button>
+      </div>
+    </div>`;
+  }
+
+  function paginationHtml(result) {
+    if (!result || !result.total) return '';
+    const { total, limit, offset, hasMore } = result;
+    const page = Math.floor(offset / limit) + 1;
+    const pages = Math.ceil(total / limit);
+    return `<nav class="billing-pagination" aria-label="Sideinddeling">
+      <span class="billing-pagination-info">${offset + 1}–${Math.min(offset + limit, total)} af ${total}</span>
+      <button type="button" class="billing-secondary-button" data-search-action="prev-page" ${offset <= 0 ? 'disabled' : ''}>← Forrige</button>
+      <span class="billing-pagination-page">Side ${page} af ${pages}</span>
+      <button type="button" class="billing-secondary-button" data-search-action="next-page" ${!hasMore ? 'disabled' : ''}>Næste →</button>
+    </nav>`;
+  }
+
+  function invoiceTableHtml(items) {
+    if (!items.length) return '<div class="billing-empty">Ingen fakturaer matcher søgningen.</div>';
+    const loc = locale();
+    return `<div class="billing-table-wrap"><table class="billing-table">
+      <thead><tr><th>Nummer</th><th>Kunde</th><th>Status</th><th>Dato</th><th>Forfald</th><th class="is-numeric">Beløb</th><th class="is-numeric">Udestående</th></tr></thead>
+      <tbody>${items.map((inv) => `<tr>
+        <td>${esc(inv.number || inv.id.slice(0, 8))}</td>
+        <td>${esc(inv.customerName)}</td>
+        <td><span class="billing-status-badge is-${esc(inv.status)}">${esc({ draft: 'Kladde', issued: 'Udstedt', overdue: 'Forfalden', paid: 'Betalt' }[inv.status] || inv.status)}</span></td>
+        <td>${esc(formatDate(inv.issuedAt, loc))}</td>
+        <td>${inv.dueDate ? esc(formatDate(inv.dueDate, loc)) : '—'}</td>
+        <td class="is-numeric">${esc(formatMoney(inv.totalGrossMinor, inv.currency, loc))}</td>
+        <td class="is-numeric">${esc(formatMoney(inv.outstandingMinor, inv.currency, loc))}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+  }
+
+  function customerTableHtml(items) {
+    if (!items.length) return '<div class="billing-empty">Ingen kunder matcher søgningen.</div>';
+    const loc = locale();
+    return `<div class="billing-table-wrap"><table class="billing-table">
+      <thead><tr><th>Navn</th><th>E-mail</th><th>Status</th><th>Faktureringsmetode</th><th class="is-numeric">Fakturaer</th><th class="is-numeric">Omsætning</th></tr></thead>
+      <tbody>${items.map((cust) => `<tr>
+        <td>${esc(cust.name)}</td>
+        <td>${esc(cust.email)}</td>
+        <td><span class="billing-status-badge is-${esc(cust.status)}">${esc(cust.status === 'active' ? 'Aktiv' : 'Inaktiv')}</span></td>
+        <td>${esc({ per_visit: 'Per besøg', monthly_batch: 'Månedlig samling' }[cust.billingMode] || cust.billingMode || '—')}</td>
+        <td class="is-numeric">${cust.invoiceCount}</td>
+        <td class="is-numeric">${esc(formatMoney(cust.totalBilledMinor, cust.currency, loc))}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+  }
+
+  function renderSearchView() {
+    const type = state.view === 'search-customers' ? 'customer' : 'invoice';
+    const title = type === 'invoice' ? 'Søg fakturaer' : 'Søg kunder';
+    const contextText = type === 'invoice' ? 'Find og filtrér fakturaer på tværs af status, dato og kunde.' : 'Find og filtrér kunder på navn, e-mail og status.';
+    els.title.textContent = title;
+    els.context.textContent = contextText;
+    els.summary.innerHTML = '';
+
+    const controls = searchControlsHtml(type);
+    let results = '';
+    if (state.searchLoading) {
+      results = '<div class="billing-skeleton" aria-busy="true" aria-label="Søger"><div class="billing-skeleton-card"><div class="billing-skeleton-line is-title"></div><div class="billing-skeleton-line is-long"></div></div></div>';
+    } else if (state.searchResults?.error) {
+      results = `<div class="billing-error"><strong>Søgefejl.</strong><br>${esc(state.searchResults.error)}</div>`;
+    } else if (state.searchResults) {
+      const table = type === 'invoice' ? invoiceTableHtml(state.searchResults.items || []) : customerTableHtml(state.searchResults.items || []);
+      results = table + paginationHtml(state.searchResults);
+    } else {
+      results = '<div class="billing-empty">Brug søgefeltet og filtrene ovenfor for at finde resultater.</div>';
+    }
+
+    // Save/delete buttons for saved views rendered inline
+    const viewsForType = getSavedViews().filter((v) => v.type === type);
+    const savedListHtml = viewsForType.length
+      ? `<div class="billing-saved-list"><h4>Gemte visninger</h4><ul>${viewsForType.map((v) => `<li><button type="button" class="billing-quiet-button" data-search-action="load-view" data-view-name="${esc(v.name)}">${esc(v.name)}</button><button type="button" class="billing-icon-button" data-search-action="delete-view" data-view-name="${esc(v.name)}" aria-label="Slet visning">×</button></li>`).join('')}</ul></div>`
+      : '';
+
+    els.list.innerHTML = `${controls}${savedListHtml}${results}`;
+  }
+
+  function handleSearchEvent(event) {
+    const target = event.target;
+    const action = target?.dataset?.searchAction;
+    const field = target?.dataset?.searchField;
+
+    if (field) {
+      state.searchQuery[field] = target.value;
+      if (field === 'search' && event.type === 'keydown' && event.key === 'Enter') {
+        event.preventDefault();
+        state.searchQuery.offset = 0;
+        runSearch();
+      }
+      return;
+    }
+
+    if (action === 'run') {
+      state.searchQuery.offset = 0;
+      runSearch();
+    } else if (action === 'toggle-sort') {
+      state.searchQuery.sortOrder = state.searchQuery.sortOrder === 'asc' ? 'desc' : 'asc';
+      state.searchQuery.offset = 0;
+      runSearch();
+    } else if (action === 'next-page') {
+      state.searchQuery.offset += state.searchQuery.limit;
+      runSearch();
+    } else if (action === 'prev-page') {
+      state.searchQuery.offset = Math.max(0, state.searchQuery.offset - state.searchQuery.limit);
+      runSearch();
+    } else if (action === 'save-view') {
+      const nameInput = $('[data-search-field="save-name"]');
+      const name = String(nameInput?.value || '').trim();
+      if (!name) return toast('Angiv et navn for visningen');
+      saveCurrentView(name);
+    } else if (action === 'load-view') {
+      const name = target.dataset.viewName || target.value;
+      if (!name) return;
+      const view = getSavedViews().find((v) => v.name === name && v.type === (state.view === 'search-customers' ? 'customer' : 'invoice'));
+      if (view) loadSavedView(view);
+    } else if (action === 'delete-view') {
+      const name = target.dataset.viewName;
+      if (name) deleteSavedView(name, state.view === 'search-customers' ? 'customer' : 'invoice');
     }
   }
 
@@ -1577,9 +1798,23 @@ function createApp() {
         fetchDashboard().then(() => renderList());
       } else if (state.view === 'products') {
         fetchProducts().then(() => renderList());
+      } else if (state.view === 'search-invoices' || state.view === 'search-customers') {
+        state.searchQuery.type = state.view === 'search-customers' ? 'customer' : 'invoice';
+        state.searchResults = null;
+        renderList();
       } else {
         renderList();
       }
+      return;
+    }
+    // Search control event delegation
+    if (event.target.closest('[data-search-action]')) {
+      handleSearchEvent(event);
+      return;
+    }
+    // Search field input/change delegation
+    if (event.target.closest('[data-search-field]')) {
+      handleSearchEvent(event);
       return;
     }
     const action = event.target.closest('[data-action]');
@@ -1870,6 +2105,19 @@ function createApp() {
   }
   document.addEventListener('click', (event) => {
     if (event.target?.dataset?.action === 'logout') handleLogout();
+  });
+
+  // Search field input/change/keydown delegation
+  document.addEventListener('input', (event) => {
+    if (event.target?.dataset?.searchField) handleSearchEvent(event);
+  });
+  document.addEventListener('change', (event) => {
+    if (event.target?.dataset?.searchField) handleSearchEvent(event);
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.target?.dataset?.searchField === 'search' && event.key === 'Enter') {
+      handleSearchEvent(event);
+    }
   });
 
   refresh();
