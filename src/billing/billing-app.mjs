@@ -564,21 +564,65 @@ function createApp() {
     }).join('');
   }
 
+  function outstandingFor(inv) {
+    if (!inv || !Number.isInteger(inv.totalGrossMinor)) return 0;
+    const paid = (inv.payments || []).reduce((sum, p) => sum + (Number.isInteger(p.amountMinor) ? p.amountMinor : 0), 0);
+    return Math.max(0, inv.totalGrossMinor - paid);
+  }
+
+  function paymentFormHtml(inv) {
+    const outstanding = outstandingFor(inv);
+    if (outstanding <= 0) return '';
+    const disabled = canMutate() ? '' : ' disabled aria-disabled="true"';
+    const currency = inv.currency || 'DKK';
+    return `<section class="billing-payment-section" aria-label="Registrér betaling">
+      <h4>Registrér betaling</h4>
+      <p class="billing-form-help">Udestående: <strong>${esc(formatMoney(outstanding, currency, locale()))}</strong></p>
+      <form id="billing-payment-form" class="billing-form" aria-describedby="billing-payment-error">
+        <input type="hidden" name="invoiceId" value="${esc(inv.id)}">
+        <div class="billing-field"><label for="payment-amount">Beløb (${esc(currency)})</label><input id="payment-amount" name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="${esc(String((outstanding / 100).toFixed(2)))}" required${disabled}></div>
+        <div class="billing-field"><label for="payment-method">Betalingsmetode</label><select id="payment-method" name="method" required${disabled}><option value="">Vælg metode</option><option value="bank_transfer">Bankoverførsel</option><option value="mobilepay">MobilePay</option><option value="card">Kort</option><option value="cash">Kontant</option><option value="other">Andet</option></select></div>
+        <div class="billing-field"><label for="payment-reference">Reference</label><input id="payment-reference" name="reference" placeholder="Transaktionsnr. eller note"${disabled}></div>
+        <div class="billing-field"><label for="payment-date">Betalingsdato</label><input id="payment-date" name="paidAt" type="date" value="${today()}" required${disabled}></div>
+        <p id="billing-payment-error" class="billing-form-error" role="alert" hidden></p>
+        <div class="billing-form-actions"><button type="submit" class="billing-primary-button"${disabled}>Registrér betaling</button></div>
+      </form>
+    </section>`;
+  }
+
+  function creditNoteFormHtml(inv) {
+    const disabled = canMutate() ? '' : ' disabled aria-disabled="true"';
+    return `<section class="billing-credit-section" aria-label="Opret kreditnota">
+      <h4>Kreditnota</h4>
+      <form id="billing-credit-form" class="billing-form" aria-describedby="billing-credit-error">
+        <input type="hidden" name="invoiceId" value="${esc(inv.id)}">
+        <div class="billing-field"><label for="credit-reason">Årsag til kreditnota</label><textarea id="credit-reason" name="reason" maxlength="1000" required placeholder="Begrundelse for annullering"${disabled}></textarea></div>
+        <p class="billing-form-help">Annullerer fakturaen og opretter en kreditnota. Denne handling kan ikke fortrydes.</p>
+        <p id="billing-credit-error" class="billing-form-error" role="alert" hidden></p>
+        <div class="billing-form-actions"><button type="submit" class="billing-secondary-button" style="color:#b91c1c;border-color:#b91c1c"${disabled}>Opret kreditnota</button></div>
+      </form>
+    </section>`;
+  }
+
   function controlsHtml() {
     const disabled = canMutate() ? '' : ' disabled aria-disabled="true" title="Kræver online og aktuelle data"';
     if (state.activeInvoice) {
       const issued = ['issued', 'emailed'].includes(state.activeInvoice.status);
       const emailed = state.activeInvoice.status === 'emailed';
       const deliveryFailed = state.activeInvoice.delivery?.state === 'failed';
-      const status = emailed ? 'Sendt til kunde' : deliveryFailed ? 'Levering fejlede' : issued ? 'Faktura udstedt' : 'Kladde oprettet';
+      const voided = state.activeInvoice.status === 'void';
+      const status = voided ? 'Kreditnota oprettet' : emailed ? 'Sendt til kunde' : deliveryFailed ? 'Levering fejlede' : issued ? 'Faktura udstedt' : 'Kladde oprettet';
       const deliveryDetail = emailed
         ? `<p>Leveret ${esc(formatDate(state.activeInvoice.delivery?.deliveredAt, locale()))} via ${esc(state.activeInvoice.delivery?.provider || 'provider')}.</p>`
         : deliveryFailed ? '<p>Fakturaen er stadig udstedt. Du kan prøve leveringen igen.</p>' : '';
-      const artifact = issued ? `<button type="button" class="billing-secondary-button" data-action="download" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>Download faktura</button>` : '';
-      const deliver = issued && !emailed ? `<button type="button" class="billing-primary-button" data-action="deliver" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>${deliveryFailed ? 'Prøv levering igen' : 'Send faktura'}</button>` : '';
-      const issue = issued ? '' : `<button type="button" class="billing-primary-button" data-action="issue" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>Udsted faktura</button>`;
-      const editManual = !issued && state.activeInvoice.source === 'manual' ? `<button type="button" class="billing-secondary-button" data-action="edit-manual-draft" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>Redigér kladde</button>` : '';
-      return `<div class="billing-draft-status"><strong>${status}</strong><p>Nr. ${esc(state.activeInvoice.number)} · forfalder ${esc(formatDate(state.activeInvoice.dueDate, locale()))}</p>${deliveryDetail}</div><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Luk</button>${artifact}${editManual}${issue}${deliver}</div>`;
+      const voidDetail = voided ? `<p>Annulleret ${esc(formatDate(state.activeInvoice.voidedAt, locale()))}. Årsag: ${esc(state.activeInvoice.voidReason || '—')}</p>` : '';
+      const artifact = issued && !voided ? `<button type="button" class="billing-secondary-button" data-action="download" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>Download faktura</button>` : '';
+      const deliver = issued && !emailed && !voided ? `<button type="button" class="billing-primary-button" data-action="deliver" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>${deliveryFailed ? 'Prøv levering igen' : 'Send faktura'}</button>` : '';
+      const issue = issued || voided ? '' : `<button type="button" class="billing-primary-button" data-action="issue" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>Udsted faktura</button>`;
+      const editManual = !issued && !voided && state.activeInvoice.source === 'manual' ? `<button type="button" class="billing-secondary-button" data-action="edit-manual-draft" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>Redigér kladde</button>` : '';
+      const paymentSection = issued && !voided ? paymentFormHtml(state.activeInvoice) : '';
+      const creditSection = issued && !voided ? creditNoteFormHtml(state.activeInvoice) : '';
+      return `<div class="billing-draft-status"><strong>${status}</strong><p>Nr. ${esc(state.activeInvoice.number)} · forfalder ${esc(formatDate(state.activeInvoice.dueDate, locale()))}</p>${deliveryDetail}${voidDetail}</div><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Luk</button>${artifact}${editManual}${issue}${deliver}</div>${paymentSection}${creditSection}`;
     }
     const nextNumber = state.billing?.settings?.invoiceSequence?.nextNumber ?? '—';
     const correctionVisit = state.activeItem?.visitIds?.length === 1 ? visit(state.activeItem.visitIds[0]) : null;
@@ -1312,6 +1356,71 @@ function createApp() {
     }
   });
 
+  async function submitPayment(form) {
+    if (!state.activeInvoice || state.busy || !canMutate()) return;
+    const data = new FormData(form);
+    const invoiceId = String(data.get('invoiceId') || '').trim();
+    const amountRaw = String(data.get('amount') || '').trim();
+    const method = String(data.get('method') || '').trim();
+    const reference = String(data.get('reference') || '').trim();
+    const paidAt = String(data.get('paidAt') || '').trim();
+    const errorEl = $('#billing-payment-error', form);
+    if (errorEl) { errorEl.hidden = true; errorEl.textContent = ''; }
+    if (!invoiceId || !amountRaw || !method || !paidAt) {
+      if (errorEl) { errorEl.hidden = false; errorEl.textContent = 'Udfyld alle påkrævede felter.'; }
+      return;
+    }
+    const parsed = Number(amountRaw);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      if (errorEl) { errorEl.hidden = false; errorEl.textContent = 'Beløb skal være et positivt tal.'; }
+      return;
+    }
+    const amountMinor = Math.round(parsed * 100);
+    if (!Number.isInteger(amountMinor) || amountMinor <= 0) {
+      if (errorEl) { errorEl.hidden = false; errorEl.textContent = 'Ugyldigt beløb.'; }
+      return;
+    }
+    state.busy = true;
+    render();
+    try {
+      await client.recordPayment(invoiceId, { amountMinor, method, reference: reference || undefined, paidAt });
+      await refresh();
+    } catch (err) {
+      if (errorEl) { errorEl.hidden = false; errorEl.textContent = err?.message || 'Kunne ikke registrere betaling.'; }
+    } finally {
+      state.busy = false;
+      render();
+    }
+  }
+
+  async function submitCreditNote(form) {
+    if (!state.activeInvoice || state.busy || !canMutate()) return;
+    const data = new FormData(form);
+    const invoiceId = String(data.get('invoiceId') || '').trim();
+    const reason = String(data.get('reason') || '').trim();
+    const errorEl = $('#billing-credit-error', form);
+    if (errorEl) { errorEl.hidden = true; errorEl.textContent = ''; }
+    if (!invoiceId || !reason) {
+      if (errorEl) { errorEl.hidden = false; errorEl.textContent = 'Angiv en årsag til kreditnotaen.'; }
+      return;
+    }
+    if (reason.length > 1000) {
+      if (errorEl) { errorEl.hidden = false; errorEl.textContent = 'Årsag må højest være 1000 tegn.'; }
+      return;
+    }
+    state.busy = true;
+    render();
+    try {
+      await client.voidInvoice(invoiceId, reason);
+      await refresh();
+    } catch (err) {
+      if (errorEl) { errorEl.hidden = false; errorEl.textContent = err?.message || 'Kunne ikke oprette kreditnota.'; }
+    } finally {
+      state.busy = false;
+      render();
+    }
+  }
+
   document.addEventListener('submit', (event) => {
     if (event.target.id === 'billing-draft-form') {
       event.preventDefault();
@@ -1331,6 +1440,12 @@ function createApp() {
     } else if (event.target.id === 'billing-customer-form') {
       event.preventDefault();
       saveCustomer(event.target);
+    } else if (event.target.id === 'billing-payment-form') {
+      event.preventDefault();
+      submitPayment(event.target);
+    } else if (event.target.id === 'billing-credit-form') {
+      event.preventDefault();
+      submitCreditNote(event.target);
     }
   });
 
