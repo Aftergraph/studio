@@ -2307,6 +2307,237 @@ function createApp() {
   document.addEventListener('keydown', (event) => {
     if (event.target?.dataset?.searchField === 'search' && event.key === 'Enter') {
       handleSearchEvent(event);
+  // ── Theme Toggle (persisted in settings API + localStorage fallback) ──
+  const THEME_STORAGE_KEY = 'aftergraph.billing.theme';
+  const themeToggle = $('#billing-theme-toggle');
+
+  function applyTheme(theme) {
+    const normalized = theme === 'dark' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', normalized);
+    try { localStorage.setItem(THEME_STORAGE_KEY, normalized); } catch {}
+    if (themeToggle) {
+      themeToggle.setAttribute('aria-label', normalized === 'dark' ? 'Skift til lyst tema' : 'Skift til mørkt tema');
+    }
+  }
+
+  async function loadPersistedTheme() {
+    try {
+      const stored = localStorage.getItem(THEME_STORAGE_KEY);
+      if (stored === 'dark' || stored === 'light') { applyTheme(stored); return; }
+    } catch {}
+    // Fallback: check system preference
+    if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
+      applyTheme('dark');
+    } else {
+      applyTheme('light');
+    }
+  }
+
+  async function persistThemeToSettings(theme) {
+    try {
+      await client.updateSettings({ theme });
+    } catch {
+      // Settings API may not support theme yet; localStorage is the primary store
+    }
+  }
+
+  if (themeToggle) {
+    themeToggle.addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme') || 'light';
+      const next = current === 'dark' ? 'light' : 'dark';
+      applyTheme(next);
+      void persistThemeToSettings(next);
+      toast(next === 'dark' ? 'Mørkt tema aktiveret' : 'Lyst tema aktiveret');
+    });
+  }
+
+  void loadPersistedTheme();
+
+  // ── Command Palette (⌘K / Ctrl+K) with fuzzy search ──
+  const cmdOverlay = $('#billing-cmd-overlay');
+  const cmdInput = $('#billing-cmd-input');
+  const cmdListbox = $('#billing-cmd-listbox');
+  let cmdOpen = false;
+  let cmdSelectedIndex = -1;
+  let cmdItems = [];
+  let cmdReturnFocus = null;
+
+  function buildCommandItems() {
+    const items = [];
+    // Actions
+    items.push({ id: 'new-invoice', label: 'Ny faktura', category: 'Handling', action: () => openNewInvoice() });
+    items.push({ id: 'new-customer', label: 'Ny kunde', category: 'Handling', action: () => toast('Opret kunde via kildesystemet') });
+    items.push({ id: 'send-reminder', label: 'Send rykker', category: 'Handling', action: () => toast('Rykker-funktion ikke tilgængelig endnu') });
+    items.push({ id: 'company-settings', label: 'Virksomhedsindstillinger', category: 'Handling', action: () => openCompanySettings() });
+    items.push({ id: 'refresh', label: 'Opdater fakturaliste', category: 'Handling', action: () => void refresh() });
+    items.push({ id: 'toggle-theme', label: 'Skift tema (lys/mørk)', category: 'Handling', action: () => themeToggle?.click() });
+    // Views
+    Object.entries(VIEWS).forEach(([key, [label]]) => {
+      items.push({ id: `view-${key}`, label: `Visning: ${label}`, category: 'Visning', action: () => { state.view = key; renderList(); } });
+    });
+    // Customers from loaded data
+    const customers = state.billing?.customers || [];
+    customers.forEach((c) => {
+      items.push({ id: `customer-${c.id}`, label: c.name || c.id, category: 'Kunde', action: () => { state.view = 'inbox'; renderList(); toast(`Valgte kunde: ${c.name || c.id}`); } });
+    });
+    // Invoices from loaded data
+    const invoices = state.billing?.invoices || [];
+    invoices.forEach((inv) => {
+      const label = inv.number ? `Faktura ${inv.number}` : `Faktura ${inv.id}`;
+      items.push({ id: `invoice-${inv.id}`, label, category: 'Faktura', action: () => toast(`${label} — åbner detaljer`) });
+    });
+    return items;
+  }
+
+  function fuzzyMatch(query, text) {
+    if (!query) return true;
+    const q = query.toLowerCase();
+    const t = text.toLowerCase();
+    if (t.includes(q)) return true;
+    // Simple subsequence match
+    let qi = 0;
+    for (let ti = 0; ti < t.length && qi < q.length; ti++) {
+      if (t[ti] === q[qi]) qi++;
+    }
+    return qi === q.length;
+  }
+
+  function renderCmdResults(query) {
+    if (!cmdListbox) return;
+    const all = buildCommandItems();
+    const filtered = query ? all.filter((item) => fuzzyMatch(query, item.label) || fuzzyMatch(query, item.category)) : all;
+    cmdItems = filtered.slice(0, 20);
+    cmdSelectedIndex = cmdItems.length > 0 ? 0 : -1;
+    if (!cmdItems.length) {
+      cmdListbox.innerHTML = '<li class="billing-cmd-empty" role="option">Ingen resultater</li>';
+      return;
+    }
+    cmdListbox.innerHTML = cmdItems.map((item, i) => `
+      <li class="billing-cmd-item${i === cmdSelectedIndex ? ' is-selected' : ''}" role="option" aria-selected="${i === cmdSelectedIndex}" data-cmd-index="${i}">
+        <span class="billing-cmd-item-label">${esc(item.label)}</span>
+        <span class="billing-cmd-item-category">${esc(item.category)}</span>
+      </li>`).join('');
+  }
+
+  function updateCmdSelection() {
+    if (!cmdListbox) return;
+    const items = $$('.billing-cmd-item', cmdListbox);
+    items.forEach((el, i) => {
+      const selected = i === cmdSelectedIndex;
+      el.classList.toggle('is-selected', selected);
+      el.setAttribute('aria-selected', String(selected));
+      if (selected) el.scrollIntoView({ block: 'nearest' });
+    });
+  }
+
+  function openCmdPalette() {
+    if (!cmdOverlay || !cmdInput) return;
+    cmdOpen = true;
+    cmdReturnFocus = document.activeElement;
+    cmdOverlay.hidden = false;
+    // Force reflow before adding class for transition
+    void cmdOverlay.offsetHeight;
+    cmdOverlay.classList.add('is-open');
+    cmdOverlay.querySelector('.billing-cmd-panel')?.setAttribute('aria-expanded', 'true');
+    cmdInput.value = '';
+    renderCmdResults('');
+    setTimeout(() => cmdInput.focus(), 0);
+  }
+
+  function closeCmdPalette() {
+    if (!cmdOverlay) return;
+    cmdOpen = false;
+    cmdOverlay.classList.remove('is-open');
+    cmdOverlay.querySelector('.billing-cmd-panel')?.setAttribute('aria-expanded', 'false');
+    setTimeout(() => { cmdOverlay.hidden = true; }, 150);
+    const returnFocus = cmdReturnFocus;
+    cmdReturnFocus = null;
+    if (returnFocus?.isConnected && typeof returnFocus.focus === 'function') returnFocus.focus();
+  }
+
+  function executeCmdItem(index) {
+    const item = cmdItems[index];
+    if (!item) return;
+    closeCmdPalette();
+    try { item.action(); } catch (err) { console.error('cmd action failed', err); }
+  }
+
+  if (cmdInput) {
+    cmdInput.addEventListener('input', () => renderCmdResults(cmdInput.value.trim()));
+  }
+
+  if (cmdOverlay) {
+    cmdOverlay.addEventListener('click', (event) => {
+      if (event.target === cmdOverlay) closeCmdPalette();
+      const itemEl = event.target.closest('[data-cmd-index]');
+      if (itemEl) executeCmdItem(Number(itemEl.dataset.cmdIndex));
+    });
+  }
+
+  // Global keyboard shortcuts
+  document.addEventListener('keydown', (event) => {
+    // ⌘K / Ctrl+K → toggle command palette
+    if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
+      event.preventDefault();
+      if (cmdOpen) closeCmdPalette(); else openCmdPalette();
+      return;
+    }
+
+    // Esc → close command palette or review dialog
+    if (event.key === 'Escape') {
+      if (cmdOpen) { closeCmdPalette(); return; }
+      // Review dialog handles its own cancel event
+      return;
+    }
+
+    // Command palette navigation
+    if (cmdOpen) {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        if (cmdItems.length) {
+          cmdSelectedIndex = (cmdSelectedIndex + 1) % cmdItems.length;
+          updateCmdSelection();
+        }
+        return;
+      }
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (cmdItems.length) {
+          cmdSelectedIndex = (cmdSelectedIndex - 1 + cmdItems.length) % cmdItems.length;
+          updateCmdSelection();
+        }
+        return;
+      }
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        if (cmdSelectedIndex >= 0) executeCmdItem(cmdSelectedIndex);
+        return;
+      }
+      return;
+    }
+
+    // Skip shortcuts when typing in form fields
+    const tag = event.target.tagName;
+    const isEditable = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || event.target.isContentEditable;
+    if (isEditable) return;
+
+    // N → new invoice
+    if (event.key === 'n' || event.key === 'N') {
+      event.preventDefault();
+      openNewInvoice();
+      return;
+    }
+    // C → new customer
+    if (event.key === 'c' || event.key === 'C') {
+      event.preventDefault();
+      toast('Opret kunde via kildesystemet');
+      return;
+    }
+    // / → focus search (command palette)
+    if (event.key === '/') {
+      event.preventDefault();
+      openCmdPalette();
+      return;
     }
   });
 

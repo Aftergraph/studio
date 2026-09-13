@@ -1228,3 +1228,180 @@ button {
     gap: 0.5rem;
   }
 }
+/* ── Command Palette Overlay ── */
+.billing-cmd-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: min(20vh, 160px);
+  background: color-mix(in srgb, var(--bg) 60%, transparent);
+  backdrop-filter: blur(8px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+}
+
+.billing-cmd-overlay.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.billing-cmd-panel {
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(420px, calc(100vh - 80px));
+  border: 1px solid var(--border-strong);
+  border-radius: var(--ag-brand-radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: translateY(-8px);
+  transition: transform 140ms ease;
+}
+
+.billing-cmd-overlay.is-open .billing-cmd-panel {
+  transform: translateY(0);
+}
+
+.billing-cmd-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--ag-brand-space-sm);
+  padding: var(--ag-brand-space-md) var(--ag-brand-space-lg);
+  border-bottom: 1px solid var(--border);
+}
+
+.billing-cmd-icon {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  color: var(--text-3);
+}
+
+.billing-cmd-input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: var(--ag-brand-type-body-lg);
+  outline: none;
+  min-height: 32px;
+}
+
+.billing-cmd-input::placeholder {
+  color: var(--text-3);
+}
+
+.billing-cmd-kbd {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-3);
+  font-size: var(--ag-brand-type-ui);
+  font-family: var(--font-mono);
+  line-height: 1.4;
+}
+
+.billing-cmd-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--ag-brand-space-xs) 0;
+  margin: 0;
+  list-style: none;
+}
+
+.billing-cmd-item {
+  display: flex;
+  align-items: center;
+  gap: var(--ag-brand-space-md);
+  padding: var(--ag-brand-space-sm) var(--ag-brand-space-lg);
+  cursor: pointer;
+  color: var(--text);
+  font-size: var(--ag-brand-type-body);
+  border-left: 3px solid transparent;
+}
+
+.billing-cmd-item:hover,
+.billing-cmd-item.is-selected {
+  background: var(--surface-strong);
+  border-left-color: var(--accent);
+}
+
+.billing-cmd-item-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.billing-cmd-item-category {
+  flex: 0 0 auto;
+  color: var(--text-3);
+  font-size: var(--ag-brand-type-ui);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 680;
+}
+
+.billing-cmd-empty {
+  padding: var(--ag-brand-space-xl) var(--ag-brand-space-lg);
+  color: var(--text-3);
+  font-size: var(--ag-brand-type-body-sm);
+  text-align: center;
+}
+
+.billing-cmd-footer {
+  display: flex;
+  gap: var(--ag-brand-space-md);
+  padding: var(--ag-brand-space-xs) var(--ag-brand-space-lg);
+  border-top: 1px solid var(--border);
+  color: var(--text-3);
+  font-size: var(--ag-brand-type-ui);
+}
+
+.billing-cmd-footer kbd {
+  padding: 1px 4px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: inherit;
+}
+
+/* ── Theme Toggle Button ── */
+.billing-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ag-brand-radius-button);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.billing-theme-toggle:hover {
+  background: var(--surface-strong);
+  color: var(--text);
+}
+
+.billing-theme-toggle svg {
+  width: 20px;
+  height: 20px;
+}
+
+.billing-theme-toggle .icon-moon { display: block; }
+.billing-theme-toggle .icon-sun { display: none; }
+
+html[data-theme="dark"] .billing-theme-toggle .icon-moon { display: none; }
+html[data-theme="dark"] .billing-theme-toggle .icon-sun { display: block; }
