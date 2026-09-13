@@ -18,4 +18,30 @@ describe('mapCompileResponse', () => {
     expect(result.content).toContain('Create the feature');
     expect(result.ambiguities).toEqual(['Target runtime is not explicit']);
   });
+
+  it('stamps a createdAt timestamp', () => {
+    const before = Date.now();
+    const result = mapCompileResponse(sample, 1);
+    const after = Date.now();
+    expect(result.createdAt).toBeGreaterThanOrEqual(before);
+    expect(result.createdAt).toBeLessThanOrEqual(after);
+  });
+
+  it('generates a unique id per call', () => {
+    const a = mapCompileResponse(sample, 1);
+    const b = mapCompileResponse(sample, 2);
+    expect(a.id).not.toBe(b.id);
+  });
+
+  it('derives the title from the goal statement', () => {
+    const result = mapCompileResponse(sample, 1);
+    expect(result.title).toBe('Create a clear implementation instruction');
+  });
+
+  it('truncates long goal statements in the title', () => {
+    const longGoal = { ...sample, ir: { ...sample.ir, goal: { ...sample.ir.goal, statement: 'A'.repeat(100) } } };
+    const result = mapCompileResponse(longGoal, 1);
+    expect(result.title.length).toBeLessThanOrEqual(72);
+    expect(result.title.endsWith('…')).toBe(true);
+  });
 });

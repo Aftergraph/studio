@@ -22,5 +22,6 @@ export function mapCompileResponse(
     ambiguities: response.ir.ambiguities,
     confidence: response.target.confidence,
     semanticMap: response.artifact.semanticMap,
+    createdAt: Date.now(),
   };
 }

@@ -13,28 +13,33 @@ export interface ToastProps {
   dismissible?: boolean;
 }
 
-export function Toast({ 
-  message, 
-  type = 'info', 
-  duration = TOAST_DURATION, 
+const toastIcon: Record<ToastType, string> = {
+  success: '\u2713',
+  error: '\u2717',
+  warning: '\u26a0',
+  info: '\u2139',
+};
+
+export function Toast({
+  message,
+  type = 'info',
+  duration = TOAST_DURATION,
   onDismiss,
-  dismissible = true 
+  dismissible = true,
 }: ToastProps) {
-  const [isVisible, setIsVisible] = useState(true);
   const [isExiting, setIsExiting] = useState(false);
 
   useEffect(() => {
-    if (!isVisible) return;
-    
     const timer = setTimeout(() => {
       setIsExiting(true);
-      setTimeout(() => {
+      const exitTimer = setTimeout(() => {
         onDismiss?.();
-      }, 300); // Animation duration
+      }, 300);
+      return () => clearTimeout(exitTimer);
     }, duration);
 
     return () => clearTimeout(timer);
-  }, [isVisible, duration, onDismiss]);
+  }, [duration, onDismiss]);
 
   const handleDismiss = () => {
     setIsExiting(true);
@@ -43,30 +48,25 @@ export function Toast({
     }, 300);
   };
 
-  if (!isVisible && !isExiting) return null;
-
   return (
-    <div 
+    <div
       className={`toast toast-${type} ${isExiting ? 'toast-exiting' : 'toast-entering'}`}
       role="alert"
       aria-live="polite"
       style={{ zIndex: Z_INDEX.toast }}
     >
       <span className="toast-icon" aria-hidden="true">
-        {type === 'success' && '\u2713'}
-        {type === 'error' && '\u2717'}
-        {type === 'warning' && '\u26a0'}
-        {type === 'info' && '\u2139'}
+        {toastIcon[type]}
       </span>
       <span className="toast-message">{message}</span>
       {dismissible && (
-        <button 
-          className="toast-dismiss" 
+        <button
+          className="toast-dismiss"
           onClick={handleDismiss}
           aria-label="Dismiss"
           type="button"
         >
-          \u00d7
+          {'\u00d7'}
         </button>
       )}
     </div>

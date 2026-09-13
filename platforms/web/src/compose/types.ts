@@ -30,6 +30,7 @@ export type InstructionArtifactModel = {
   ambiguities: string[];
   confidence: number;
   semanticMap: Record<string, string[]>;
+  createdAt: number;
 };
 
 export type ConversationItem = {
@@ -39,31 +40,4 @@ export type ConversationItem = {
   activeVersion: number;
   artifacts: InstructionArtifactModel[];
   title?: string;
-};
-
-// Toast types
-export type ToastType = 'success' | 'error' | 'info' | 'warning';
-
-export type ToastState = {
-  id: string;
-  message: string;
-  type: ToastType;
-  duration?: number;
-  dismissible?: boolean;
-};
-
-// Compile status types
-export type CompileStatus = 
-  | 'idle'
-  | 'working'
-  | 'aborting'
-  | 'aborted'
-  | 'error'
-  | 'queueing';
-
-// Rate limit status
-export type RateLimitStatus = {
-  remaining: number;
-  resetAt: number;
-  limited: boolean;
 };

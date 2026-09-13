@@ -95,7 +95,8 @@ export function debounce<T extends (...args: Parameters<T>) => ReturnType<T>>(
  * Check if currently online
  */
 export function isOnline(): boolean {
-  return typeof navigator !== 'undefined' ? navigator.onLine : true;
+  if (typeof navigator === 'undefined') return true;
+  return typeof navigator.onLine === 'boolean' ? navigator.onLine : true;
 }
 
 /**
