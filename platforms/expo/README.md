@@ -1,7 +1,45 @@
-# Expo reference layer — Living Interface V5/V6
+# Aftergraph Compose mobile
 
-The Expo source carries the same semantic product contract as the web build: **Chat** and **Work** are the only primary modes, while artifacts, approvals, trajectory and context become contextual native surfaces.
+Compose is the mobile capture surface for turning rough thoughts into agent-ready instructions. The mobile app never carries model-provider credentials and does not directly execute agent actions in v0.1.
 
-V5/V6 maps the shared motion semantics to native-friendly patterns: Reanimated-style springs, haptics, safe-area-aware sheets, Expo Router navigation and SF Symbols through `expo-image`. Today/Library route sources remain supporting/contextual routes, not permanent primary navigation.
+## Run the app
 
-Verification in this package is TypeScript/source-contract only. This container does not provide Expo Go, an iOS Simulator or an Android emulator, so no device-runtime claim is made.
+```bash
+cd platforms/expo
+npm install
+```
+
+Set only the reachable Studio API URL in the Expo environment:
+
+```text
+EXPO_PUBLIC_AFTERGRAPH_API_URL=http://<studio-host>:8000
+```
+Then start Expo:
+
+```bash
+npx expo start
+```
+
+## Backend contract
+
+Studio owns the public mobile API. Its intent provider talks only to the isolated local Hermes Compose service on loopback. Backend configuration uses:
+
+- `AFTERGRAPH_INTENT_HERMES_URL`
+- `AFTERGRAPH_INTENT_HERMES_AUTH`
+- `AFTERGRAPH_INTENT_HERMES_MODEL`
+- `AFTERGRAPH_INTENT_HERMES_TIMEOUT_MS`
+
+The credential value is managed outside git and must never be exposed through an `EXPO_PUBLIC_*` variable.
+## Product boundary
+
+Compose v0.1 compiles, refines, copies, shares and stores recent instructions. It does not directly invoke Runtime, GitHub, Trust Gateway or other consequential write surfaces.
+
+## Verification
+
+```bash
+npm run typecheck
+npx expo-doctor
+npx expo export --platform android
+```
+
+A successful build does not replace a physical-device check; the final gate is the real iPhone flow against a reachable Studio API.

@@ -2,7 +2,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createAppServer as createWorkspaceAppServer, upstreamConfigFromEnv } from './server/app-server.mjs';
 import { createIntentCompileHandler } from './server/intent-routes.mjs';
-import { createHermesIntentProvider } from './server/intent-provider.mjs';
+import { createHermesApiIntentProvider } from './server/intent-provider.mjs';
 import { authSecretFromEnv, subjectFromAuthHeader } from './src/auth/magic-link.mjs';
 import { sendJson } from './server/http-utils.mjs';
 
@@ -12,7 +12,7 @@ export function createAppServer(options={}) {
   const { intentProvider=null, ...workspaceOptions }=options;
   const server=createWorkspaceAppServer(workspaceOptions);
   const baseHandlers=server.listeners('request');
-  const compileHandler=createIntentCompileHandler({provider:intentProvider || createHermesIntentProvider()});
+  const compileHandler=createIntentCompileHandler({provider:intentProvider || createHermesApiIntentProvider()});
   const requireAuth=workspaceOptions.requireAuth ?? process.env.AFTERGRAPH_REQUIRE_AUTH === 'true';
   const secret=workspaceOptions.authSecret || authSecretFromEnv();
 

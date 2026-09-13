@@ -337,9 +337,10 @@ Test `createIntentProvider({fetchImpl,baseUrl,apiKey,model})`:
 Environment mapping:
 
 ```text
-AFTERGRAPH_INTENT_BASE_URL
-AFTERGRAPH_INTENT_API_KEY
-AFTERGRAPH_INTENT_MODEL
+AFTERGRAPH_INTENT_HERMES_URL
+AFTERGRAPH_INTENT_HERMES_AUTH
+AFTERGRAPH_INTENT_HERMES_MODEL
+AFTERGRAPH_INTENT_HERMES_TIMEOUT_MS
 ```
 
 Do not define default credential values. Do not serialize these fields to logs or API responses.
@@ -769,9 +770,10 @@ Record this evidence as **operator-observed Expo Go behavior**, not simulator or
 Set backend-only environment variables on the authorized deployment host:
 
 ```text
-AFTERGRAPH_INTENT_BASE_URL=<OpenAI-compatible endpoint>
-AFTERGRAPH_INTENT_API_KEY=<secret managed outside git>
-AFTERGRAPH_INTENT_MODEL=<selected model id>
+AFTERGRAPH_INTENT_HERMES_URL=<loopback Hermes API endpoint>
+AFTERGRAPH_INTENT_HERMES_AUTH=<secret managed outside git>
+AFTERGRAPH_INTENT_HERMES_MODEL=<Hermes API model name>
+AFTERGRAPH_INTENT_HERMES_TIMEOUT_MS=45000
 ```
 
 Set the mobile public endpoint only:

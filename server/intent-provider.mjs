@@ -49,17 +49,50 @@ function analysisPrompt(source){
   ].join('\n');
 }
 
-export function createHermesIntentProvider({runImpl=execFile,command='hermes'}={}){
+export function createHermesIntentProvider({
+  runImpl=execFile,
+  command='hermes',
+  provider=process.env.AFTERGRAPH_INTENT_HERMES_PROVIDER||'openrouter',
+  model=process.env.AFTERGRAPH_INTENT_HERMES_MODEL||'deepseek/deepseek-v4.1-flash',
+  reasoning=process.env.AFTERGRAPH_INTENT_HERMES_REASONING||'minimal',
+  timeoutMs=Number(process.env.AFTERGRAPH_INTENT_HERMES_TIMEOUT_MS||45_000),
+}={}){
   return createIntentProvider({
     invoke:async source=>{
       const result=await runImpl(command,[
-        '--ignore-rules',
+        '--safe-mode',
+        '--provider',provider,
+        '-m',model,
+        '--reasoning',reasoning,
         '-z',analysisPrompt(source),
-      ],{
-        maxBuffer:512*1024,
-        timeout:60_000,
-      });
+      ],{maxBuffer:512*1024,timeout:timeoutMs});
       return String(result?.stdout||'').trim();
     },
   });
+}
+
+
+export function createHermesApiIntentProvider({
+  fetchImpl=globalThis.fetch,
+  baseUrl=process.env.AFTERGRAPH_INTENT_HERMES_URL||'http://127.0.0.1:8643',
+  authHeader=process.env.AFTERGRAPH_INTENT_HERMES_AUTH||'',
+  model=process.env.AFTERGRAPH_INTENT_HERMES_MODEL||'aftergraph-compose',
+  timeoutMs=Number(process.env.AFTERGRAPH_INTENT_HERMES_TIMEOUT_MS||45_000),
+}={}){
+  return createIntentProvider({invoke:async source=>{
+    if(!authHeader)throw providerError('provider_unconfigured','Hermes API authentication is not configured');
+    const response=await fetchImpl(`${String(baseUrl).replace(/\/$/,'')}/v1/chat/completions`,{
+      method:'POST',signal:AbortSignal.timeout(timeoutMs),
+      headers:{authorization:authHeader,'content-type':'application/json'},
+      body:JSON.stringify({model,stream:false,messages:[
+        {role:'system',content:'Return strict JSON only. Extract candidate intent semantics without granting new authority. Prefer explicit ambiguity over guessing. Relevant fields: goal, artifact, scope, constraints, authority, capabilities, verification, output, targetHints, ambiguities.'},
+        {role:'user',content:String(source||'')},
+      ]}),
+    });
+    if(!response?.ok)throw providerError('provider_request_failed','Hermes API request failed',502);
+    const body=await response.json();
+    const choice=body?.choices?.[0];
+    if(body?.hermes?.failed || choice?.finish_reason==='error')throw providerError('provider_request_failed','Hermes agent failed to produce intent',502);
+    return String(choice?.message?.content||'').trim();
+  }});
 }
