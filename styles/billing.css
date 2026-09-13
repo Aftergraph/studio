@@ -16,51 +16,33 @@ button {
 }
 
 .billing-header {
-  min-height: var(--ag-brand-space-5xl);
+  min-height: 64px;
   padding: 0 var(--ag-brand-space-xl);
   border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  display: flex;
   align-items: center;
-  gap: var(--ag-brand-space-lg);
+  justify-content: space-between;
+  gap: var(--ag-brand-space-md);
   position: sticky;
   top: 0;
   z-index: 20;
   backdrop-filter: blur(18px);
 }
 
-.billing-back,
 .billing-brand {
   display: inline-flex;
   align-items: center;
   gap: var(--ag-brand-space-sm);
-  color: var(--text-2);
-  text-decoration: none;
-  font-size: var(--ag-brand-type-body);
-  font-weight: 620;
-}
-
-.billing-back {
-  justify-self: start;
-}
-
-.billing-back:hover {
   color: var(--text);
-}
-
-.billing-brand {
-  justify-self: center;
-  color: var(--text);
+  font-size: var(--ag-brand-type-subhead);
+  font-weight: 720;
   letter-spacing: -0.01em;
+  white-space: nowrap;
 }
 
 .billing-brand strong {
-  font-weight: 720;
-}
-
-.billing-brand-separator {
-  color: var(--text-3);
+  font-weight: 760;
 }
 
 .billing-mark {
@@ -211,8 +193,8 @@ button {
 
 .billing-tab {
   flex: 0 0 auto;
-  min-height: 44px;
-  padding: 0 var(--ag-brand-space-md);
+  min-height: 48px;
+  padding: 0 var(--ag-brand-space-lg);
   border: 1px solid transparent;
   border-radius: var(--ag-brand-radius-pill);
   background: transparent;
@@ -220,6 +202,8 @@ button {
   font-size: var(--ag-brand-type-body);
   font-weight: 680;
   cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .billing-tab span {
@@ -539,13 +523,16 @@ button {
 }
 
 .billing-field label {
-  color: var(--text-2);
-  font-size: var(--ag-brand-type-ui);
-  font-weight: 700;
+  color: var(--text);
+  font-size: var(--ag-brand-type-body-sm);
+  font-weight: 720;
+  letter-spacing: 0.01em;
 }
 
-.billing-field input {
-  min-height: 44px;
+.billing-field input,
+.billing-field select,
+.billing-field textarea {
+  min-height: 48px;
   width: 100%;
   box-sizing: border-box;
   padding: 0 var(--ag-brand-space-md);
@@ -554,6 +541,8 @@ button {
   background: var(--canvas);
   color: var(--text);
   outline: none;
+  font-size: max(16px, var(--ag-brand-type-body));
+  touch-action: manipulation;
 }
 
 .billing-field input:focus {
@@ -652,25 +641,29 @@ button {
 
 @media (max-width: 760px) {
   .billing-header {
-    min-height: 54px;
-    padding: 0 var(--ag-brand-space-base);
-    grid-template-columns: auto 1fr auto;
-  }
-
-  .billing-back span:last-child,
-  .billing-brand > span:not(.billing-mark),
-  .billing-brand-separator {
-    display: none;
+    min-height: 56px;
+    padding: 0 var(--ag-brand-space-md);
+    gap: var(--ag-brand-space-sm);
   }
 
   .billing-brand {
-    justify-self: start;
+    font-size: var(--ag-brand-type-body-lg);
+  }
+
+  .billing-header-actions {
+    gap: var(--ag-brand-space-xxs);
   }
 
   .billing-quiet-button {
     min-height: 44px;
+    min-width: 44px;
     padding: 0 var(--ag-brand-space-sm);
     font-size: var(--ag-brand-type-body-sm);
+  }
+
+  .billing-primary-button {
+    min-height: 44px;
+    padding: 0 var(--ag-brand-space-md);
   }
 
   .billing-shell {
@@ -697,15 +690,20 @@ button {
 
   .billing-summary {
     grid-template-columns: 1fr 1fr;
+    gap: 0;
   }
 
   .billing-summary-item {
-    min-height: 92px;
-    padding: var(--ag-brand-space-lg) var(--ag-brand-space-md) var(--ag-brand-space-lg) 0;
+    min-height: 88px;
+    padding: var(--ag-brand-space-md) var(--ag-brand-space-md) var(--ag-brand-space-md) 0;
   }
 
   .billing-summary-item + .billing-summary-item {
     padding-left: var(--ag-brand-space-md);
+  }
+
+  .billing-summary-label {
+    font-size: max(var(--ag-brand-type-ui), 11px);
   }
 
   .billing-summary-value {

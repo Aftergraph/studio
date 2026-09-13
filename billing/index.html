@@ -19,17 +19,17 @@
 </head>
 <body class="billing-page">
   <header class="billing-header">
-    <a class="billing-back" href="/" aria-label="Åbn Aftergraph Studio">
-      <span aria-hidden="true">←</span>
-      <span>Studio</span>
-    </a>
-    <div class="billing-brand" aria-label="Aftergraph Billing">
+    <div class="billing-brand" aria-label="Aftergraph Fakturering">
       <span class="billing-mark" aria-hidden="true"></span>
-      <span>Aftergraph</span>
-      <span class="billing-brand-separator" aria-hidden="true">/</span>
-      <strong>Billing</strong>
+      <strong>Fakturering</strong>
     </div>
-    <div class="billing-header-actions"><button class="billing-primary-button" type="button" data-action="new-invoice">Ny faktura</button><button class="billing-quiet-button" type="button" data-action="manage-customers">Kunder</button><button class="billing-quiet-button" type="button" data-action="company-settings">Virksomhed</button><button class="billing-quiet-button" id="billing-refresh" type="button">Opdater</button></div>
+    <div class="billing-header-actions">
+      <button class="billing-quiet-button" type="button" data-action="manage-customers">Kunder</button>
+      <button class="billing-quiet-button" id="billing-refresh" type="button" aria-label="Opdater fakturaliste">Opdater</button>
+      <button class="billing-quiet-button" type="button" data-action="company-settings" aria-label="Virksomhedsindstillinger">Indstillinger</button>
+      <button class="billing-primary-button" type="button" data-action="new-invoice">Ny faktura</button>
+    </div>
+
   </header>
 
   <main id="billing-app" class="billing-shell">
