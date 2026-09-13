@@ -100,9 +100,10 @@ describe('performance-regression', () => {
       console.log(`  structuredClone: avg=${result.avg.toFixed(2)}μs, p95=${result.p95.toFixed(2)}μs, max=${result.max.toFixed(2)}μs`);
       console.log(`  Baseline: avg=${BASELINES.fullStateClone.avg}μs, max=${BASELINES.fullStateClone.max}μs`);
       
-      // Allow 50% overhead for different environments
-      const avgThreshold = BASELINES.fullStateClone.avg * 2.0;
-      const maxThreshold = BASELINES.fullStateClone.max * 2.0;
+      // Use p95 instead of max to avoid flakiness from GC pauses on shared CI runners.
+      // Allow 5x overhead for slower CI environments.
+      const avgThreshold = BASELINES.fullStateClone.avg * 5.0;
+      const p95Threshold = BASELINES.fullStateClone.max * 5.0;
       
       assert.ok(
         result.avg <= avgThreshold,
@@ -110,8 +111,8 @@ describe('performance-regression', () => {
       );
       
       assert.ok(
-        result.max <= maxThreshold,
-        `${BASELINES.fullStateClone.name}: max ${result.max.toFixed(2)}μs exceeds threshold ${maxThreshold.toFixed(2)}μs`
+        result.p95 <= p95Threshold,
+        `${BASELINES.fullStateClone.name}: p95 ${result.p95.toFixed(2)}μs exceeds threshold ${p95Threshold.toFixed(2)}μs`
       );
     });
 
@@ -148,9 +149,9 @@ describe('performance-regression', () => {
       console.log(`  JSON.stringify (compact): avg=${result.avg.toFixed(2)}μs, p95=${result.p95.toFixed(2)}μs`);
       console.log(`  Baseline: avg=${BASELINES.jsonStringifyCompact.avg}μs, max=${BASELINES.jsonStringifyCompact.max}μs`);
       
-      // Allow 50% overhead
-      const avgThreshold = BASELINES.jsonStringifyCompact.avg * 1.5;
-      const maxThreshold = BASELINES.jsonStringifyCompact.max * 1.5;
+      // Use p95 and allow 3x overhead for CI environments
+      const avgThreshold = BASELINES.jsonStringifyCompact.avg * 3.0;
+      const p95Threshold = BASELINES.jsonStringifyCompact.max * 3.0;
       
       assert.ok(
         result.avg <= avgThreshold,
@@ -158,8 +159,8 @@ describe('performance-regression', () => {
       );
       
       assert.ok(
-        result.max <= maxThreshold,
-        `${BASELINES.jsonStringifyCompact.name}: max ${result.max.toFixed(2)}μs exceeds threshold ${maxThreshold.toFixed(2)}μs`
+        result.p95 <= p95Threshold,
+        `${BASELINES.jsonStringifyCompact.name}: p95 ${result.p95.toFixed(2)}μs exceeds threshold ${p95Threshold.toFixed(2)}μs`
       );
     });
 

@@ -5,6 +5,7 @@
 
 import * as assert from 'node:assert';
 import { describe, it, beforeEach } from 'node:test';
+import { performance } from 'node:perf_hooks';
 import { createInitialState } from '../src/state.mjs';
 import {
   setIn,
@@ -309,41 +310,41 @@ describe('state-update', () => {
     });
 
     it('should be faster than full clone for single property update', () => {
-      const start1 = Date.now();
-      for (let i = 0; i < 100; i++) {
+      const start1 = performance.now();
+      for (let i = 0; i < 1000; i++) {
         const state = clone(initialState);
         state.missions[0].progress = 50;
       }
-      const time1 = Date.now() - start1;
+      const time1 = performance.now() - start1;
 
-      const start2 = Date.now();
-      for (let i = 0; i < 100; i++) {
+      const start2 = performance.now();
+      for (let i = 0; i < 1000; i++) {
         setIn(initialState, ['missions', 0, 'progress'], 50);
       }
-      const time2 = Date.now() - start2;
+      const time2 = performance.now() - start2;
 
       // setIn should be at least 2x faster for this operation
       // (it only clones the path, not the entire state)
-      console.log(`Full clone: ${time1}ms, setIn: ${time2}ms, ratio: ${(time1/time2).toFixed(2)}x`);
-      assert.ok(time2 < time1, `setIn (${time2}ms) should be faster than full clone (${time1}ms)`);
+      console.log(`Full clone: ${time1.toFixed(2)}ms, setIn: ${time2.toFixed(2)}ms, ratio: ${(time1/time2).toFixed(2)}x`);
+      assert.ok(time2 < time1, `setIn (${time2.toFixed(2)}ms) should be faster than full clone (${time1.toFixed(2)}ms)`);
     });
 
     it('should be faster for array element updates', () => {
-      const start1 = Date.now();
-      for (let i = 0; i < 100; i++) {
+      const start1 = performance.now();
+      for (let i = 0; i < 1000; i++) {
         const arr = clone(initialState.missions);
         arr[0] = { ...arr[0], progress: 50 };
       }
-      const time1 = Date.now() - start1;
+      const time1 = performance.now() - start1;
 
-      const start2 = Date.now();
-      for (let i = 0; i < 100; i++) {
+      const start2 = performance.now();
+      for (let i = 0; i < 1000; i++) {
         updateArrayElement(initialState.missions, 0, m => ({ ...m, progress: 50 }));
       }
-      const time2 = Date.now() - start2;
+      const time2 = performance.now() - start2;
 
-      console.log(`Full array clone: ${time1}ms, updateArrayElement: ${time2}ms, ratio: ${(time1/time2).toFixed(2)}x`);
-      assert.ok(time2 < time1, `updateArrayElement (${time2}ms) should be faster than full array clone (${time1}ms)`);
+      console.log(`Full array clone: ${time1.toFixed(2)}ms, updateArrayElement: ${time2.toFixed(2)}ms, ratio: ${(time1/time2).toFixed(2)}x`);
+      assert.ok(time2 < time1, `updateArrayElement (${time2.toFixed(2)}ms) should be faster than full array clone (${time1.toFixed(2)}ms)`);
     });
   });
 });
