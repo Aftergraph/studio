@@ -6,6 +6,7 @@ import path from 'node:path';
 import { existsSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
+  assertComposeHermesGateway,
   assertPortsAvailable,
   buildComposePlan,
   buildExpoEnv,
@@ -68,6 +69,14 @@ async function waitForHealth(url, options = {}) {
 }
 
 async function validateHermes(plan) {
+  const command = process.platform === 'win32' ? 'hermes.exe' : 'hermes';
+  const status = spawnSync(command, ['--profile', 'compose', 'gateway', 'status'], { encoding: 'utf8', windowsHide: true });
+  if (status.error || status.status !== 0) throw commandError('hermes_compose_gateway_unavailable');
+  assertComposeHermesGateway({
+    statusOutput: status.stdout,
+    portStatus: inspectPort(plan.hermesPort),
+    port: plan.hermesPort,
+  });
   const baseUrl = validateHermesLoopback(plan.hermesUrl);
   const auth = process.env.AFTERGRAPH_INTENT_HERMES_AUTH || process.env.AFTERGRAPH_INTENT_HERMES_KEY || process.env.API_SERVER_KEY;
   const headers = auth ? { authorization: auth.startsWith('Bearer ') ? auth : `Bearer ${auth}` } : {};

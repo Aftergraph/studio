@@ -89,3 +89,27 @@ test('port owner parser recognizes only listeners on the requested port', () => 
     [1234],
   );
 });
+
+
+test('Compose Hermes profile status must identify the gateway PID that owns the configured port', () => {
+  assert.equal(typeof lib.assertComposeHermesGateway, 'function');
+  assert.equal(
+    lib.assertComposeHermesGateway({
+      statusOutput: '✓ Gateway is running (PID: 54868)\n',
+      portStatus: { occupied: true, ownerPids: [54868] },
+      port: 8643,
+    }),
+    54868,
+  );
+});
+
+test('Compose Hermes validation fails closed when the profile is stopped or another process owns the port', () => {
+  assert.throws(
+    () => lib.assertComposeHermesGateway({ statusOutput: 'Gateway is not running\n', portStatus: { occupied: false, ownerPids: [] }, port: 8643 }),
+    /hermes_compose_gateway_unavailable/,
+  );
+  assert.throws(
+    () => lib.assertComposeHermesGateway({ statusOutput: 'Gateway is running (PID: 54868)\n', portStatus: { occupied: true, ownerPids: [50136] }, port: 8643 }),
+    /hermes_compose_gateway_port_mismatch/,
+  );
+});

@@ -98,6 +98,19 @@ export function parsePortStatus(output, port) {
   return { occupied, ownerPids: parsePortOwners(output, wanted) };
 }
 
+export function assertComposeHermesGateway({ statusOutput = '', portStatus = {}, port = DEFAULT_PORTS.hermes } = {}) {
+  const match = String(statusOutput).match(/Gateway is running \(PID:\s*(\d+)\)/i);
+  if (!match) {
+    throw composeError('hermes_compose_gateway_unavailable', 'compose profile gateway is not running');
+  }
+  const pid = Number(match[1]);
+  const owners = (portStatus.ownerPids ?? (portStatus.ownerPid == null ? [] : [portStatus.ownerPid])).map(Number);
+  if (!portStatus.occupied || owners.length === 0 || owners.some(owner => owner !== pid)) {
+    throw composeError('hermes_compose_gateway_port_mismatch', 'compose gateway PID ' + pid + ' does not exclusively own port ' + port);
+  }
+  return pid;
+}
+
 export function assertComposePortOwner({ label, port, ownerPid, ownerPids, occupied = false, allowedPids = [] } = {}) {
   const allowed = new Set((allowedPids || []).map(Number));
   const owners = ownerPids == null ? (ownerPid == null ? [] : [ownerPid]) : ownerPids;
