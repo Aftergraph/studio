@@ -11,4 +11,9 @@ test('Compose web platform is verified from root', async () => {
   assert.match(web.scripts.verify, /typecheck/);
   assert.match(web.scripts.verify, /test/);
   assert.match(web.scripts.verify, /build/);
+
+  const verifier = await read('scripts/platform_verify.mjs');
+  assert.match(verifier, /platforms\/web/);
+  assert.match(verifier, /package-lock\.json/);
+  assert.match(verifier, /Compose web/);
 });
