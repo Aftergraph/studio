@@ -200,7 +200,7 @@ test('billing app exposes tenant company settings and uses automatic invoice num
   const html = await text('billing/index.html');
   const source = await text('src/billing/billing-app.mjs');
   assert.match(html, /data-action="company-settings"/);
-  assert.match(html, />Virksomhed</);
+  assert.match(html, />Indstillinger</);
   assert.match(source, /Virksomhedsprofil/);
   assert.match(source, /updateSettings/);
   assert.match(source, /invoiceSequence/);
