@@ -24,6 +24,7 @@ import { CostLedger } from '../src/economy/outcome-economy.mjs';
 import { createKnowledgeEntry, promoteKnowledge, isAuthoritative } from '../src/brain/knowledge.mjs';
 import { createServerLog } from '../src/distributed/server-log.mjs';
 import { createUpstreamHub } from '../src/integrations/upstream-hub.mjs';
+import { inspectStateBackup } from '../scripts/state_backup.mjs';
 import { createFederationApiHandler } from './federation-routes.mjs';
 
 
@@ -58,7 +59,21 @@ export function upstreamConfigFromEnv(env=process.env) {
   };
 }
 
-export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, upstreamConfig = null, federation = null, fixtures = true, authSecret = null, requireAuth = process.env.AFTERGRAPH_REQUIRE_AUTH === 'true', maxUserStores = 100, releaseSha = process.env.AFTERGRAPH_RELEASE_SHA || 'unknown' } = {}) {
+export function createAppServer({
+  root,
+  stateFile,
+  runtimeIntervalMs = 1250,
+  upstreamConfig = null,
+  federation = null,
+  fixtures = true,
+  authSecret = null,
+  requireAuth = process.env.AFTERGRAPH_REQUIRE_AUTH === 'true',
+  maxUserStores = 100,
+  releaseSha = process.env.AFTERGRAPH_RELEASE_SHA || 'unknown',
+  requireBackup = process.env.AFTERGRAPH_REQUIRE_BACKUP === 'true',
+  backupDir = process.env.AFTERGRAPH_BACKUP_DIR || null,
+  backupMaxAgeMs = Number(process.env.AFTERGRAPH_BACKUP_MAX_AGE_MS || 36 * 60 * 60 * 1000),
+} = {}) {
   const rootDir = resolveRoot(root);
   const secret = authSecret || authSecretFromEnv(process.env, { requireProduction: requireAuth });
   if (requireAuth && isDevSecret(secret)) {
@@ -207,13 +222,19 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
         await store.readyP;
         const persistence = Boolean(store.stateFile);
         const configuredAuth = !isDevSecret(secret);
-        const ready = persistence && configuredAuth && releaseSha !== 'unknown';
-        sendJson(res, ready ? 200 : 503, {
+        const backup = requireBackup
+          ? await inspectStateBackup({ backupDir, maxAgeMs: backupMaxAgeMs })
+          : null;
+        const backupReady = !requireBackup || backup?.status === 'fresh';
+        const ready = persistence && configuredAuth && releaseSha !== 'unknown' && backupReady;
+        const body = {
           status: ready ? 'ready' : 'not_ready',
           releaseSha,
           persistence,
           auth: { required: requireAuth, configured: configuredAuth },
-        });
+        };
+        if (requireBackup) body.backup = { required: true, ...backup };
+        sendJson(res, ready ? 200 : 503, body);
       } catch (error) {
         sendJson(res, 503, { status:'not_ready', releaseSha, error:'persistence_unavailable' });
       }

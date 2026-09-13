@@ -57,6 +57,104 @@ function safeManifestName(name) {
     && !name.includes('\0');
 }
 
+async function readBackupManifest(backupPath) {
+  let manifest;
+  try {
+    manifest = JSON.parse(await readFile(path.join(backupPath, 'manifest.json'), 'utf8'));
+  } catch {
+    const error = new Error('invalid backup manifest');
+    error.code = 'invalid_backup_manifest';
+    throw error;
+  }
+  if (manifest?.schema !== SCHEMA || !Array.isArray(manifest.files)) {
+    const error = new Error('invalid backup manifest');
+    error.code = 'invalid_backup_manifest';
+    throw error;
+  }
+  for (const file of manifest.files) {
+    if (!safeManifestName(file?.name)) {
+      const error = new Error('unsafe backup filename');
+      error.code = 'unsafe_backup_filename';
+      throw error;
+    }
+  }
+  return manifest;
+}
+
+export async function verifyStateBackup({ backupPath } = {}) {
+  const source = required(backupPath, 'AFTERGRAPH_BACKUP_PATH');
+  const manifest = await readBackupManifest(source);
+  for (const file of manifest.files) {
+    const sourceFile = path.join(source, file.name);
+    let info;
+    try {
+      info = await stat(sourceFile);
+    } catch {
+      const error = new Error(`backup file missing: ${file.name}`);
+      error.code = 'backup_file_missing';
+      throw error;
+    }
+    if (info.size !== file.bytes || await sha256(sourceFile) !== file.sha256) {
+      const error = new Error(`backup checksum mismatch: ${file.name}`);
+      error.code = 'backup_checksum_mismatch';
+      throw error;
+    }
+  }
+  return { backupPath: source, manifest, files: manifest.files };
+}
+
+export async function inspectStateBackup({
+  backupDir,
+  now = new Date(),
+  maxAgeMs = 36 * 60 * 60 * 1000,
+} = {}) {
+  const destination = typeof backupDir === 'string' && backupDir.trim()
+    ? path.resolve(backupDir)
+    : null;
+  const base = { backupDir: destination, maxAgeMs };
+  if (!destination) return { ...base, status: 'missing' };
+
+  let entries;
+  try {
+    entries = await readdir(destination, { withFileTypes: true });
+  } catch (error) {
+    if (error?.code === 'ENOENT') return { ...base, status: 'missing' };
+    return { ...base, status: 'invalid', errorCode: error?.code || 'backup_directory_unavailable' };
+  }
+
+  const candidates = entries
+    .filter(entry => entry.isDirectory() && entry.name.startsWith('state-'))
+    .sort((a, b) => b.name.localeCompare(a.name));
+  if (candidates.length === 0) return { ...base, status: 'missing' };
+
+  const latestBackupPath = path.join(destination, candidates[0].name);
+  let verified;
+  try {
+    verified = await verifyStateBackup({ backupPath: latestBackupPath });
+  } catch (error) {
+    return {
+      ...base,
+      status: 'invalid',
+      latestBackupPath,
+      errorCode: error?.code || 'backup_verification_failed',
+    };
+  }
+
+  const createdAt = new Date(verified.manifest.createdAt);
+  if (Number.isNaN(createdAt.getTime())) {
+    return { ...base, status: 'invalid', latestBackupPath, errorCode: 'invalid_backup_timestamp' };
+  }
+  const ageMs = Math.max(0, new Date(now).getTime() - createdAt.getTime());
+  return {
+    ...base,
+    status: ageMs <= maxAgeMs ? 'fresh' : 'stale',
+    latestBackupPath,
+    createdAt: createdAt.toISOString(),
+    ageMs,
+    files: verified.files,
+  };
+}
+
 export async function createStateBackup({ stateFile, backupDir, now = new Date(), pid = process.pid } = {}) {
   const source = required(stateFile, 'AFTERGRAPH_STATE_FILE');
   const destination = required(backupDir, 'AFTERGRAPH_BACKUP_DIR');
@@ -164,7 +262,13 @@ async function main() {
     console.log(`restore_dir=${result.restoreDir}`);
     return;
   }
-  throw new Error('command must be backup or restore');
+  if (command === 'verify') {
+    const result = await verifyStateBackup({ backupPath: process.env.AFTERGRAPH_BACKUP_PATH });
+    console.log(`verified_backup_path=${result.backupPath}`);
+    console.log(`verified_files=${result.files.length}`);
+    return;
+  }
+  throw new Error('command must be backup, restore or verify');
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {

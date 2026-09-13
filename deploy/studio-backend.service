@@ -7,6 +7,7 @@ Type=simple
 User=aftergraph
 WorkingDirectory=/opt/aftergraph-studio/current
 EnvironmentFile=/etc/aftergraph/studio-backend.env
+Environment=AFTERGRAPH_REQUIRE_BACKUP=true
 ExecStart=/usr/bin/node /opt/aftergraph-studio/current/server.mjs
 Restart=on-failure
 RestartSec=5

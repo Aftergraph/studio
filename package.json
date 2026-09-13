@@ -9,6 +9,7 @@
     "auth:bootstrap-token": "node scripts/issue_bootstrap_token.mjs",
     "state:backup": "node scripts/state_backup.mjs backup",
     "state:restore": "node scripts/state_backup.mjs restore",
+    "state:verify": "node scripts/state_backup.mjs verify",
     "test": "node --test tests/*.test.mjs",
     "verify": "node scripts/verify.mjs",
     "verify:platforms": "node scripts/platform_verify.mjs",

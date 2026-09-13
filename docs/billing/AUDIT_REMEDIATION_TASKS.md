@@ -74,6 +74,7 @@ flowchart TD
 | 3 | FIN-301 | Make actual evidence immutable/conflict-safe | src/billing/mutations.mjs; server/billing-server.mjs; Billing tests | Existing actuals cannot be silently replaced; conflicts fail closed; canonical actual metadata remains unchanged after rejection | AUD-000 | DONE — 15 Billing API tests pass; final exact-head evidence recorded in PR #55 |
 | 4 | DEL-401 | Make delivery claim exclusive and idempotent | server/billing-delivery.mjs; src/billing/mutations.mjs; delivery tests | Concurrent distinct requests produce one provider attempt; pending claims return 409; provider receives stable attempt/provider idempotency identity; failed attempts remain retryable | DATA-201, FIN-301 | DONE — 24 delivery/API tests pass; final exact-head evidence recorded in PR #55 |
 | 5 | OPS-501 | Repair backup and readiness truthfulness | scripts/state_backup.mjs; deploy units; readiness tests; VDS evidence | Real production backup exists, restore drill passes, freshness is observable, readiness cannot be green with stale/failed backup | AUD-000 | BLOCKED: production operations approval/evidence |
+| 5.1 | OPS-502 | Make backup evidence observable and checksum-verified | scripts/state_backup.mjs; server/app-server.mjs; deploy/studio-backend.service; backup tests | `state:verify` validates every manifest file; `/readyz` is 503 for missing/stale/invalid backup and 200 only for fresh verified evidence | OPS-501 | DONE — focused backup/readyz tests pass; production backup evidence still required by OPS-501 |
  
 ### P1 — compliance, validation and proof
 
@@ -82,8 +83,9 @@ flowchart TD
 | 6 | FIN-302 | Add governed actual correction workflow | src/billing/mutations.mjs; server/billing-server.mjs; src/billing/browser-client.mjs; src/billing/billing-app.mjs; capability and Billing tests | Correction requires explicit actor, dedicated `billing.actuals.correct` permission, non-empty bounded reason, immutable audit event, replay-safe correction identity, and rejection after active invoice binding; UI exposes a reasoned correction dialog and client route | FIN-301 | DONE — 18/18 Billing API, 5/5 browser-client, 13/13 UI-contract tests pass; final exact-head evidence recorded in PR #55 |
 | 7 | VAL-701 | Harden Billing/source boundary validation | src/billing/mutations.mjs; src/billing/source-sync.mjs; source/Billing tests | Impossible dates, duplicate IDs, invalid schedules/currency and negative terms are rejected with typed errors; UI cannot crash on malformed currency | FIN-301 | DONE — source suite 17/17 pass; final exact-head evidence recorded in PR #55 |
 | 8 | COMP-601 | Enforce Peppol validator contract | src/billing/document-profile.mjs; server/billing-server.mjs; server.mjs; API tests | Missing external validator fails closed; configured validator result is required; no false 200 compliance export | VAL-701 | BLOCKED — fail-closed guard + 17 Billing API tests pass; production validator contract/config authority missing |
+| 8.1 | COMP-602 | Add governed runtime validator adapter | server/billing-document-validator.mjs; server.mjs; docs/PRODUCTION.md; validator tests | HTTPS-only env adapter posts aftergraph.billing.validator.v1; timeout/malformed/non-2xx responses fail closed; tenant data cannot select endpoint | COMP-601 | DONE — adapter and Billing API focused tests pass; production authority/config still required by COMP-601 |
 | 9 | UI-801 | Add real Billing production browser-QA gate | Billing browser harness, test scripts, CI/release verification | Reachable production route proves auth/source/Ready/draft/issue/PDF/delivery/offline/reconnect/390px/no overflow/no errors at exact SHA | AUD-000 | DONE — fresh production tenant QA PASS: route/auth/source/Ready/draft/issue/PDF/Peppol/delivery/invoiced/mobile/offline/cold reload/reconnect/no errors |
-| 10 | A11Y-802 | Close Billing UI accessibility gaps | billing/index.html; src/billing/billing-app.mjs; styles/billing.css/tokens.css; UI tests; VDS axe harness | Correct tabs or buttons, keyboard behavior, focus return, 44px targets, contrast >=4.5:1, offline semantics and axe evidence | UI-801 | DONE — fresh Billing axe WCAG 2.2 A/AA: 61 checks, 0 violations; UI contract 13/13; production browser-QA PASS |
+| 10 | A11Y-802 | Close Billing UI accessibility gaps | billing/index.html; src/billing/billing-app.mjs; styles/billing.css/tokens.css; UI tests; VDS axe harness | Correct tabs or buttons, keyboard behavior, focus return, 44px targets, contrast >=4.5:1, offline semantics and axe evidence | UI-801 | DONE — fresh Billing axe WCAG 2.2 A/AA: 22 passes, 0 violations; UI contract 13/13; production browser-QA PASS |
 | 11 | SUP-901 | Restore dependency reproducibility | package.json; package-lock.json; CI | Lockfile committed, `npm ci --dry-run` and `npm audit --omit=dev` pass; supported Node version is documented | AUD-000 | DONE — lockfile generated; npm ci dry-run and audit 0 vulnerabilities |
  
 ### P2 — residual hardening and release
@@ -97,8 +99,8 @@ flowchart TD
 ## Verification checkpoint (2026-09-13, final remediation candidate)
 
 - Source suite: **17/17 PASS**.
-- All Billing tests: **110/110 PASS**.
-- Full `npm test`: **772/772 PASS**.
+- All Billing tests: **114/114 PASS**.
+- Full `npm test`: **780/780 PASS**.
 - Fresh production tenant browser-QA: **PASS**.
 - Fresh Billing axe WCAG 2.2 A/AA: **22 passes, 0 violations**.
 - `npm run verify:secrets`: **PASS**.
@@ -106,8 +108,10 @@ flowchart TD
 - `node scripts/v6_release_verify.mjs`: **49/49 PASS**.
 - `npm run verify`: **PASS**.
 - Dependency reproducibility: `npm ci --ignore-scripts --no-audit --dry-run` PASS; `npm audit --omit=dev` reports 0 vulnerabilities.
+- OPS-502 backup freshness/checksum/readiness tests: **PASS**.
+- COMP-602 runtime validator adapter/API tests: **PASS**.
 - Generated screenshots/performance output were restored and are excluded from the remediation scope.
-- External blockers remain: OPS-501 production backup evidence and COMP-601 validator contract/config. Exact-head CI/CodeQL are green; PR evidence is being finalized.
+- External blockers remain: OPS-501 production backup evidence and COMP-601 validator contract/config. Exact-head CI/CodeQL and PR evidence must be rerun for the new feature SHA before release.
 
 ## Execution loop
 

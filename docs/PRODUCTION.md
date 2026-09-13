@@ -14,6 +14,8 @@ How to host a single-tenant Aftergraph Studio instance with auth enforcement on.
 | `AFTERGRAPH_RUNTIME_INTERVAL_MS` | no (1250) | Mission runtime tick. |
 | `AFTERGRAPH_RELEASE_SHA` | YES in production | Exact immutable commit SHA served by this deployment; exposed by /healthz and /readyz. |
 | `AFTERGRAPH_BACKUP_DIR` | YES for production recovery | Root directory for checksummed state snapshots; keep outside the live state directory. |
+| `AFTERGRAPH_REQUIRE_BACKUP` | YES (`'true'`) in production | Makes `/readyz` fail closed until the newest backup is fresh and checksum-verified. |
+| `AFTERGRAPH_BACKUP_MAX_AGE_MS` | no (36 hours) | Maximum accepted age for the newest verified backup. |
 
 ## 2. First boot (operator onboarding)
 
@@ -67,11 +69,17 @@ Billing is inert with respect to outbound delivery unless a provider is explicit
 |---|---|---|
 | `AFTERGRAPH_BILLING_DELIVERY_WEBHOOK_URL` | only for outbound delivery | HTTPS endpoint that accepts the versioned Billing delivery payload. |
 | `AFTERGRAPH_BILLING_DELIVERY_WEBHOOK_TOKEN` | provider-dependent | Optional bearer credential sent only in the Authorization header. Never commit or log it. |
-| `AFTERGRAPH_BILLING_DELIVERY_TIMEOUT_MS` | no (8000) | Timeout for the outbound delivery request. |
+| `AFTERGRAPH_BILLING_DELIVERY_TIMEOUT_MS` | no (8000) | Timeout for the outbound delivery request. |\n| `AFTERGRAPH_BILLING_DOCUMENT_VALIDATOR_URL` | only for Peppol BIS 3 export | HTTPS endpoint implementing the Aftergraph validator contract; without it Peppol remains fail-closed. |\n| `AFTERGRAPH_BILLING_DOCUMENT_VALIDATOR_TOKEN` | provider-dependent | Optional bearer credential for the validator; never commit or log it. |\n| `AFTERGRAPH_BILLING_DOCUMENT_VALIDATOR_TIMEOUT_MS` | no (8000) | Timeout for external document validation. |
 
 The webhook receives the immutable invoice recipient, invoice metadata and the generated PDF as a base64 attachment. It must return JSON containing a non-empty `messageId` and an ISO `deliveredAt` timestamp. Billing records `pending` before the call and records delivered/email state only after that receipt validates.
 
 The webhook URL must use HTTPS. With no webhook configured, `POST /api/v1/billing/invoices/:id/deliver` fails closed with provider unavailable and the issued invoice remains retryable.
+
+The document validator receives a versioned JSON request containing the semantic
+document and rendered UBL XML. It must return JSON `{ "ok": true }` or
+`{ "ok": false, "errors": ["..."] }`. Non-HTTPS endpoints, malformed receipts,
+timeouts and non-2xx responses fail closed. Provider configuration is deployment
+owned; tenant data cannot select the validator URL.
 
 Provider credentials belong in the deployment secret store, not tenant Billing settings. Tenant settings contain business identity, invoice sequence, payment copy and optional Peppol/Nemhandel identifiers, but never delivery-provider secrets.
 
