@@ -167,6 +167,12 @@ export function createBillingClient({
     deliverInvoice(invoiceId) {
       return write(`/api/v1/billing/invoices/${encodeURIComponent(invoiceId)}/deliver`, {}, 'billing-deliver');
     },
+    previewInvoiceEmail(invoiceId) {
+      return write(`/api/v1/billing/invoices/${encodeURIComponent(invoiceId)}/email-preview`, {}, 'billing-email-preview');
+    },
+    sendInvoiceEmail(invoiceId) {
+      return write(`/api/v1/billing/invoices/${encodeURIComponent(invoiceId)}/send-email`, {}, 'billing-send-email');
+    },
     createCustomer({ id, name, address, email, countryCode, registrationId, registrationScheme, billing }) {
       return write('/api/v1/billing/customers', {
         id,

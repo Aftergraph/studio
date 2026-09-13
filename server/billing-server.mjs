@@ -1,5 +1,6 @@
 import { API_VERSION, readJson, sendJson } from './http-utils.mjs';
 import { handleBillingDelivery } from './billing-delivery.mjs';
+import { composeInvoiceEmail, createSmtpBillingDeliveryAdapter, smtpBillingDeliveryAdapterFromEnv } from './billing-email-adapter.mjs';
 import { createActionGuard, assertActorCapability } from '../src/action-guard.mjs';
 import { authSecretFromEnv } from '../src/auth/magic-link.mjs';
 import { getUser, updateCapabilities } from '../src/user/user-store.mjs';
@@ -46,7 +47,7 @@ function isBillingPath(pathname) {
     || pathname === '/api/v1/billing/audit'
     || pathname === '/api/v1/billing/query'
     || pathname === '/api/v1/billing/invoices/manual-draft'
-    || /^\/api\/v1\/billing\/invoices\/[^/]+\/(issue|artifact|document|peppol-bis3|deliver|void|payment|remind)$/.test(pathname)
+    || /^\/api\/v1\/billing\/invoices\/[^/]+\/(issue|artifact|document|peppol-bis3|deliver|send-email|email-preview|void|payment|remind)$/.test(pathname)
     || /^\/api\/v1\/billing\/invoices\/[^/]+$/.test(pathname)
     || /^\/api\/v1\/billing\/customers\/[^/]+$/.test(pathname)
     || pathname === '/api/v1/billing/products'
@@ -211,7 +212,9 @@ export function decorateBillingServer(server, {
   requireAuth = process.env.AFTERGRAPH_REQUIRE_AUTH === 'true',
   billingDeliveryAdapter = null,
   billingDocumentValidator = null,
+  smtpDeliveryAdapter = null,
 } = {}) {
+  const resolvedSmtpAdapter = smtpDeliveryAdapter || smtpBillingDeliveryAdapterFromEnv();
   const originals = server.listeners('request');
   if (originals.length === 0) throw new Error('billing decorator requires a request listener');
   const secret = authSecret || authSecretFromEnv();
@@ -614,6 +617,51 @@ export function decorateBillingServer(server, {
           version: API_VERSION,
           invoice,
           billing: projectBillingState(next.billing),
+        });
+        return;
+      }
+
+      const emailPreviewMatch = url.pathname.match(/^\/api\/v1\/billing\/invoices\/([^/]+)\/email-preview$/);
+      if (emailPreviewMatch && req.method === 'POST') {
+        const invoiceId = decodeURIComponent(emailPreviewMatch[1]);
+        try { assertActorCapability({ state: store.snapshot(), actor, capability: 'billing.read', users }); }
+        catch { throw actorError('forbidden', 403); }
+        const snapshot = store.snapshot().billing;
+        const invoice = snapshot.invoices?.find((i) => i.id === invoiceId);
+        if (!invoice) throw actorError('invoice_not_found', 404);
+        const customer = snapshot.customers?.find((c) => c.id === invoice.customerId);
+        const recipientEmail = invoice.customerSnapshot?.email || customer?.email || null;
+        if (!recipientEmail) throw actorError('delivery_recipient_missing', 422);
+        const issuer = invoice.issuerSnapshot || snapshot.settings?.issuer || {};
+        const { subject, text, html } = composeInvoiceEmail({ invoice, customer, issuer });
+        sendJson(res, 200, {
+          version: API_VERSION,
+          preview: {
+            invoiceId,
+            recipientEmail,
+            subject,
+            text,
+            html,
+            attachmentFilename: `invoice-${String(invoice.number || invoiceId).replace(/[^a-zA-Z0-9._-]/g, '-')}.pdf`,
+          },
+        });
+        return;
+      }
+
+      const sendEmailMatch = url.pathname.match(/^\/api\/v1\/billing\/invoices\/([^/]+)\/send-email$/);
+      if (sendEmailMatch && req.method === 'POST') {
+        if (!resolvedSmtpAdapter?.name || typeof resolvedSmtpAdapter.deliver !== 'function') {
+          throw actorError('smtp_delivery_unavailable', 503);
+        }
+        const invoiceId = decodeURIComponent(sendEmailMatch[1]);
+        await handleBillingDelivery({
+          store,
+          invoiceId,
+          actor,
+          adapter: resolvedSmtpAdapter,
+          actionKey,
+          actionGuard,
+          res,
         });
         return;
       }
