@@ -6,13 +6,13 @@ const CONSEQUENCES = new Set(['read', 'write', 'consequential']);
 const OPENUI_COMPONENTS = Object.freeze(['Stack', 'Callout', 'TextContent', 'Buttons', 'Button']);
 const SENSITIVE_KEY = /(token|secret|credential|password|api[-_]?key|authoritylease)/i;
 
-function deepFreeze(value) {
+function interactionDeepFreeze(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
-  for (const child of Object.values(value)) deepFreeze(child);
+  for (const child of Object.values(value)) interactionDeepFreeze(child);
   return Object.freeze(value);
 }
 
-function clone(value) {
+function interactionClone(value) {
   return structuredClone(value);
 }
 
@@ -27,7 +27,7 @@ function normalizeViews(views = []) {
   if (!Array.isArray(views)) throw new TypeError('views must be an array');
   return views.map(view => {
     if (!view?.id || !VIEW_KINDS.has(view.kind)) throw new Error(`unsupported view kind ${view?.kind ?? 'missing'}`);
-    return clone(view);
+    return interactionClone(view);
   });
 }
 
@@ -52,10 +52,10 @@ function normalizeActions(actions = []) {
 export function createInteractionSurface(input = {}) {
   const status = normalizeMissionState(input.status);
   if (!status) throw new Error(`unknown mission state ${input.status ?? 'missing'}`);
-  const evidence = Array.isArray(input.evidence) ? clone(input.evidence) : [];
+  const evidence = Array.isArray(input.evidence) ? interactionClone(input.evidence) : [];
   if (status === 'VERIFIED' && evidence.length === 0) throw new Error('VERIFIED interaction surface requires evidence');
   if (!input.id || !input.missionId) throw new TypeError('interaction surface id and missionId required');
-  return deepFreeze({
+  return interactionDeepFreeze({
     id: input.id,
     missionId: input.missionId,
     workId: input.workId ?? null,
@@ -66,7 +66,7 @@ export function createInteractionSurface(input = {}) {
     views: normalizeViews(input.views),
     actions: normalizeActions(input.actions),
     evidence,
-    metrics: clone(input.metrics ?? {}),
+    metrics: interactionClone(input.metrics ?? {}),
   });
 }
 
@@ -78,9 +78,9 @@ export function createNativeInteractionRenderer() {
   return Object.freeze({
     id: 'native',
     render(surface) {
-      return deepFreeze({
+      return interactionDeepFreeze({
         format: 'aftergraph-native',
-        surface: clone(surface),
+        surface: interactionClone(surface),
         semanticActionIds: semanticActionIds(surface),
         complete: true,
       });
@@ -155,7 +155,7 @@ export function createOpenUIInteractionRenderer() {
       const bindings = complete
         ? surface.actions.map(action => ({ event: `action:${action.id}`, actionId: action.id }))
         : [];
-      return deepFreeze({
+      return interactionDeepFreeze({
         format: 'openui-lang', content, components: [...OPENUI_COMPONENTS],
         semanticActionIds: semanticActionIds(surface), bindings, complete: Boolean(complete),
       });
@@ -179,7 +179,7 @@ export function resolveInteractionAction({ surface, actionId, authorize } = {}) 
   if (!decision?.allowed || !decision?.authorityRef) {
     throw new Error(`authority unavailable for ${action.capability}`);
   }
-  return deepFreeze({
+  return interactionDeepFreeze({
     type: 'capability.request', missionId: surface.missionId, surfaceId: surface.id,
     actionId: action.id, capability: action.capability, consequence: action.consequence,
     requiresConfirmation: action.requiresConfirmation, authorityRef: decision.authorityRef,
@@ -207,7 +207,7 @@ export async function benchmarkInteractionRenderer({ renderer, surface, iteratio
     if (!renderer.validate(result)) parseFailures += 1;
     if (JSON.stringify(result.semanticActionIds ?? []) !== JSON.stringify(expected)) semanticActionErrors += 1;
   }
-  return deepFreeze({
+  return interactionDeepFreeze({
     renderer: renderer.id ?? 'unknown', iterations, tokens: totalTokens,
     meanLatencyMs: totalLatency / iterations, parseFailures, semanticActionErrors,
   });
