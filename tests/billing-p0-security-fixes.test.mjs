@@ -23,11 +23,11 @@ describe('P0 Security Fixes Regression Tests', () => {
     assert.ok(content.includes('schedulerRunning = false'), 'must clear running flag in finally');
   });
 
-  test('Fix 3: withTimeout clears timer on abort to prevent leaks', () => {
+  test('Fix 3: inline timeout cleanup in read/readBlob prevents leaks', () => {
     const content = readFileSync(join(root, 'src/billing/browser-client.mjs'), 'utf8');
-    // The withTimeout helper must clear the timer when signal aborts
-    assert.ok(content.includes('clearTimeout(timer)'), 'withTimeout must call clearTimeout');
-    assert.ok(content.includes("{ once: true }"), 'abort listener should be one-shot to prevent leaks');
+    // withTimeout was removed as dead code; timeout cleanup is now inline in read/readBlob
+    assert.ok(content.includes('clearTimeout(timer)'), 'read/readBlob must call clearTimeout');
+    assert.ok(!content.includes('const withTimeout'), 'dead withTimeout function should be removed');
   });
 
   test('Fix 4: audit log has time-based pruning and bounded memory', () => {
