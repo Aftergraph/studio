@@ -4,7 +4,6 @@ import { canFinanciallyMutate, itemsForBillingView } from './app-state.mjs';
 import { esc, today, formatDate, formatSyncTime, formatMoney, formatWorkMinutes } from './lib/format.mjs';
 
 const $ = (selector, root = document) => root.querySelector(selector);
-const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const AUTH_TOKEN_KEY = 'aftergraph.auth.token';
 const IDENTITY_BINDING_PREFIX = 'aftergraph.billing.identity.v1';
 const SECURE_CONTEXT_REQUIRED = typeof globalThis.isSecureContext !== 'undefined' ? !globalThis.isSecureContext : (typeof location !== 'undefined' && location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1');
@@ -38,11 +37,6 @@ function itemKey(item) {
   return `${item.status}:${item.customerId}:${(item.visitIds || []).join(',')}`;
 }
 
-function getActor() {
-  // URL actor param is no longer used for auth bootstrap; retained only for
-  // test harness compatibility. Real identity comes from stored token or login.
-  return null;
-}
 
 function readStoredToken() {
   try { return localStorage.getItem(AUTH_TOKEN_KEY) || null; }
@@ -214,9 +208,6 @@ function createApp() {
     </div>`;
   }
 
-  function hideSkeleton() {
-    // Skeleton is replaced by renderList() or error states; no-op if already cleared.
-  }
 
   const locale = () => state.billing?.settings?.locale || 'da-DK';
   const projection = () => state.billing?.projection || { items: [], summary: {} };

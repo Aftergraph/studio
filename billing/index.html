@@ -18,7 +18,7 @@
   <link rel="stylesheet" href="/styles/billing.css">
 </head>
 <body class="billing-page">
-  <header class="billing-header">
+  <header class="billing-header" hidden data-deferred="auth">
     <div class="billing-brand" aria-label="Ledger by Aftergraph">
       <span class="billing-mark" aria-hidden="true"></span>
       <strong>Ledger</strong>
@@ -46,7 +46,7 @@
 
     <section id="billing-summary" class="billing-summary" aria-label="Faktureringsoversigt" aria-live="polite"></section>
 
-    <nav class="billing-queue-nav" aria-label="Faktureringsnavigation">
+    <nav class="billing-queue-nav" hidden data-deferred="auth" aria-label="Faktureringsnavigation">
       <div class="billing-tabs" role="tablist" aria-label="Faktureringsvisning">
         <button class="billing-tab is-active" type="button" role="tab" aria-selected="true" data-view="dashboard" id="billing-tab-dashboard" aria-controls="billing-panel" tabindex="0">
           Overblik
