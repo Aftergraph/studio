@@ -157,6 +157,7 @@ export function createAppServer({
       'approval.decide','autonomy.check','autonomy.kill','autonomy.record',
       'memory.promote','memory.revoke','memory.write','mission.control',
       'workspace.reset','user.manage','auth.issue','goal.manage',
+      'billing.read','billing.manage','billing.approve',
     ]});
   } catch { /* seeded already */ }
   const beginAction=(req,body,capability,path,confirmation=false)=>{
