@@ -4,5 +4,11 @@ node_modules/
 *.log
 *.tmp
 dist/
+.next/
+*.tsbuildinfo
 .DS_Store
 Thumbs.db
+.expo/
+.env
+.env.local
+.env.*.local

@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 const root=fileURLToPath(new URL('..',import.meta.url));
@@ -48,4 +48,16 @@ check('SwiftUI uses native sheets',swiftSource.includes('.sheet('));
 check('SwiftUI uses searchable',swiftSource.includes('.searchable('));
 check('SwiftUI uses sensory feedback in Space',swiftSpace.includes('sensoryFeedback'));
 check('SwiftUI shares motion semantics',swiftMotion.includes('surfaceExpand')&&swiftMotion.includes('attentionFocus')&&swiftMotion.includes('outcomeSettle')&&swiftMotion.includes('.spring('));
-if(!process.exitCode)console.log('ALL PLATFORM V5 SOURCE CHECKS PASS');
+
+const webRoot=path.join(root,'platforms/web');
+const webPkgPath=path.join(webRoot,'package.json');
+const webLockPath=path.join(webRoot,'package-lock.json');
+check('Compose web package exists',existsSync(webPkgPath));
+check('Compose web lockfile exists',existsSync(webLockPath));
+if(existsSync(webPkgPath)&&existsSync(webLockPath)){
+  const webPkg=JSON.parse(readFileSync(webPkgPath,'utf8'));
+  const webLock=JSON.parse(readFileSync(webLockPath,'utf8'));
+  check('Compose web lockfile matches package name',webLock.name===webPkg.name);
+  check('Compose web exposes full verify gate',webPkg.scripts?.verify==='npm run typecheck && npm run test && npm run build');
+}
+if(!process.exitCode)console.log('ALL PLATFORM V5 + COMPOSE WEB SOURCE CHECKS PASS');
