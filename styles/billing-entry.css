@@ -1,0 +1,23 @@
+/* Ledger Billing Design System — Modular Entry Point */
+/* Auto-generated from monolith split; preserves all original selectors */
+
+@import "./billing/a11y.css";
+@import "./billing/approval.css";
+@import "./billing/base.css";
+@import "./billing/buttons.css";
+@import "./billing/command-palette.css";
+@import "./billing/dashboard.css";
+@import "./billing/forms.css";
+@import "./billing/header.css";
+@import "./billing/list.css";
+@import "./billing/modal.css";
+@import "./billing/print.css";
+@import "./billing/responsive.css";
+@import "./billing/search.css";
+@import "./billing/skeleton.css";
+@import "./billing/states.css";
+@import "./billing/summary.css";
+@import "./billing/table.css";
+@import "./billing/tabs.css";
+@import "./billing/theme.css";
+@import "./billing/toast.css";

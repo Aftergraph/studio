@@ -1,0 +1,132 @@
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  color: inherit;
+}
+
+.billing-shell {
+  width: min(1120px, calc(100% - var(--ag-brand-space-4xl)));
+  margin: 0 auto;
+  padding: var(--ag-brand-space-5xl) 0 calc(var(--ag-brand-space-5xl) + var(--ag-brand-space-xxl));
+}
+
+.billing-intro {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--ag-brand-space-xxl);
+  margin-bottom: var(--ag-brand-space-3xl);
+}
+
+.billing-intro h1 {
+  margin: 0;
+  font-size: clamp(var(--ag-brand-type-display), 4vw, 52px);
+  line-height: 1.02;
+  letter-spacing: -0.045em;
+  font-weight: 760;
+}
+
+.billing-intro p {
+  max-width: 650px;
+  margin: var(--ag-brand-space-md) 0 0;
+  color: var(--text-2);
+  font-size: var(--ag-brand-type-subhead);
+  line-height: 1.55;
+}
+
+.billing-connection {
+  flex: 0 0 auto;
+  color: var(--text-3);
+  font-size: var(--ag-brand-type-body-sm);
+  font-weight: 650;
+}
+
+.billing-connection.is-current {
+  color: var(--success);
+}
+
+.billing-connection.is-degraded {
+  color: var(--danger);
+}
+
+.billing-totals {
+  margin: 0 0 var(--ag-brand-space-xl) auto;
+  width: min(100%, 340px);
+}
+
+.billing-total-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--ag-brand-space-lg);
+  padding: var(--ag-brand-space-xs) 0;
+  color: var(--text-2);
+  font-size: var(--ag-brand-type-body-sm);
+}
+
+.billing-total-row.is-total {
+  margin-top: var(--ag-brand-space-xs);
+  padding-top: var(--ag-brand-space-md);
+  border-top: 1px solid var(--border-strong);
+  color: var(--text);
+  font-size: var(--ag-brand-type-subhead);
+  font-weight: 760;
+}
+
+.billing-draft-status {
+  padding: var(--ag-brand-space-lg);
+  margin-bottom: var(--ag-brand-space-lg);
+  border: 1px solid color-mix(in srgb, var(--success) 25%, var(--border));
+  border-radius: 12px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--success) 6%, var(--surface)) 0%, var(--surface) 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.billing-draft-status::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--success);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--success) 40%, transparent);
+}
+
+.billing-draft-status strong {
+  display: block;
+  color: var(--success);
+  font-size: var(--ag-brand-type-body-sm);
+}
+
+.billing-draft-status p {
+  margin: var(--ag-brand-space-xs) 0 0;
+  color: var(--text-2);
+  font-size: var(--ag-brand-type-body-sm);
+}
+
+/* ── Mobile Safe Area & Touch Improvements ── */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .billing-shell {
+    padding-bottom: calc(var(--ag-brand-space-5xl) + env(safe-area-inset-bottom, 0px));
+  }
+
+  .billing-toast {
+    bottom: calc(var(--ag-brand-space-xl) + env(safe-area-inset-bottom, 0px));
+  }
+
+  .billing-form-actions {
+    padding-bottom: calc(var(--ag-brand-space-md) + env(safe-area-inset-bottom, 0px));
+  }
+}

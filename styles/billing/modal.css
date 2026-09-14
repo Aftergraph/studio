@@ -1,0 +1,114 @@
+.billing-review {
+  width: min(580px, calc(100vw - 32px));
+  max-height: min(85vh, 860px);
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  background: var(--glass-bg);
+  color: var(--text);
+  box-shadow: var(--shadow-float), var(--shadow-glow);
+  overflow: hidden;
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  animation: billing-modal-enter 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes billing-modal-enter {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.billing-review::backdrop {
+  background: color-mix(in srgb, var(--bg) 60%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: billing-backdrop-enter 200ms ease;
+}
+
+@keyframes billing-backdrop-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.billing-review-frame {
+  max-height: inherit;
+  overflow-y: auto;
+}
+
+.billing-review-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--ag-brand-space-lg);
+  padding: var(--ag-brand-space-xl) var(--ag-brand-space-xl) var(--ag-brand-space-lg);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface);
+}
+
+.billing-review-kicker {
+  margin: 0 0 var(--ag-brand-space-xs);
+  color: var(--text-3);
+  font-size: var(--ag-brand-type-caption);
+  font-weight: 740;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.billing-review-header h2 {
+  margin: 0;
+  font-size: var(--ag-brand-type-headline);
+  letter-spacing: -0.03em;
+}
+
+.billing-review-body {
+  padding: var(--ag-brand-space-xl);
+}
+
+.billing-review-customer {
+  margin-bottom: var(--ag-brand-space-xl);
+}
+
+.billing-review-customer h3 {
+  margin: 0 0 var(--ag-brand-space-xs);
+  font-size: var(--ag-brand-type-subhead);
+}
+
+.billing-review-customer p {
+  margin: 0;
+  color: var(--text-3);
+  font-size: var(--ag-brand-type-body-sm);
+}
+
+.billing-review-lines {
+  border-top: 1px solid var(--border-strong);
+  margin-bottom: var(--ag-brand-space-xl);
+}
+
+.billing-review-line {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--ag-brand-space-base);
+  padding: var(--ag-brand-space-md) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.billing-review-line strong {
+  display: block;
+  font-size: var(--ag-brand-type-body);
+}
+
+.billing-review-line small {
+  display: block;
+  margin-top: var(--ag-brand-space-xs);
+  color: var(--text-3);
+  font-size: var(--ag-brand-type-ui);
+}
+
+.billing-review-line-amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
