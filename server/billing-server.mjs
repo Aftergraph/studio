@@ -46,10 +46,14 @@ function apiError(res, error) {
 }
 
 function reportToCsv(report) {
+  const DANGEROUS_CSV_LEAD = /^[=+\-@\t\r]/;
   const esc = (v) => {
     if (v == null) return '';
     const s = String(v);
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    // P1-11: check original leading char BEFORE quoting
+    const dangerous = DANGEROUS_CSV_LEAD.test(s);
+    const quoted = /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    return dangerous ? `'${quoted}` : quoted;
   };
   const rows = [];
   if (report.type === 'revenue-by-customer') {
@@ -146,12 +150,19 @@ function queryBilling(billing, params = {}) {
       });
     }
   } else {
+    // P1-9: pre-index invoices by customerId to eliminate O(n*m) nested filter
+    const invoicesByCustomer = new Map();
+    for (const inv of invoices) {
+      if (!inv || inv.status === 'void') continue;
+      let bucket = invoicesByCustomer.get(inv.customerId);
+      if (!bucket) { bucket = []; invoicesByCustomer.set(inv.customerId, bucket); }
+      bucket.push(inv);
+    }
     for (const cust of customers) {
       if (!cust) continue;
-      const invoiceCount = invoices.filter((i) => i.customerId === cust.id && i.status !== 'void').length;
-      const totalBilled = invoices
-        .filter((i) => i.customerId === cust.id && i.status !== 'void')
-        .reduce((s, i) => s + (i.totalGrossMinor || 0), 0);
+      const custInvoices = invoicesByCustomer.get(cust.id) || [];
+      const invoiceCount = custInvoices.length;
+      const totalBilled = custInvoices.reduce((s, i) => s + (i.totalGrossMinor || 0), 0);
       items.push({
         id: cust.id,
         name: cust.name || '',
@@ -517,7 +528,10 @@ export function decorateBillingServer(server, {
         if (!draft.billing) draft.billing = {};
         if (!Array.isArray(draft.billing.auditLog)) draft.billing.auditLog = [];
         draft.billing.auditLog.push(entry);
-        // Keep last 1000 entries to prevent unbounded growth
+        // Time-based pruning: remove entries older than 90 days
+        const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+        draft.billing.auditLog = draft.billing.auditLog.filter((e) => e.timestamp >= cutoff);
+        // Bounded memory: keep last 1000 entries max
         if (draft.billing.auditLog.length > 1000) {
           draft.billing.auditLog = draft.billing.auditLog.slice(-1000);
         }
@@ -1147,21 +1161,29 @@ export function decorateBillingServer(server, {
   // The previous __scheduler__ phantom store wrote drafts nowhere visible.
   // Now we iterate all live tenant stores; each tick is idempotent via nextRunAt.
   let schedulerTimer = null;
+  let schedulerRunning = false;
   const SCHEDULER_INTERVAL_MS = Number.parseInt(process.env.BILLING_SCHEDULER_INTERVAL_MS || '60000', 10);
   if (SCHEDULER_INTERVAL_MS > 0 && !process.env.BILLING_SCHEDULER_DISABLED) {
     schedulerTimer = setInterval(async () => {
-      const tenantStores = server.workspace?.stores;
-      if (!tenantStores || typeof tenantStores.forEach !== 'function') return;
-      for (const [, entry] of tenantStores) {
-        try {
-          await entry.mutate((draft) => {
-            const result = tickRecurringScheduler(draft.billing, { actor: 'scheduler' });
-            draft.billing = result.billing;
-            return draft;
-          });
-        } catch (err) {
-          console.error('[scheduler] auto-tick failed for tenant store:', err?.message || err);
+      // Concurrency guard: skip if previous tick is still running
+      if (schedulerRunning) return;
+      schedulerRunning = true;
+      try {
+        const tenantStores = server.workspace?.stores;
+        if (!tenantStores || typeof tenantStores.forEach !== 'function') return;
+        for (const [, entry] of tenantStores) {
+          try {
+            await entry.mutate((draft) => {
+              const result = tickRecurringScheduler(draft.billing, { actor: 'scheduler' });
+              draft.billing = result.billing;
+              return draft;
+            });
+          } catch (err) {
+            console.error('[scheduler] auto-tick failed for tenant store:', err?.message || err);
+          }
         }
+      } finally {
+        schedulerRunning = false;
       }
     }, SCHEDULER_INTERVAL_MS);
     if (schedulerTimer.unref) schedulerTimer.unref();
