@@ -26,16 +26,21 @@
 @media (max-width: 760px) {
   .billing-header {
     min-height: 56px;
-    padding: 0 var(--ag-brand-space-md);
+    padding: var(--ag-brand-space-xs) var(--ag-brand-space-md);
     gap: var(--ag-brand-space-sm);
+    flex-wrap: wrap;
   }
 
   .billing-brand {
     font-size: var(--ag-brand-type-body-lg);
+    flex: 0 0 auto;
   }
 
   .billing-header-actions {
     gap: var(--ag-brand-space-xxs);
+    flex: 1 1 auto;
+    justify-content: flex-end;
+    min-width: 0;
   }
 
   .billing-quiet-button {
@@ -43,11 +48,15 @@
     min-width: 44px;
     padding: 0 var(--ag-brand-space-sm);
     font-size: var(--ag-brand-type-body-sm);
+    white-space: nowrap;
+    flex: 0 0 auto;
   }
 
   .billing-primary-button {
     min-height: 44px;
     padding: 0 var(--ag-brand-space-md);
+    white-space: nowrap;
+    flex: 0 0 auto;
   }
 
   .billing-shell {
@@ -194,6 +203,52 @@
 @media (prefers-reduced-motion: reduce) {
   .billing-skeleton-line {
     animation: none;
+  }
+}
+
+/* ── Mobile header: stack brand above actions on narrow viewports ── */
+@media (max-width: 480px) {
+  .billing-header {
+    flex-direction: column;
+    align-items: stretch;
+    padding: var(--ag-brand-space-sm) var(--ag-brand-space-md);
+    gap: var(--ag-brand-space-xs);
+  }
+
+  .billing-brand {
+    font-size: var(--ag-brand-type-body-lg);
+    flex: 0 0 auto;
+    width: 100%;
+  }
+
+  .billing-header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: var(--ag-brand-space-xxs);
+  }
+
+  .billing-quiet-button {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0 var(--ag-brand-space-sm);
+    font-size: max(var(--ag-brand-type-body-sm), 12px);
+    flex: 0 1 auto;
+    white-space: nowrap;
+  }
+
+  .billing-primary-button {
+    min-height: 44px;
+    padding: 0 var(--ag-brand-space-md);
+    font-size: max(var(--ag-brand-type-body-sm), 12px);
+    flex: 0 1 auto;
+    white-space: nowrap;
+  }
+
+  .billing-theme-toggle {
+    min-width: 44px;
+    min-height: 44px;
+    flex: 0 0 auto;
   }
 }
 
