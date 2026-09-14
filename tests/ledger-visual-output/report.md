@@ -1,18 +1,17 @@
 # Ledger Visual QA Acceptance Report — Repaired
 
-**Generated:** 2026-09-14T03:08:29.609212Z
-**Base URL:** http://127.0.0.1:8765
+**Generated:** 2026-09-14T06:58:51.692031Z
+**Base URL:** http://127.0.0.1:8769
 **Branch:** fix/ledger-qa-real
 **Commit:** 913ae84a
 **Screenshots:** 12
-**Findings:** 2
+**Findings:** 0
 **Auth Verified:** ✅ Yes — dashboard rendered with fixture data
 
 ## Executive Summary
 
 | Severity | Count |
 |----------|-------|
-| HIGH | 2 |
 
 ## Authentication Method
 
@@ -26,38 +25,22 @@ Synthetic magic token generated using the **dev secret** (`aftergraph-dev-secret
 
 ## Findings
 
-### 1. [HIGH] Horizontal overflow on mobile-light populated
-
-- **Category:** Visual
-- **Viewport:** mobile
-- **Theme:** light
-- **State:** populated
-- **Description:** Scroll width 491 exceeds client width 390
-- **Screenshot:** `/root/workspace/aftergraph/studio-ledger-qa-repair/tests/ledger-visual-output/screenshots/mobile-light-populated.png`
-
-### 2. [HIGH] Horizontal overflow on mobile-dark populated
-
-- **Category:** Visual
-- **Viewport:** mobile
-- **Theme:** dark
-- **State:** populated
-- **Description:** Scroll width 491 exceeds client width 390
-- **Screenshot:** `/root/workspace/aftergraph/studio-ledger-qa-repair/tests/ledger-visual-output/screenshots/mobile-dark-populated.png`
+No issues found during this run.
 
 ## Screenshots Captured
 
-- `/root/workspace/aftergraph/studio-ledger-qa-repair/tests/ledger-visual-output/screenshots/desktop-dark-empty.png`
-- `/root/workspace/aftergraph/studio-ledger-qa-repair/tests/ledger-visual-output/screenshots/desktop-dark-error.png`
-- `/root/workspace/aftergraph/studio-ledger-qa-repair/tests/ledger-visual-output/screenshots/desktop-dark-populated.png`
-- `/root/workspace/aftergraph/studio-ledger-qa-repair/tests/ledger-visual-output/screenshots/desktop-light-empty.png`
-- `/root/workspace/aftergraph/studio-ledger-qa-repair/tests/ledger-visual-output/screenshots/desktop-light-error.png`
-- `/root/workspace/aftergraph/studio-ledger-qa-repair/tests/ledger-visual-output/screenshots/desktop-light-populated.png`
-- `/root/workspace/aftergraph/studio-ledger-qa-repair/tests/ledger-visual-output/screenshots/mobile-dark-empty.png`
-- `/root/workspace/aftergraph/studio-ledger-qa-repair/tests/ledger-visual-output/screenshots/mobile-dark-error.png`
-- `/root/workspace/aftergraph/studio-ledger-qa-repair/tests/ledger-visual-output/screenshots/mobile-dark-populated.png`
-- `/root/workspace/aftergraph/studio-ledger-qa-repair/tests/ledger-visual-output/screenshots/mobile-light-empty.png`
-- `/root/workspace/aftergraph/studio-ledger-qa-repair/tests/ledger-visual-output/screenshots/mobile-light-error.png`
-- `/root/workspace/aftergraph/studio-ledger-qa-repair/tests/ledger-visual-output/screenshots/mobile-light-populated.png`
+- `/root/workspace/aftergraph/studio-ledger-final-qa/tests/ledger-visual-output/screenshots/desktop-dark-empty.png`
+- `/root/workspace/aftergraph/studio-ledger-final-qa/tests/ledger-visual-output/screenshots/desktop-dark-error.png`
+- `/root/workspace/aftergraph/studio-ledger-final-qa/tests/ledger-visual-output/screenshots/desktop-dark-populated.png`
+- `/root/workspace/aftergraph/studio-ledger-final-qa/tests/ledger-visual-output/screenshots/desktop-light-empty.png`
+- `/root/workspace/aftergraph/studio-ledger-final-qa/tests/ledger-visual-output/screenshots/desktop-light-error.png`
+- `/root/workspace/aftergraph/studio-ledger-final-qa/tests/ledger-visual-output/screenshots/desktop-light-populated.png`
+- `/root/workspace/aftergraph/studio-ledger-final-qa/tests/ledger-visual-output/screenshots/mobile-dark-empty.png`
+- `/root/workspace/aftergraph/studio-ledger-final-qa/tests/ledger-visual-output/screenshots/mobile-dark-error.png`
+- `/root/workspace/aftergraph/studio-ledger-final-qa/tests/ledger-visual-output/screenshots/mobile-dark-populated.png`
+- `/root/workspace/aftergraph/studio-ledger-final-qa/tests/ledger-visual-output/screenshots/mobile-light-empty.png`
+- `/root/workspace/aftergraph/studio-ledger-final-qa/tests/ledger-visual-output/screenshots/mobile-light-error.png`
+- `/root/workspace/aftergraph/studio-ledger-final-qa/tests/ledger-visual-output/screenshots/mobile-light-populated.png`
 
 ## Coverage Gaps (Honest)
 

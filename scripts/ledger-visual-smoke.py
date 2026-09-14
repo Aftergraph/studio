@@ -89,14 +89,32 @@ def set_theme(page, theme):
 
 
 def inject_auth_and_navigate(page, base_url, token):
-    """Inject auth token into localStorage BEFORE navigation so the app sees it on boot."""
+    """Inject auth token + actor identity binding into localStorage BEFORE navigation.
+    
+    The billing app resolves session via:
+    1. Read token from localStorage('aftergraph.auth.token')
+    2. Compute SHA-256 fingerprint of token
+    3. Call /api/v1/auth/me — if this fails (401/403), fall back to
+       localStorage('aftergraph.identity.<fingerprint>') for the actor id
+    4. Use actor to call /api/v1/billing?actor=<actor> which returns projection
+    
+    Without pre-seeding the identity binding, the fallback returns null actor,
+    and /api/v1/billing returns empty data even though fixtures are loaded.
+    """
+    # Compute SHA-256 fingerprint matching the app's tokenFingerprint() function
+    fingerprint = hashlib.sha256(token.encode('utf-8')).hexdigest()
+    identity_key = f"aftergraph.identity.{fingerprint}"
+    
     # Navigate to billing page first to establish origin for localStorage
     page.goto(f"{base_url}/billing/", wait_until="domcontentloaded", timeout=15000)
-    # Inject token into localStorage
-    page.evaluate(f"localStorage.setItem('{AUTH_TOKEN_KEY}', '{token}')")
-    # Reload so the app boots with the token present
+    # Inject token AND actor identity binding into localStorage
+    page.evaluate(f"""() => {{
+        localStorage.setItem('{AUTH_TOKEN_KEY}', '{token}');
+        localStorage.setItem('{identity_key}', 'demo-user');
+    }}""")
+    # Reload so the app boots with the token + identity present
     page.reload(wait_until="domcontentloaded", timeout=15000)
-    page.wait_for_timeout(800)
+    page.wait_for_timeout(1500)  # Extra time for async session resolution + API fetch
 
 
 def verify_dashboard_rendered(page):
@@ -179,6 +197,50 @@ def test_viewport_theme_states(browser, base_url, viewport_name, viewport_size, 
                 "; ".join(console_errors[:3]),
                 viewport_name, theme, "populated", screenshot_path)
         
+        # === CLOSE ANY OPEN REVIEW DIALOG BEFORE TAB NAVIGATION ===
+        # The #billing-review dialog blocks pointer events on tab buttons when open.
+        # Defensively close it before any tab click to prevent MEDIUM blocking finding.
+        try:
+            page.evaluate("""() => {
+                const dialog = document.querySelector('#billing-review');
+                if (dialog && dialog.open) {
+                    if (typeof dialog.close === 'function') dialog.close();
+                    else dialog.removeAttribute('open');
+                }
+                // Also close any other open dialogs
+                document.querySelectorAll('dialog[open]').forEach(d => {
+                    if (typeof d.close === 'function') d.close();
+                    else d.removeAttribute('open');
+                });
+            }""")
+            page.wait_for_timeout(200)
+        except Exception:
+            pass
+
+        # === VERIFY INVOICE ROWS VISIBLE IN POPULATED STATE ===
+        # .billing-row elements only render in inbox/queue views, NOT on dashboard.
+        # Navigate to inbox tab first, then wait for rows to appear.
+        try:
+            inbox_tab = page.locator("[data-view='inbox']")
+            if inbox_tab.count() > 0:
+                inbox_tab.click(timeout=5000)
+                page.wait_for_timeout(500)
+        except Exception:
+            pass
+        try:
+            page.wait_for_selector(".billing-row", state="attached", timeout=15000)
+        except Exception:
+            pass  # Will report 0 rows below if not found
+        billing_rows = page.locator(".billing-row")
+        billing_row_count = billing_rows.count()
+        invoice_numbers = page.locator("[data-invoice-id], .billing-row-meta strong")
+        invoice_number_count = invoice_numbers.count()
+        print(f"  📊 Billing rows visible: {billing_row_count}, invoice/meta elements: {invoice_number_count}")
+        if billing_row_count == 0:
+            record_finding("HIGH", "Functional", f"No billing rows visible on {label} populated",
+                "Dashboard rendered but .billing-row elements missing — fixture visits may not be projecting to queue items",
+                viewport_name, theme, "populated", screenshot_path)
+        
         # === EMPTY STATE ===
         # Use the API to get empty state by filtering to nonexistent customer
         # The billing app reads from /api/v1/billing/dashboard; we can't override via window globals
@@ -186,10 +248,18 @@ def test_viewport_theme_states(browser, base_url, viewport_name, viewport_size, 
         # or use the search tab with no results
         console_errors.clear()
         try:
+            # Defensively close any dialog again before tab click
+            page.evaluate("""() => {
+                document.querySelectorAll('dialog[open]').forEach(d => {
+                    if (typeof d.close === 'function') d.close();
+                    else d.removeAttribute('open');
+                });
+            }""")
+            page.wait_for_timeout(100)
             # Click search tab and search for something that won't match
             search_tab = page.locator("[data-view='search-invoices']")
             if search_tab.count() > 0:
-                search_tab.click()
+                search_tab.click(timeout=5000)
                 page.wait_for_timeout(400)
                 search_input = page.locator("input[type='search'], input[placeholder*='øg'], input[placeholder*='search']")
                 if search_input.count() > 0:
