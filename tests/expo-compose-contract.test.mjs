@@ -58,7 +58,7 @@ test('result route exposes usable output actions without direct delivery',async(
 test('result route can override all supported targets',async()=>{
   const screen=await text('app/compose-result.tsx');
   for(const target of ['friday.chatgpt','anthropic.claude-code','openai.codex','aftergraph.hermes','generic']){
-    assert.match(screen,new RegExp(target.replace(/[.]/g,'\\.')));
+    assert.match(screen,new RegExp(target.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
   }
   assert.match(screen,/compileIntent/);
 });
