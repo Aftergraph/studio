@@ -243,6 +243,7 @@ function ensureDemoBillingCapability() {
   let changed = false;
   if (!caps.has('billing.read')) { caps.add('billing.read'); changed = true; }
   if (!caps.has('billing.manage')) { caps.add('billing.manage'); changed = true; }
+  if (!caps.has('billing.approve')) { caps.add('billing.approve'); changed = true; }
   if (changed) updateCapabilities('demo-user', [...caps]);
 }
 
@@ -1039,7 +1040,7 @@ export function decorateBillingServer(server, {
       const recurringMatch = url.pathname.match(/^\/api\/v1\/billing\/recurring\/([^/]+)$/);
       if (recurringMatch && req.method === 'PATCH') {
         const recurringId = decodeURIComponent(recurringMatch[1]);
-        const actionKey = begin(req, body, actor, store, `/api/v1/billing/recurring/${recurringId}`);
+        // ponytail: use outer actionKey from line 536 — do NOT redeclare/shadow
         let recurring;
         const next = await store.mutate((draft) => {
           const result = updateRecurringInvoice(draft.billing, {
@@ -1064,7 +1065,7 @@ export function decorateBillingServer(server, {
 
       if (recurringMatch && req.method === 'DELETE') {
         const recurringId = decodeURIComponent(recurringMatch[1]);
-        const actionKey = begin(req, body, actor, store, `/api/v1/billing/recurring/${recurringId}`);
+        // ponytail: use outer actionKey from line 536 — do NOT redeclare/shadow
         const next = await store.mutate((draft) => {
           const result = deleteRecurringInvoice(draft.billing, { id: recurringId, actor });
           draft.billing = result.billing;
