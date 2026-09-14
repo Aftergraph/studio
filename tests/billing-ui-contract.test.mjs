@@ -51,7 +51,9 @@ test('billing operator app uses plain Danish workflow copy and never derives bil
   assert.match(source, /Faktureret/);
   assert.match(source, /Tilføj arbejdstid/);
   assert.match(source, /Gennemgå faktura/);
-  assert.match(source, /Intl\.NumberFormat/);
+  // Intl.NumberFormat moved to lib/format.mjs during extraction
+  const formatSource = await text('src/billing/lib/format.mjs');
+  assert.match(formatSource, /Intl\.NumberFormat/);
   assert.match(source, /missing_actuals/);
   assert.doesNotMatch(source, /scheduledEnd[^\n]*-[^\n]*scheduledStart/);
   assert.doesNotMatch(source, /alarm|nøglekode|keycode|door code/i);
