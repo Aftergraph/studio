@@ -1,0 +1,102 @@
+.billing-form {
+  display: grid;
+  gap: var(--ag-brand-space-md);
+}
+
+.billing-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--ag-brand-space-md);
+}
+
+.billing-field {
+  display: grid;
+  gap: var(--ag-brand-space-xs);
+}
+
+.billing-field label {
+  color: var(--text);
+  font-size: var(--ag-brand-type-body-sm);
+  font-weight: 720;
+  letter-spacing: 0.01em;
+}
+
+.billing-field input,
+.billing-field select,
+.billing-field textarea {
+  min-height: 48px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 var(--ag-brand-space-md);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--ag-brand-radius-button);
+  background: var(--canvas);
+  color: var(--text);
+  outline: none;
+  font-size: max(16px, var(--ag-brand-type-body));
+  touch-action: manipulation;
+}
+
+.billing-field input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.billing-form-error {
+  margin: -4px 0 2px;
+  color: var(--danger);
+  font-size: var(--ag-brand-type-body-sm);
+  line-height: 1.45;
+}
+
+.billing-form-help {
+  margin: -4px 0 2px;
+  color: var(--text-3);
+  font-size: var(--ag-brand-type-ui);
+  line-height: 1.45;
+}
+
+.billing-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ag-brand-space-sm);
+  padding-top: var(--ag-brand-space-sm);
+}
+
+.billing-company-form { gap: var(--ag-brand-space-lg); }
+
+.billing-advanced {
+  border: 1px solid var(--border);
+  border-radius: var(--ag-brand-radius-card);
+  padding: var(--ag-brand-space-md) var(--ag-brand-space-base);
+  background: var(--surface);
+}
+
+.billing-advanced summary {
+  cursor: pointer;
+  font-weight: 680;
+  color: var(--text-2);
+}
+
+.billing-advanced[open] summary { margin-bottom: var(--ag-brand-space-base); }
+
+/* ── Visual Polish: Settings Panel ── */
+.billing-company-form .billing-field input,
+.billing-company-form .billing-field select {
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.billing-company-form .billing-field input:focus,
+.billing-company-form .billing-field select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.billing-advanced {
+  transition: background 200ms ease, border-color 200ms ease;
+}
+
+.billing-advanced[open] {
+  background: var(--surface-strong);
+  border-color: var(--border-strong);
+}

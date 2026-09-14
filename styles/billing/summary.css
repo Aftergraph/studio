@@ -1,0 +1,84 @@
+.billing-summary {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.45fr) repeat(3, minmax(130px, 1fr));
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: var(--ag-brand-space-xl);
+  box-shadow: var(--shadow-soft);
+}
+
+.billing-summary-item {
+  min-height: 108px;
+  padding: var(--ag-brand-space-lg) var(--ag-brand-space-lg) var(--ag-brand-space-lg) 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: var(--surface);
+  position: relative;
+  overflow: hidden;
+}
+
+.billing-summary-item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--gradient-subtle);
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+
+.billing-summary-item:hover::before {
+  opacity: 1;
+}
+
+.billing-summary-item + .billing-summary-item {
+  border-left: 1px solid var(--border);
+  padding-left: var(--ag-brand-space-lg);
+}
+
+.billing-summary-label {
+  color: var(--text-3);
+  font-size: var(--ag-brand-type-ui);
+  font-weight: 720;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.billing-summary-value {
+  margin-top: var(--ag-brand-space-sm);
+  font-size: clamp(var(--ag-brand-type-title), 2.7vw, var(--ag-brand-type-display));
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-weight: 760;
+  color: var(--text-emphasis);
+}
+
+.billing-summary-item.is-primary .billing-summary-value {
+  color: var(--success);
+}
+
+.billing-summary-detail {
+  margin-top: var(--ag-brand-space-xs);
+  color: var(--text-3);
+  font-size: var(--ag-brand-type-ui);
+}
+
+.billing-summary-item.is-alert {
+  border-color: var(--danger, #d32f2f);
+  background: color-mix(in srgb, var(--danger, #d32f2f) 6%, var(--surface, #fff));
+}
+
+.billing-summary-item.is-alert .billing-summary-value {
+  color: var(--danger, #d32f2f);
+}
+
+.billing-summary-item {
+  transition: background 200ms ease, border-color 200ms ease;
+}
+
+.billing-summary-item:hover {
+  background: color-mix(in srgb, var(--surface-strong) 50%, var(--surface));
+}

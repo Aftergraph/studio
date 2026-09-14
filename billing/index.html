@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="da" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#0b0f16">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Billing">
+  <meta name="application-name" content="Aftergraph Billing">
+  <title>Ledger — Aftergraph</title>
+  <link rel="manifest" href="/billing/manifest.webmanifest">
+  <link rel="icon" href="/billing/icons/icon-192.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/billing/icons/icon-192.svg">
+  <link rel="stylesheet" href="/styles/tokens.css?v=1294adb5">
+  <link rel="stylesheet" href="/styles/reset.css?v=1294adb5">
+  <link rel="stylesheet" href="/styles/billing.css?v=1294adb5">
+</head>
+<body class="billing-page">
+  <header class="billing-header" hidden data-deferred="auth">
+    <div class="billing-brand" aria-label="Ledger by Aftergraph">
+      <span class="billing-mark" aria-hidden="true"></span>
+      <strong>Ledger</strong>
+    </div>
+    <div class="billing-header-actions">
+      <button class="billing-quiet-button" type="button" data-action="manage-customers">Kunder</button>
+      <button class="billing-theme-toggle" id="billing-theme-toggle" type="button" aria-label="Skift tema (lys/mørk)" title="Skift tema">
+        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      </button>
+      <button class="billing-quiet-button" id="billing-refresh" type="button" aria-label="Opdater fakturaliste">Opdater</button>
+      <button class="billing-quiet-button" type="button" data-action="company-settings" aria-label="Virksomhedsindstillinger">Indstillinger</button>
+      <button class="billing-primary-button" type="button" data-action="new-invoice">Ny faktura</button>
+    </div>
+  </header>
+
+  <main id="billing-app" class="billing-shell">
+    <section class="billing-intro" aria-labelledby="billing-title">
+      <div>
+        <h1 id="billing-title">Fakturering</h1>
+        <p>Det der kræver handling først. Resten kan vente.</p>
+      </div>
+      <div id="billing-connection" class="billing-connection" aria-live="polite">Indlæser…</div>
+    </section>
+
+    <section id="billing-summary" class="billing-summary" aria-label="Faktureringsoversigt" aria-live="polite"></section>
+
+    <nav class="billing-queue-nav" hidden data-deferred="auth" aria-label="Faktureringsnavigation">
+      <div class="billing-tabs" role="tablist" aria-label="Faktureringsvisning">
+        <button class="billing-tab is-active" type="button" role="tab" aria-selected="true" data-view="dashboard" id="billing-tab-dashboard" aria-controls="billing-panel" tabindex="0">
+          Overblik
+        </button>
+        <button class="billing-tab" type="button" role="tab" aria-selected="false" data-view="inbox" id="billing-tab-inbox" aria-controls="billing-panel" tabindex="-1">
+          Indbakke <span data-count="inbox">0</span>
+        </button>
+        <button class="billing-tab" type="button" role="tab" aria-selected="false" data-view="ready" id="billing-tab-ready" aria-controls="billing-panel" tabindex="-1">
+          Klar <span data-count="ready">0</span>
+        </button>
+        <button class="billing-tab" type="button" role="tab" aria-selected="false" data-view="waiting" id="billing-tab-waiting" aria-controls="billing-panel" tabindex="-1">
+          Venter <span data-count="waiting">0</span>
+        </button>
+        <button class="billing-tab" type="button" role="tab" aria-selected="false" data-view="needs_info" id="billing-tab-needs_info" aria-controls="billing-panel" tabindex="-1">
+          Mangler <span data-count="needs_info">0</span>
+        </button>
+        <button class="billing-tab" type="button" role="tab" aria-selected="false" data-view="invoiced" id="billing-tab-invoiced" aria-controls="billing-panel" tabindex="-1">
+          Faktureret <span data-count="invoiced">0</span>
+        </button>
+        <button class="billing-tab" type="button" role="tab" aria-selected="false" data-view="products" id="billing-tab-products" aria-controls="billing-panel" tabindex="-1">
+          Produkter
+        </button>
+        <button class="billing-tab" type="button" role="tab" aria-selected="false" data-view="recurring" id="billing-tab-recurring" aria-controls="billing-panel" tabindex="-1">
+          Gentagende
+        </button>
+        <button class="billing-tab" type="button" role="tab" aria-selected="false" data-view="search-invoices" id="billing-tab-search-invoices" aria-controls="billing-panel" tabindex="-1">
+          Søg fakturaer
+        </button>
+        <button class="billing-tab" type="button" role="tab" aria-selected="false" data-view="search-customers" id="billing-tab-search-customers" aria-controls="billing-panel" tabindex="-1">
+          Søg kunder
+        </button>
+      </div>
+    </nav>
+
+    <section class="billing-worklist" aria-labelledby="billing-list-title" role="tabpanel" id="billing-panel">
+      <div class="billing-list-heading">
+        <h2 id="billing-list-title">Indbakke</h2>
+        <p id="billing-list-context">Mangler oplysninger først, derefter det der er klar til fakturering.</p>
+      </div>
+      <div id="billing-list" class="billing-list" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <div id="billing-toast" class="billing-toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <dialog id="billing-review" class="billing-review" aria-labelledby="billing-review-title">
+    <div class="billing-review-frame">
+      <header class="billing-review-header">
+        <div>
+          <p class="billing-review-kicker" id="billing-review-kicker">Fakturakladde</p>
+          <h2 id="billing-review-title">Gennemgå faktura</h2>
+        </div>
+        <button type="button" class="billing-icon-button" data-action="close-review" aria-label="Luk">×</button>
+      </header>
+      <div id="billing-review-body" class="billing-review-body"></div>
+    </div>
+  </dialog>
+
+  <!-- Command Palette Overlay -->
+  <div id="billing-cmd-overlay" class="billing-cmd-overlay" role="dialog" aria-modal="true" aria-label="Kommandopalette" hidden>
+    <div class="billing-cmd-panel" role="combobox" aria-expanded="false" aria-haspopup="listbox">
+      <div class="billing-cmd-input-wrap">
+        <svg class="billing-cmd-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="billing-cmd-input" class="billing-cmd-input" type="text" placeholder="Søg kommandoer, kunder, fakturaer…" autocomplete="off" aria-autocomplete="list" aria-controls="billing-cmd-listbox">
+        <kbd class="billing-cmd-kbd" aria-hidden="true">Esc</kbd>
+      </div>
+      <ul id="billing-cmd-listbox" class="billing-cmd-list" role="listbox" aria-label="Kommandoresultater"></ul>
+      <div class="billing-cmd-footer" aria-hidden="true">
+        <span><kbd>↑↓</kbd> navigér</span>
+        <span><kbd>↵</kbd> vælg</span>
+        <span><kbd>⌘K</kbd> luk</span>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/billing/pwa.mjs?v=1294adb5"></script>
+  <script type="module" src="/src/billing/billing-app.mjs?v=1294adb5"></script>
+</body>
+</html>

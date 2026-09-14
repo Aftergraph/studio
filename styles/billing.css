@@ -1,0 +1,32 @@
+/* Ledger Billing Design System — Modular Entry Point */
+/* Auto-generated from monolith split; preserves all original selectors */
+
+/* Base modules first */
+@import "./billing/a11y.css";
+@import "./billing/base.css";
+@import "./billing/buttons.css";
+@import "./billing/forms.css";
+@import "./billing/header.css";
+@import "./billing/list.css";
+@import "./billing/modal.css";
+@import "./billing/search.css";
+@import "./billing/skeleton.css";
+@import "./billing/states.css";
+@import "./billing/summary.css";
+@import "./billing/table.css";
+@import "./billing/tabs.css";
+@import "./billing/theme.css";
+@import "./billing/toast.css";
+@import "./billing/approval.css";
+@import "./billing/command-palette.css";
+@import "./billing/dashboard.css";
+/* Print and responsive MUST come last to override base rules */
+@import "./billing/print.css";
+@import "./billing/responsive.css";
+
+/* Ponytail: hide dead UI before auth */
+body:not(.is-authenticated) .billing-header-actions,
+body:not(.is-authenticated) .billing-queue-nav,
+body:not(.is-authenticated) .billing-cmd-overlay {
+    display: none !important;
+}

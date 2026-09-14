@@ -1,0 +1,138 @@
+.billing-empty,
+.billing-error {
+  padding: var(--ag-brand-space-4xl) 0;
+  color: var(--text-3);
+  font-size: var(--ag-brand-type-body);
+  line-height: 1.55;
+}
+
+.billing-error strong {
+  color: var(--danger);
+}
+
+/* PWA Install Banner */
+.billing-install-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #0b0f16;
+  border-top: 1px solid rgba(89, 212, 255, 0.3);
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  z-index: 1000;
+  animation: billing-install-slide-up 0.3s ease-out;
+}
+
+@keyframes billing-install-slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.billing-install-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.billing-install-content strong {
+  color: #f5f7fa;
+  font-size: 0.95rem;
+}
+
+.billing-install-content span {
+  color: rgba(245, 247, 250, 0.7);
+  font-size: 0.85rem;
+}
+
+.billing-install-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.billing-overdue-badge {
+  display: inline-block;
+  margin-left: var(--ag-brand-space-xs, 0.5rem);
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #991b1b;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: var(--ag-brand-space-xxs, 0.25rem);
+  vertical-align: middle;
+}
+
+.billing-status-badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.billing-status-badge.is-draft { background: var(--surface-2, #eee); color: var(--text-2, #666); }
+
+.billing-status-badge.is-issued { background: color-mix(in srgb, var(--brand, #0066cc) 12%, transparent); color: var(--brand, #0066cc); }
+
+.billing-status-badge.is-overdue { background: color-mix(in srgb, var(--danger, #d32f2f) 12%, transparent); color: var(--danger, #d32f2f); }
+
+.billing-status-badge.is-paid { background: color-mix(in srgb, var(--success, #2e7d32) 12%, transparent); color: var(--success, #2e7d32); }
+
+.billing-status-badge.is-active { background: color-mix(in srgb, var(--success, #2e7d32) 12%, transparent); color: var(--success, #2e7d32); }
+
+.billing-status-badge.is-inactive { background: var(--surface-2, #eee); color: var(--text-2, #666); }
+
+/* Status badges with refined colors */
+.billing-status-badge.is-pending_approval {
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  color: var(--warning);
+}
+
+/* ── Dark Mode Consistency Fixes ── */
+html[data-theme="dark"] .billing-install-banner {
+  background: var(--ag-brand-canvas);
+  border-top-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+html[data-theme="dark"] .billing-overdue-badge {
+  color: #fca5a5;
+  background: rgba(220, 38, 38, 0.15);
+  border-color: rgba(220, 38, 38, 0.3);
+}
+
+/* ── Error State Enhancement ── */
+.billing-error {
+  padding: var(--ag-brand-space-xl);
+  border-radius: var(--ag-brand-radius-card);
+  background: color-mix(in srgb, var(--danger) 6%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--danger) 20%, var(--border));
+}
+
+.billing-error strong {
+  display: block;
+  margin-bottom: var(--ag-brand-space-xs);
+  font-size: var(--ag-brand-type-body);
+}
+
+/* ── Empty State Enhancement ── */
+.billing-empty {
+  text-align: center;
+  padding: var(--ag-brand-space-5xl) var(--ag-brand-space-xl);
+  color: var(--text-3);
+}
+
+.billing-empty::before {
+  content: '📭';
+  display: block;
+  font-size: 2rem;
+  margin-bottom: var(--ag-brand-space-md);
+  opacity: 0.5;
+}
