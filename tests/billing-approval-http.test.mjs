@@ -219,6 +219,141 @@ test('approval HTTP: missing idempotency key returns 422', async () => {
   });
 });
 
+test('approval HTTP: REGRESSION - issue blocked when approval required and status is pending_approval (bypass via /issue without approve)', async () => {
+  await withServer(async (base) => {
+    // Enable required approval policy
+    const settingsRes = await postJson(base, '/api/v1/billing/settings', APPROVER_ID, {
+      approvalPolicy: { required: true, allowSelfApproval: false },
+    });
+    assert.equal(settingsRes.status, 200);
+
+    // Requester creates draft and requests approval
+    const invoice = await createDraft(base, REQUESTER_ID);
+    const reqRes = await postJson(base, `/api/v1/billing/invoices/${invoice.id}/request-approval`, REQUESTER_ID, {});
+    assert.equal(reqRes.status, 200);
+    const reqBody = await reqRes.json();
+    assert.equal(reqBody.invoice.status, 'pending_approval');
+
+    // CRITICAL BYPASS TEST: Requester (without billing.approve) calls /issue directly
+    // This MUST be rejected — requester should not be able to skip approval by calling /issue
+    const issueRes = await postJson(base, `/api/v1/billing/invoices/${invoice.id}/issue`, REQUESTER_ID, {});
+    assert.equal(issueRes.status, 422, `BYPASS: requester issued pending_approval invoice without approval, got ${issueRes.status}`);
+    const issueBody = await issueRes.json();
+    assert.equal(issueBody.error, 'approval_required_before_issue', `Expected approval_required_before_issue, got ${issueBody.error}`);
+
+    // Verify invoice is still pending_approval, not issued
+    const getRes = await fetch(`${base}/api/v1/billing?actor=${REQUESTER_ID}`);
+    const state = await getRes.json();
+    const stillPending = state.billing.invoices.find((inv) => inv.id === invoice.id);
+    assert.equal(stillPending.status, 'pending_approval', 'Invoice should remain pending_approval after blocked issue attempt');
+  });
+});
+
+test('approval HTTP: REGRESSION - cross-tenant issue blocked even with pending_approval status', async () => {
+  await withServer(async (base) => {
+    const settingsRes = await postJson(base, '/api/v1/billing/settings', APPROVER_ID, {
+      approvalPolicy: { required: true },
+    });
+    assert.equal(settingsRes.status, 200);
+
+    const invoice = await createDraft(base, REQUESTER_ID);
+    await postJson(base, `/api/v1/billing/invoices/${invoice.id}/request-approval`, REQUESTER_ID, {});
+
+    // Different workspace user tries to issue
+    const res = await postJson(base, `/api/v1/billing/invoices/${invoice.id}/issue`, 'demo-user', {});
+    // Should fail — either tenant isolation or approval gate
+    assert.ok(res.status === 403 || res.status === 404 || res.status === 422,
+      `Cross-tenant issue should be blocked, got ${res.status}`);
+  });
+});
+
+test('approval HTTP: REGRESSION - policy change from optional to required blocks existing pending_approval issues', async () => {
+  await withServer(async (base) => {
+    // Start with approval NOT required
+    const settingsRes1 = await postJson(base, '/api/v1/billing/settings', APPROVER_ID, {
+      approvalPolicy: { required: false },
+    });
+    assert.equal(settingsRes1.status, 200);
+
+    const invoice = await createDraft(base, REQUESTER_ID);
+    await postJson(base, `/api/v1/billing/invoices/${invoice.id}/request-approval`, REQUESTER_ID, {});
+
+    // Now enable required approval
+    const settingsRes2 = await postJson(base, '/api/v1/billing/settings', APPROVER_ID, {
+      approvalPolicy: { required: true },
+    });
+    assert.equal(settingsRes2.status, 200);
+
+    // Issue should now be blocked despite being pending_approval before policy change
+    const issueRes = await postJson(base, `/api/v1/billing/invoices/${invoice.id}/issue`, REQUESTER_ID, {});
+    assert.equal(issueRes.status, 422, `Policy tightening should block issue of pending_approval without approval`);
+  });
+});
+
+test('approval HTTP: REGRESSION - strict boolean validation rejects string "false" for approvalPolicy.required', async () => {
+  await withServer(async (base) => {
+    const res = await postJson(base, '/api/v1/billing/settings', APPROVER_ID, {
+      approvalPolicy: { required: 'false' },
+    });
+    assert.equal(res.status, 422, `String 'false' should be rejected, got ${res.status}`);
+    const body = await res.json();
+    assert.equal(body.error, 'invalid_approval_policy');
+  });
+});
+
+test('approval HTTP: REGRESSION - strict boolean validation rejects null for approvalPolicy.required', async () => {
+  await withServer(async (base) => {
+    const res = await postJson(base, '/api/v1/billing/settings', APPROVER_ID, {
+      approvalPolicy: { required: null },
+    });
+    assert.equal(res.status, 422, `null should be rejected, got ${res.status}`);
+    const body = await res.json();
+    assert.equal(body.error, 'invalid_approval_policy');
+  });
+});
+
+test('approval HTTP: REGRESSION - partial policy update preserves existing allowSelfApproval', async () => {
+  await withServer(async (base) => {
+    // Set both fields
+    const set1 = await postJson(base, '/api/v1/billing/settings', APPROVER_ID, {
+      approvalPolicy: { required: true, allowSelfApproval: true },
+    });
+    assert.equal(set1.status, 200);
+
+    // Update only required — allowSelfApproval should be preserved
+    const set2 = await postJson(base, '/api/v1/billing/settings', APPROVER_ID, {
+      approvalPolicy: { required: false },
+    });
+    assert.equal(set2.status, 200);
+
+    const getRes = await fetch(`${base}/api/v1/billing?actor=${APPROVER_ID}`);
+    const state = await getRes.json();
+    assert.equal(state.billing.settings.approvalPolicy.required, false);
+    assert.equal(state.billing.settings.approvalPolicy.allowSelfApproval, true, 'allowSelfApproval should be preserved on partial update');
+  });
+});
+
+test('approval HTTP: REGRESSION - enabling required approval defaults allowSelfApproval to false (fail-closed)', async () => {
+  await withServer(async (base) => {
+    // Clear any existing policy first
+    const clearRes = await postJson(base, '/api/v1/billing/settings', APPROVER_ID, {
+      approvalPolicy: { required: false },
+    });
+    assert.equal(clearRes.status, 200);
+
+    // Enable required without specifying allowSelfApproval
+    const setRes = await postJson(base, '/api/v1/billing/settings', APPROVER_ID, {
+      approvalPolicy: { required: true },
+    });
+    assert.equal(setRes.status, 200);
+
+    const getRes = await fetch(`${base}/api/v1/billing?actor=${APPROVER_ID}`);
+    const state = await getRes.json();
+    assert.equal(state.billing.settings.approvalPolicy.required, true);
+    assert.equal(state.billing.settings.approvalPolicy.allowSelfApproval, false, 'Should default to fail-closed when enabling required approval');
+  });
+});
+
 test('approval HTTP: settings roundtrip persists approvalPolicy', async () => {
   await withServer(async (base) => {
     const setRes = await postJson(base, '/api/v1/billing/settings', APPROVER_ID, {

@@ -209,8 +209,12 @@ export function issueBillingInvoice(billing, { invoiceId, actor } = {}) {
     return { billing: next, invoice: clone(invoice) };
   }
   const policy = next.settings?.approvalPolicy || {};
-  if (policy.required && invoice.status === 'draft') {
-    throw codedError('approval_required_before_issue', 'invoice must be approved before issuing when approval policy is enabled', 422);
+  if (policy.required) {
+    // When approval is required, only allow issue if invoice has been explicitly approved
+    // Block both draft and pending_approval statuses — pending_approval without approvedBy is a bypass
+    if (!invoice.approval?.approvedBy) {
+      throw codedError('approval_required_before_issue', 'invoice must be approved before issuing when approval policy is enabled', 422);
+    }
   }
   if (invoice.status !== 'draft' && invoice.status !== 'pending_approval') throw codedError('invoice_not_issuable');
   invoice.status = 'issued';
@@ -866,10 +870,24 @@ export function updateBillingSettings(billing, {
   }
 
   if (approvalPolicy !== undefined) {
-    const policy = {};
-    policy.required = Boolean(approvalPolicy.required);
+    // Strict boolean validation: reject non-boolean values to prevent Boolean('false')=true bypass
+    if (approvalPolicy.required !== undefined && typeof approvalPolicy.required !== 'boolean') {
+      throw codedError('invalid_approval_policy', 'approvalPolicy.required must be a boolean', 422);
+    }
+    if (approvalPolicy.allowSelfApproval !== undefined && typeof approvalPolicy.allowSelfApproval !== 'boolean') {
+      throw codedError('invalid_approval_policy', 'approvalPolicy.allowSelfApproval must be a boolean', 422);
+    }
+    // Merge with existing policy to prevent partial replacement loss
+    const existing = next.settings.approvalPolicy || {};
+    const policy = { ...existing };
+    if (approvalPolicy.required !== undefined) {
+      policy.required = approvalPolicy.required;
+    }
     if (approvalPolicy.allowSelfApproval !== undefined) {
-      policy.allowSelfApproval = Boolean(approvalPolicy.allowSelfApproval);
+      policy.allowSelfApproval = approvalPolicy.allowSelfApproval;
+    } else if (approvalPolicy.required === true && existing.allowSelfApproval === undefined) {
+      // Fail-closed default: when enabling required approval, default self-approval to false
+      policy.allowSelfApproval = false;
     }
     next.settings.approvalPolicy = policy;
   }
