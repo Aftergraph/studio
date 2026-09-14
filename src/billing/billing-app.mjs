@@ -1259,13 +1259,19 @@ function createApp() {
         ? `<p>Leveret ${esc(formatDate(state.activeInvoice.delivery?.deliveredAt, locale()))} via ${esc(state.activeInvoice.delivery?.provider || 'provider')}.</p>`
         : deliveryFailed ? '<p>Fakturaen er stadig udstedt. Du kan prøve leveringen igen.</p>' : '';
       const voidDetail = voided ? `<p>Annulleret ${esc(formatDate(state.activeInvoice.voidedAt, locale()))}. Årsag: ${esc(state.activeInvoice.voidReason || '—')}</p>` : '';
-      const approvalDetail = pendingApproval
-        ? `<p class="billing-approval-info">Anmodet om godkendelse af ${esc(state.activeInvoice.approval?.requestedBy || 'ukendt')} den ${esc(formatDate(state.activeInvoice.approval?.requestedAt, locale()))}.</p>`
-        : state.activeInvoice.approval?.approvedBy
-          ? `<p class="billing-approval-info">Godkendt af ${esc(state.activeInvoice.approval.approvedBy)} den ${esc(formatDate(state.activeInvoice.approval.approvedAt, locale()))}.</p>`
-          : state.activeInvoice.approval?.rejectedBy
-            ? `<p class="billing-approval-info billing-approval-rejected">Afvist af ${esc(state.activeInvoice.approval.rejectedBy)}: ${esc(state.activeInvoice.approval.rejectionReason || 'Ingen begrundelse')}</p>`
-            : '';
+      const approvalEvents = [];
+      if (state.activeInvoice.approval?.requestedAt) {
+        approvalEvents.push(`<div class="billing-approval-event is-pending"><strong>Anmodet om godkendelse</strong><time>${esc(state.activeInvoice.approval.requestedBy || 'ukendt')} · ${esc(formatDate(state.activeInvoice.approval.requestedAt, locale()))}</time></div>`);
+      }
+      if (state.activeInvoice.approval?.approvedBy) {
+        approvalEvents.push(`<div class="billing-approval-event is-approved"><strong>Godkendt</strong><time>${esc(state.activeInvoice.approval.approvedBy)} · ${esc(formatDate(state.activeInvoice.approval.approvedAt, locale()))}</time></div>`);
+      }
+      if (state.activeInvoice.approval?.rejectedBy) {
+        approvalEvents.push(`<div class="billing-approval-event is-rejected"><strong>Afvist</strong><time>${esc(state.activeInvoice.approval.rejectedBy)} · ${esc(formatDate(state.activeInvoice.approval.rejectedAt, locale()))}</time><small>${esc(state.activeInvoice.approval.rejectionReason || 'Ingen begrundelse')}</small></div>`);
+      }
+      const approvalTimeline = approvalEvents.length
+        ? `<div class="billing-approval-timeline" aria-label="Godkendelseshistorik">${approvalEvents.join('')}</div>`
+        : '';
       const artifact = issued && !voided ? `<button type="button" class="billing-secondary-button" data-action="download" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>Download faktura</button>` : '';
       const deliver = issued && !emailed && !voided ? `<button type="button" class="billing-primary-button" data-action="deliver" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>${deliveryFailed ? 'Prøv levering igen' : 'Send faktura'}</button>` : '';
       const issue = issued || voided || pendingApproval ? '' : (approvalPolicy.required
@@ -1279,7 +1285,7 @@ function createApp() {
       const remind = issued && !voided ? `<button type="button" class="billing-secondary-button" data-action="send-reminder" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>Send rykker</button>` : '';
       const paymentSection = issued && !voided ? paymentFormHtml(state.activeInvoice) : '';
       const creditSection = issued && !voided ? creditNoteFormHtml(state.activeInvoice) : '';
-      return `<div class="billing-draft-status"><strong>${status}</strong>${overdueBadge}<p>Nr. ${esc(state.activeInvoice.number)} · forfalder ${esc(formatDate(state.activeInvoice.dueDate, locale()))}</p>${deliveryDetail}${voidDetail}${approvalDetail}</div><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Luk</button>${artifact}${editManual}${issue}${approveBtn}${rejectBtn}${deliver}${remind}</div>${paymentSection}${creditSection}`;
+      return `<div class="billing-draft-status"><strong>${status}</strong>${overdueBadge}<p>Nr. ${esc(state.activeInvoice.number)} · forfalder ${esc(formatDate(state.activeInvoice.dueDate, locale()))}</p>${deliveryDetail}${voidDetail}${approvalTimeline}</div><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Luk</button>${artifact}${editManual}${issue}${approveBtn}${rejectBtn}${deliver}${remind}</div>${paymentSection}${creditSection}`;
     }
     const nextNumber = state.billing?.settings?.invoiceSequence?.nextNumber ?? '—';
     const correctionVisit = state.activeItem?.visitIds?.length === 1 ? visit(state.activeItem.visitIds[0]) : null;
