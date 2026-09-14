@@ -69,7 +69,16 @@ test('billing forms expose inline accessible error targets', async () => {
 });
 
 test('billing styling dogfoods Aftergraph tokens and remains usable on mobile safe areas', async () => {
-  const css = await text('styles/billing.css');
+  const entry = await text('styles/billing.css');
+  // Modular CSS: resolve all @import targets to verify token usage across modules
+  const importRe = /@import\s+"\.\/(billing\/[^"]+)";/g;
+  const modules = [];
+  let match;
+  while ((match = importRe.exec(entry)) !== null) {
+    modules.push(await text(`styles/${match[1]}`));
+  }
+  const css = [entry, ...modules].join('\n');
+  assert.ok(modules.length > 0, 'billing.css must import at least one module');
   assert.match(css, /var\(--bg\)/);
   assert.match(css, /var\(--surface\)/);
   assert.match(css, /var\(--accent\)/);

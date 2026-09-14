@@ -7,7 +7,7 @@ const text = (path) => readFile(new URL(path, root), 'utf8');
 
 test('billing standalone app declares installable product metadata', async () => {
   const html = await text('billing/index.html');
-  assert.match(html, /<title>Aftergraph Billing<\/title>/i);
+  assert.match(html, /<title>Ledger — Aftergraph<\/title>/i);
   assert.match(html, /name="viewport"[^>]*viewport-fit=cover/i);
   assert.match(html, /rel="manifest"[^>]*manifest\.webmanifest/i);
   assert.match(html, /apple-mobile-web-app-capable/i);
@@ -17,8 +17,8 @@ test('billing standalone app declares installable product metadata', async () =>
 test('billing manifest is scoped to the standalone billing app', async () => {
   const raw = await text('billing/manifest.webmanifest');
   const manifest = JSON.parse(raw);
-  assert.equal(manifest.name, 'Aftergraph Billing');
-  assert.equal(manifest.short_name, 'Billing');
+  assert.equal(manifest.name, 'Ledger by Aftergraph');
+  assert.equal(manifest.short_name, 'Ledger');
   assert.equal(manifest.start_url, '/billing/');
   assert.equal(manifest.scope, '/billing/');
   assert.equal(manifest.display, 'standalone');

@@ -1,4 +1,4 @@
-const CACHE = 'aftergraph-billing-shell-v3';
+const CACHE = 'aftergraph-billing-shell-v4';
 const OFFLINE_URL = '/billing/offline.html';
 const SHELL = [
   '/billing/',
@@ -9,6 +9,26 @@ const SHELL = [
   '/styles/tokens.css',
   '/styles/reset.css',
   '/styles/billing.css',
+  '/styles/billing/a11y.css',
+  '/styles/billing/approval.css',
+  '/styles/billing/base.css',
+  '/styles/billing/buttons.css',
+  '/styles/billing/command-palette.css',
+  '/styles/billing/dashboard.css',
+  '/styles/billing/forms.css',
+  '/styles/billing/header.css',
+  '/styles/billing/list.css',
+  '/styles/billing/modal.css',
+  '/styles/billing/print.css',
+  '/styles/billing/responsive.css',
+  '/styles/billing/search.css',
+  '/styles/billing/skeleton.css',
+  '/styles/billing/states.css',
+  '/styles/billing/summary.css',
+  '/styles/billing/table.css',
+  '/styles/billing/tabs.css',
+  '/styles/billing/theme.css',
+  '/styles/billing/toast.css',
   '/src/billing/pwa.mjs',
   '/src/billing/billing-app.mjs',
   '/src/billing/browser-client.mjs',
