@@ -1,3 +1,15 @@
+/**
+ * Normalize a billing API error response into a standard Error shape.
+ *
+ * Contract (mirrors server-side billingError factory):
+ *   - Returns an Error with `.code` (string) and `.status` (integer HTTP status).
+ *   - `.message` falls back to a generic description when the body lacks an error field.
+ *   - All billing API errors follow this shape for uniform client-side handling.
+ *
+ * @param {Response} response  The fetch Response object.
+ * @param {object|null} body   Parsed JSON body (may be null on parse failure).
+ * @returns {Error & { code: string, status: number }}
+ */
 function normalizeError(response, body) {
   const error = new Error(body?.error || `billing request failed (${response.status})`);
   error.code = body?.error || 'billing_request_failed';
@@ -27,18 +39,6 @@ export function createBillingClient({
     ...authHeaders(),
     ...extra,
   });
-
-  const withTimeout = (signal) => {
-    if (typeof AbortController === 'undefined') return signal;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 30000);
-    const combined = controller.signal;
-    if (signal) {
-      signal.addEventListener('abort', () => controller.abort());
-    }
-    // Note: caller must clear timeout on completion; simplified here by relying on abort
-    return combined;
-  };
 
   const read = async (path) => {
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
