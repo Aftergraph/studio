@@ -65,9 +65,11 @@ function queryBilling(billing, params = {}) {
   const sortOrder = params.sortOrder === 'asc' ? 'asc' : 'desc';
   const limit = Math.min(Math.max(Number.parseInt(params.limit, 10) || 25, 1), 200);
   const offset = Math.max(Number.parseInt(params.offset, 10) || 0, 0);
+
   const invoices = billing.invoices || [];
   const customers = billing.customers || [];
   const customersById = new Map(customers.map((c) => [c.id, c]));
+
   let items = [];
   if (type === 'invoice') {
     for (const inv of invoices) {
@@ -80,31 +82,107 @@ function queryBilling(billing, params = {}) {
         : inv.dueDate && new Date(inv.dueDate) < new Date() ? 'overdue'
         : 'issued';
       items.push({
-        id: inv.id, number: inv.number || null, customerId: inv.customerId,
-        customerName: customer?.name || inv.customerId, status: derivedStatus,
-        issuedAt: inv.issuedAt || inv.createdAt || null, dueDate: inv.dueDate || null,
-        totalGrossMinor: inv.totalGrossMinor || 0, outstandingMinor: outstanding,
+        id: inv.id,
+        number: inv.number || null,
+        customerId: inv.customerId,
+        customerName: customer?.name || inv.customerId,
+        status: derivedStatus,
+        issuedAt: inv.issuedAt || inv.createdAt || null,
+        dueDate: inv.dueDate || null,
+        totalGrossMinor: inv.totalGrossMinor || 0,
+        outstandingMinor: outstanding,
         currency: inv.currency || customer?.billing?.currency || 'DKK',
       });
     }
   } else {
-    for (const c of customers) {
-      items.push({ id: c.id, name: c.name || '', email: c.email || '', countryCode: c.countryCode || null });
+    // P1-9: pre-index invoices by customerId to eliminate O(n*m) nested filter
+    const invoicesByCustomer = new Map();
+    for (const inv of invoices) {
+      if (!inv || inv.status === 'void') continue;
+      let bucket = invoicesByCustomer.get(inv.customerId);
+      if (!bucket) { bucket = []; invoicesByCustomer.set(inv.customerId, bucket); }
+      bucket.push(inv);
+    }
+    for (const cust of customers) {
+      if (!cust) continue;
+      const custInvoices = invoicesByCustomer.get(cust.id) || [];
+      const invoiceCount = custInvoices.length;
+      const totalBilled = custInvoices.reduce((s, i) => s + (i.totalGrossMinor || 0), 0);
+      items.push({
+        id: cust.id,
+        name: cust.name || '',
+        email: cust.email || '',
+        address: cust.address || '',
+        status: cust.status || 'active',
+        billingMode: cust.billing?.mode || null,
+        rateMinor: cust.billing?.rateMinor || null,
+        currency: cust.billing?.currency || 'DKK',
+        invoiceCount,
+        totalBilledMinor: totalBilled,
+        createdAt: cust.createdAt || null,
+      });
     }
   }
-  if (search) items = items.filter((i) => JSON.stringify(i).toLowerCase().includes(search));
-  if (status && type === 'invoice') items = items.filter((i) => i.status === status);
-  if (customerId && type === 'invoice') items = items.filter((i) => i.customerId === customerId);
-  if (dateFrom && type === 'invoice') items = items.filter((i) => i.issuedAt >= dateFrom);
-  if (dateTo && type === 'invoice') items = items.filter((i) => i.issuedAt <= dateTo);
+
+  // Filter by status
+  if (status) {
+    items = items.filter((item) => item.status === status);
+  }
+
+  // Filter by customerId (invoices only)
+  if (customerId && type === 'invoice') {
+    items = items.filter((item) => item.customerId === customerId);
+  }
+
+  // Filter by date range
+  if (dateFrom || dateTo) {
+    const from = dateFrom ? new Date(dateFrom).getTime() : -Infinity;
+    const to = dateTo ? new Date(dateTo).setHours(23, 59, 59, 999) : Infinity;
+    items = items.filter((item) => {
+      const d = new Date(type === 'invoice' ? item.issuedAt : item.createdAt).getTime();
+      return Number.isFinite(d) && d >= from && d <= to;
+    });
+  }
+
+  // Text search
+  if (search) {
+    items = items.filter((item) => {
+      if (type === 'invoice') {
+        return (item.number || '').toLowerCase().includes(search)
+          || item.customerName.toLowerCase().includes(search)
+          || item.id.toLowerCase().includes(search);
+      }
+      return item.name.toLowerCase().includes(search)
+        || item.email.toLowerCase().includes(search)
+        || item.id.toLowerCase().includes(search);
+    });
+  }
+
+  // Sort
   items.sort((a, b) => {
-    const av = a[sortBy] ?? ''; const bv = b[sortBy] ?? '';
-    const cmp = typeof av === 'number' ? av - bv : String(av).localeCompare(String(bv));
-    return sortOrder === 'asc' ? cmp : -cmp;
+    let va = a[sortBy];
+    let vb = b[sortBy];
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    if (typeof va === 'string') va = va.toLowerCase();
+    if (typeof vb === 'string') vb = vb.toLowerCase();
+    if (va < vb) return sortOrder === 'asc' ? -1 : 1;
+    if (va > vb) return sortOrder === 'asc' ? 1 : -1;
+    return 0;
   });
+
   const total = items.length;
-  items = items.slice(offset, offset + limit);
-  return { type, items, total, limit, offset, sortBy, sortOrder };
+  const sliced = items.slice(offset, offset + limit);
+
+  return {
+    type,
+    items: sliced,
+    total,
+    limit,
+    offset,
+    hasMore: offset + limit < total,
+  };
 }
 
 export function decorateBillingServer(server, {
