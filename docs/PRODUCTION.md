@@ -60,6 +60,9 @@ How to host a single-tenant Aftergraph Studio instance with auth enforcement on.
   43+ release gates, browser QA, viewport sweep, axe a11y, CodeQL, Scorecard.
 - Release Drafter maintains the draft; publish it from the releases page.
 - Verify a release: `npm test` then `node scripts/v6_release_verify.mjs`.
+- **Cache-bust static assets:** Run `bash scripts/build-billing.sh` before deploying
+  to append `?v=<git-short-sha>` to all `.css` and `.mjs` references in
+  `billing/index.html`. This prevents stale CDN caches from serving outdated assets.
 
 ## 6. Billing production configuration
 
