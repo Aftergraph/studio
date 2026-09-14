@@ -23,3 +23,10 @@
 /* Print and responsive MUST come last to override base rules */
 @import "./billing/print.css";
 @import "./billing/responsive.css";
+
+/* Ponytail: hide dead UI before auth */
+body:not(.is-authenticated) .billing-header-actions,
+body:not(.is-authenticated) .billing-queue-nav,
+body:not(.is-authenticated) .billing-cmd-overlay {
+    display: none !important;
+}

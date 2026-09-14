@@ -136,10 +136,10 @@ function renderLoginScreen(els, { error = '', secureWarning = false, onLogin }) 
     <section class="billing-login" aria-labelledby="billing-login-title">
       <div class="billing-login-card">
         <h1 id="billing-login-title">Log ind på Ledger</h1>
-        <p class="billing-login-subtitle">Indtast din magic-link token for at fortsætte til fakturering.</p>
+        <p class="billing-login-subtitle">Indtast den adgangstoken du har modtaget via e-mail.</p>
         ${warningHtml}
         <form id="billing-login-form" autocomplete="off">
-          <label for="billing-login-token">Token</label>
+          <label for="billing-login-token">Adgangstoken</label>
           <input id="billing-login-token" name="token" type="password" required
             placeholder="v1.…" inputmode="text" autocapitalize="off" spellcheck="false"
             ${secureWarning ? 'disabled' : ''}>
@@ -162,11 +162,6 @@ function renderLoginScreen(els, { error = '', secureWarning = false, onLogin }) 
   }
 }
 
-function restoreAppShell() {
-  // Re-inject the original billing shell if login replaced it.
-  // This is a simplified restore; full shell lives in index.html and is
-  // reloaded via location.reload() after login succeeds.
-}
 
 function createApp() {
   const client = createBillingClient();

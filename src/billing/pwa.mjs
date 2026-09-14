@@ -15,7 +15,12 @@ export async function registerBillingPwa() {
   window.addEventListener('beforeinstallprompt', (event) => {
     event.preventDefault();
     deferredPrompt = event;
-    showInstallBanner();
+    // ponytail: gate install banner behind auth — no reason to install before login
+    if (document.body.classList.contains('is-authenticated')) {
+        showInstallBanner();
+    } else {
+        window.addEventListener('billing:authenticated', () => showInstallBanner(), { once: true });
+    }
   });
 
   if (!('serviceWorker' in navigator)) return null;
