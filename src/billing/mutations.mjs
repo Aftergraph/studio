@@ -208,10 +208,97 @@ export function issueBillingInvoice(billing, { invoiceId, actor } = {}) {
   if (invoice.status === 'issued' || invoice.status === 'emailed') {
     return { billing: next, invoice: clone(invoice) };
   }
-  if (invoice.status !== 'draft') throw codedError('invoice_not_issuable');
+  const policy = next.settings?.approvalPolicy || {};
+  if (policy.required && invoice.status === 'draft') {
+    throw codedError('approval_required_before_issue', 'invoice must be approved before issuing when approval policy is enabled', 422);
+  }
+  if (invoice.status !== 'draft' && invoice.status !== 'pending_approval') throw codedError('invoice_not_issuable');
   invoice.status = 'issued';
   invoice.issuedBy = actor ?? null;
   invoice.issuedAt = new Date().toISOString();
+  return { billing: next, invoice: clone(invoice) };
+}
+
+export function requestBillingApproval(billing, { invoiceId, actor } = {}) {
+  const next = clone(billing);
+  const invoice = next.invoices.find((entry) => entry.id === invoiceId);
+  if (!invoice) throw codedError('invoice_not_found', 'invoice not found', 404);
+  if (invoice.status === 'pending_approval') return { billing: next, invoice: clone(invoice) };
+  if (invoice.status !== 'draft') throw codedError('invoice_not_approvable', 'only draft invoices can request approval', 422);
+  invoice.status = 'pending_approval';
+  invoice.approval = {
+    requestedBy: actor ?? null,
+    requestedAt: new Date().toISOString(),
+  };
+  next.auditLog ||= [];
+  next.auditLog.push({
+    id: `audit-approval-request-${randomUUID()}`,
+    action: 'approval_requested',
+    invoiceId,
+    actor: actor ?? null,
+    at: invoice.approval.requestedAt,
+  });
+  return { billing: next, invoice: clone(invoice) };
+}
+
+export function approveBillingInvoice(billing, { invoiceId, actor, permissions = [] } = {}) {
+  const next = clone(billing);
+  const invoice = next.invoices.find((entry) => entry.id === invoiceId);
+  if (!invoice) throw codedError('invoice_not_found', 'invoice not found', 404);
+  if (invoice.status === 'issued' || invoice.status === 'emailed') return { billing: next, invoice: clone(invoice) };
+  if (invoice.status !== 'pending_approval') throw codedError('invoice_not_pending_approval', 'invoice is not pending approval', 422);
+  if (!permissions.includes('billing.approve')) {
+    throw codedError('permission_denied', 'actor lacks billing.approve permission', 403);
+  }
+  const policy = next.settings?.approvalPolicy || {};
+  if (policy.allowSelfApproval === false && invoice.approval?.requestedBy && invoice.approval.requestedBy === actor) {
+    throw codedError('self_approval_forbidden', 'self-approval is forbidden by policy', 403);
+  }
+  const approvedAt = new Date().toISOString();
+  invoice.status = 'issued';
+  invoice.issuedBy = actor ?? null;
+  invoice.issuedAt = approvedAt;
+  invoice.approval = {
+    ...invoice.approval,
+    approvedBy: actor ?? null,
+    approvedAt,
+  };
+  next.auditLog ||= [];
+  next.auditLog.push({
+    id: `audit-approval-grant-${randomUUID()}`,
+    action: 'invoice_approved',
+    invoiceId,
+    actor: actor ?? null,
+    at: approvedAt,
+  });
+  return { billing: next, invoice: clone(invoice) };
+}
+
+export function rejectBillingApproval(billing, { invoiceId, actor, reason, permissions = [] } = {}) {
+  const next = clone(billing);
+  const invoice = next.invoices.find((entry) => entry.id === invoiceId);
+  if (!invoice) throw codedError('invoice_not_found', 'invoice not found', 404);
+  if (invoice.status !== 'pending_approval') throw codedError('invoice_not_pending_approval', 'invoice is not pending approval', 422);
+  if (!permissions.includes('billing.approve')) {
+    throw codedError('permission_denied', 'actor lacks billing.approve permission', 403);
+  }
+  const rejectedAt = new Date().toISOString();
+  invoice.status = 'draft';
+  invoice.approval = {
+    ...invoice.approval,
+    rejectedBy: actor ?? null,
+    rejectedAt,
+    rejectionReason: String(reason || '').trim() || null,
+  };
+  next.auditLog ||= [];
+  next.auditLog.push({
+    id: `audit-approval-reject-${randomUUID()}`,
+    action: 'approval_rejected',
+    invoiceId,
+    actor: actor ?? null,
+    at: rejectedAt,
+    reason: invoice.approval.rejectionReason,
+  });
   return { billing: next, invoice: clone(invoice) };
 }
 
@@ -544,8 +631,21 @@ export function updateManualBillingDraft(billing, {
   const next = clone(billing);
   const invoice = next.invoices.find((entry) => entry.id === invoiceId);
   if (!invoice) throw codedError('invoice_not_found', 'invoice not found', 404);
-  if (invoice.status !== 'draft') throw codedError('invoice_not_editable', 'only draft invoices can be edited');
+  if (invoice.status !== 'draft' && invoice.status !== 'pending_approval') throw codedError('invoice_not_editable', 'only draft or pending_approval invoices can be edited');
   if (invoice.source !== 'manual') throw codedError('invoice_not_manual', 'only manual drafts can be edited this way');
+  const wasPendingApproval = invoice.status === 'pending_approval';
+  if (wasPendingApproval) {
+    invoice.status = 'draft';
+    delete invoice.approval;
+    next.auditLog ||= [];
+    next.auditLog.push({
+      id: `audit-approval-invalidate-${randomUUID()}`,
+      action: 'approval_invalidated_by_edit',
+      invoiceId,
+      actor: actor ?? null,
+      at: new Date().toISOString(),
+    });
+  }
   if (issueDate !== undefined) assertDateOnly(issueDate, 'issueDate');
 
   const customer = next.customers.find((entry) => entry.id === invoice.customerId);
@@ -736,6 +836,7 @@ export function updateBillingSettings(billing, {
   issuer = undefined,
   defaultServiceLabel = undefined,
   invoiceSequence = undefined,
+  approvalPolicy = undefined,
 } = {}) {
   const next = clone(billing);
   next.settings ||= {};
@@ -762,6 +863,15 @@ export function updateBillingSettings(billing, {
       .reduce((max, entry) => Math.max(max, Number(entry.number)), 0);
     if (nextNumber <= maxReserved) throw codedError('invoice_sequence_conflict', 'invoice sequence would reuse a reserved number', 409);
     next.settings.invoiceSequence = { nextNumber };
+  }
+
+  if (approvalPolicy !== undefined) {
+    const policy = {};
+    policy.required = Boolean(approvalPolicy.required);
+    if (approvalPolicy.allowSelfApproval !== undefined) {
+      policy.allowSelfApproval = Boolean(approvalPolicy.allowSelfApproval);
+    }
+    next.settings.approvalPolicy = policy;
   }
 
   return { billing: next, settings: clone(next.settings) };

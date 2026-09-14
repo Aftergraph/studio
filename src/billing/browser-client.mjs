@@ -160,6 +160,15 @@ export function createBillingClient({
     issueInvoice(invoiceId) {
       return write(`/api/v1/billing/invoices/${encodeURIComponent(invoiceId)}/issue`, {}, 'billing-issue');
     },
+    requestApproval(invoiceId) {
+      return write(`/api/v1/billing/invoices/${encodeURIComponent(invoiceId)}/request-approval`, {}, 'billing-request-approval');
+    },
+    approveInvoice(invoiceId) {
+      return write(`/api/v1/billing/invoices/${encodeURIComponent(invoiceId)}/approve`, {}, 'billing-approve');
+    },
+    rejectApproval(invoiceId, reason) {
+      return write(`/api/v1/billing/invoices/${encodeURIComponent(invoiceId)}/reject-approval`, { reason }, 'billing-reject-approval');
+    },
     downloadArtifact(invoiceId) {
       const suffix = currentActor ? `?actor=${encodeURIComponent(currentActor)}` : '';
       return readBlob(`/api/v1/billing/invoices/${encodeURIComponent(invoiceId)}/artifact${suffix}`);

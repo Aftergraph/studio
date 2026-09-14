@@ -140,7 +140,7 @@ test('updateManualBillingDraft rejects edits to issued invoices', () => {
     invoiceId: created.invoice.id,
     lines: baseLines,
     actor: 'op',
-  }), /only draft invoices can be edited/);
+  }), /only draft or pending_approval invoices can be edited/);
 });
 
 test('updateManualBillingDraft rejects non-manual drafts', () => {

@@ -28,6 +28,9 @@ import {
   failBillingDelivery,
   remindBillingInvoice,
   updateBillingSettings,
+  requestBillingApproval,
+  approveBillingInvoice,
+  rejectBillingApproval,
 } from '../src/billing/mutations.mjs';
 import {
   createRecurringInvoice,
@@ -91,7 +94,7 @@ function isBillingPath(pathname) {
     || pathname === '/api/v1/billing/audit'
     || pathname === '/api/v1/billing/query'
     || pathname === '/api/v1/billing/invoices/manual-draft'
-    || /^\/api\/v1\/billing\/invoices\/[^/]+\/(issue|artifact|document|peppol-bis3|deliver|send-email|email-preview|void|payment|remind)$/.test(pathname)
+    || /^\/api\/v1\/billing\/invoices\/[^/]+\/(issue|artifact|document|peppol-bis3|deliver|send-email|email-preview|void|payment|remind|request-approval|approve|reject-approval)$/.test(pathname)
     || /^\/api\/v1\/billing\/invoices\/[^/]+$/.test(pathname)
     || /^\/api\/v1\/billing\/customers\/[^/]+$/.test(pathname)
     || pathname === '/api/v1/billing/products'
@@ -707,6 +710,74 @@ export function decorateBillingServer(server, {
         let invoice;
         const next = await store.mutate((draft) => {
           const result = issueBillingInvoice(draft.billing, { invoiceId, actor });
+          draft.billing = result.billing;
+          invoice = result.invoice;
+          return draft;
+        });
+        actionGuard.complete(actionKey, { status: 'accepted', invoiceId: invoice.id });
+        sendJson(res, 200, {
+          version: API_VERSION,
+          invoice,
+          billing: projectBillingState(next.billing),
+        });
+        return;
+      }
+
+      const requestApprovalMatch = url.pathname.match(/^\/api\/v1\/billing\/invoices\/([^/]+)\/request-approval$/);
+      if (requestApprovalMatch && req.method === 'POST') {
+        const invoiceId = decodeURIComponent(requestApprovalMatch[1]);
+        try { assertActorCapability({ state: store.snapshot(), actor, capability: 'billing.manage', users }); }
+        catch { throw actorError('forbidden', 403); }
+        let invoice;
+        const next = await store.mutate((draft) => {
+          const result = requestBillingApproval(draft.billing, { invoiceId, actor });
+          draft.billing = result.billing;
+          invoice = result.invoice;
+          return draft;
+        });
+        actionGuard.complete(actionKey, { status: 'accepted', invoiceId: invoice.id });
+        sendJson(res, 200, {
+          version: API_VERSION,
+          invoice,
+          billing: projectBillingState(next.billing),
+        });
+        return;
+      }
+
+      const approveMatch = url.pathname.match(/^\/api\/v1\/billing\/invoices\/([^/]+)\/approve$/);
+      if (approveMatch && req.method === 'POST') {
+        const invoiceId = decodeURIComponent(approveMatch[1]);
+        try { assertActorCapability({ state: store.snapshot(), actor, capability: 'billing.approve', users }); }
+        catch { throw actorError('forbidden', 403); }
+        const user = getUser(actor);
+        const permissions = user?.capabilities || [];
+        let invoice;
+        const next = await store.mutate((draft) => {
+          const result = approveBillingInvoice(draft.billing, { invoiceId, actor, permissions });
+          draft.billing = result.billing;
+          invoice = result.invoice;
+          return draft;
+        });
+        actionGuard.complete(actionKey, { status: 'accepted', invoiceId: invoice.id });
+        sendJson(res, 200, {
+          version: API_VERSION,
+          invoice,
+          billing: projectBillingState(next.billing),
+        });
+        return;
+      }
+
+      const rejectApprovalMatch = url.pathname.match(/^\/api\/v1\/billing\/invoices\/([^/]+)\/reject-approval$/);
+      if (rejectApprovalMatch && req.method === 'POST') {
+        const invoiceId = decodeURIComponent(rejectApprovalMatch[1]);
+        try { assertActorCapability({ state: store.snapshot(), actor, capability: 'billing.approve', users }); }
+        catch { throw actorError('forbidden', 403); }
+        const user = getUser(actor);
+        const permissions = user?.capabilities || [];
+        const reason = body?.reason || '';
+        let invoice;
+        const next = await store.mutate((draft) => {
+          const result = rejectBillingApproval(draft.billing, { invoiceId, actor, reason, permissions });
           draft.billing = result.billing;
           invoice = result.invoice;
           return draft;

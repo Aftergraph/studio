@@ -1252,21 +1252,34 @@ function createApp() {
       const emailed = state.activeInvoice.status === 'emailed';
       const deliveryFailed = state.activeInvoice.delivery?.state === 'failed';
       const voided = state.activeInvoice.status === 'void';
-      const status = voided ? 'Kreditnota oprettet' : emailed ? 'Sendt til kunde' : deliveryFailed ? 'Levering fejlede' : issued ? 'Faktura udstedt' : 'Kladde oprettet';
+      const pendingApproval = state.activeInvoice.status === 'pending_approval';
+      const approvalPolicy = state.billing?.settings?.approvalPolicy || {};
+      const status = voided ? 'Kreditnota oprettet' : emailed ? 'Sendt til kunde' : deliveryFailed ? 'Levering fejlede' : pendingApproval ? 'Afventer godkendelse' : issued ? 'Faktura udstedt' : 'Kladde oprettet';
       const deliveryDetail = emailed
         ? `<p>Leveret ${esc(formatDate(state.activeInvoice.delivery?.deliveredAt, locale()))} via ${esc(state.activeInvoice.delivery?.provider || 'provider')}.</p>`
         : deliveryFailed ? '<p>Fakturaen er stadig udstedt. Du kan prøve leveringen igen.</p>' : '';
       const voidDetail = voided ? `<p>Annulleret ${esc(formatDate(state.activeInvoice.voidedAt, locale()))}. Årsag: ${esc(state.activeInvoice.voidReason || '—')}</p>` : '';
+      const approvalDetail = pendingApproval
+        ? `<p class="billing-approval-info">Anmodet om godkendelse af ${esc(state.activeInvoice.approval?.requestedBy || 'ukendt')} den ${esc(formatDate(state.activeInvoice.approval?.requestedAt, locale()))}.</p>`
+        : state.activeInvoice.approval?.approvedBy
+          ? `<p class="billing-approval-info">Godkendt af ${esc(state.activeInvoice.approval.approvedBy)} den ${esc(formatDate(state.activeInvoice.approval.approvedAt, locale()))}.</p>`
+          : state.activeInvoice.approval?.rejectedBy
+            ? `<p class="billing-approval-info billing-approval-rejected">Afvist af ${esc(state.activeInvoice.approval.rejectedBy)}: ${esc(state.activeInvoice.approval.rejectionReason || 'Ingen begrundelse')}</p>`
+            : '';
       const artifact = issued && !voided ? `<button type="button" class="billing-secondary-button" data-action="download" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>Download faktura</button>` : '';
       const deliver = issued && !emailed && !voided ? `<button type="button" class="billing-primary-button" data-action="deliver" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>${deliveryFailed ? 'Prøv levering igen' : 'Send faktura'}</button>` : '';
-      const issue = issued || voided ? '' : `<button type="button" class="billing-primary-button" data-action="issue" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>Udsted faktura</button>`;
-      const editManual = !issued && !voided && state.activeInvoice.source === 'manual' ? `<button type="button" class="billing-secondary-button" data-action="edit-manual-draft" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>Redigér kladde</button>` : '';
+      const issue = issued || voided || pendingApproval ? '' : (approvalPolicy.required
+        ? `<button type="button" class="billing-secondary-button" data-action="request-approval" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>Anmod om godkendelse</button>`
+        : `<button type="button" class="billing-primary-button" data-action="issue" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>Udsted faktura</button>`);
+      const approveBtn = pendingApproval ? `<button type="button" class="billing-primary-button" data-action="approve-invoice" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>Godkend faktura</button>` : '';
+      const rejectBtn = pendingApproval ? `<button type="button" class="billing-secondary-button" data-action="reject-approval" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>Afvis</button>` : '';
+      const editManual = !issued && !voided && !pendingApproval && state.activeInvoice.source === 'manual' ? `<button type="button" class="billing-secondary-button" data-action="edit-manual-draft" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>Redigér kladde</button>` : '';
       const isOverdue = issued && !voided && state.activeInvoice.dueDate && new Date() > new Date(`${state.activeInvoice.dueDate}T23:59:59.999Z`);
       const overdueBadge = isOverdue ? '<span class="billing-overdue-badge" aria-label="Fakturaen er forfalden">⚠ Forfalden</span>' : '';
       const remind = issued && !voided ? `<button type="button" class="billing-secondary-button" data-action="send-reminder" data-invoice-id="${esc(state.activeInvoice.id)}"${disabled}>Send rykker</button>` : '';
       const paymentSection = issued && !voided ? paymentFormHtml(state.activeInvoice) : '';
       const creditSection = issued && !voided ? creditNoteFormHtml(state.activeInvoice) : '';
-      return `<div class="billing-draft-status"><strong>${status}</strong>${overdueBadge}<p>Nr. ${esc(state.activeInvoice.number)} · forfalder ${esc(formatDate(state.activeInvoice.dueDate, locale()))}</p>${deliveryDetail}${voidDetail}</div><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Luk</button>${artifact}${editManual}${issue}${deliver}${remind}</div>${paymentSection}${creditSection}`;
+      return `<div class="billing-draft-status"><strong>${status}</strong>${overdueBadge}<p>Nr. ${esc(state.activeInvoice.number)} · forfalder ${esc(formatDate(state.activeInvoice.dueDate, locale()))}</p>${deliveryDetail}${voidDetail}${approvalDetail}</div><div class="billing-form-actions"><button type="button" class="billing-secondary-button" data-action="close-review">Luk</button>${artifact}${editManual}${issue}${approveBtn}${rejectBtn}${deliver}${remind}</div>${paymentSection}${creditSection}`;
     }
     const nextNumber = state.billing?.settings?.invoiceSequence?.nextNumber ?? '—';
     const correctionVisit = state.activeItem?.visitIds?.length === 1 ? visit(state.activeItem.visitIds[0]) : null;
@@ -1638,6 +1651,8 @@ function createApp() {
       <div class="billing-form-row"><div class="billing-field"><label for="company-email">E-mail</label><input id="company-email" name="email" type="email" value="${esc(issuer.email || '')}"></div><div class="billing-field"><label for="company-phone">Telefon</label><input id="company-phone" name="phone" value="${esc(issuer.phone || '')}"></div></div>
       <div class="billing-field"><label for="company-payment">Betalingsoplysninger</label><input id="company-payment" name="paymentText" value="${esc(issuer.paymentText || '')}" placeholder="Bank, MobilePay eller anden digital betaling"></div>
       <div class="billing-form-row"><div class="billing-field"><label for="company-service">Standardydelse</label><input id="company-service" name="defaultServiceLabel" value="${esc(settings.defaultServiceLabel || 'Service')}" required></div><div class="billing-field"><label for="company-sequence">Næste fakturanummer</label><input id="company-sequence" name="nextNumber" type="number" min="1" step="1" value="${esc(settings.invoiceSequence?.nextNumber || 1)}" required></div></div>
+      <div class="billing-field"><label><input type="checkbox" name="approvalRequired" ${settings.approvalPolicy?.required ? 'checked' : ''}> Kræv godkendelse før fakturering</label><p class="billing-form-help">Når aktiveret, skal fakturaer godkendes af en bruger med godkendelsesrettigheder, før de kan udstedes.</p></div>
+      <div class="billing-field"><label><input type="checkbox" name="allowSelfApproval" ${settings.approvalPolicy?.allowSelfApproval !== false ? 'checked' : ''}> Tillad selv-godkendelse</label><p class="billing-form-help">Når deaktiveret, kan den der anmoder om godkendelse ikke selv godkende fakturaen.</p></div>
       <details class="billing-advanced"><summary>Peppol / Nemhandel</summary>
         <div class="billing-form-row"><div class="billing-field"><label for="company-endpoint-scheme">Endpoint scheme</label><input id="company-endpoint-scheme" name="endpointScheme" value="${esc(endpoint.schemeId || '')}" placeholder="0184"></div><div class="billing-field"><label for="company-endpoint-value">Elektronisk endpoint</label><input id="company-endpoint-value" name="endpointValue" value="${esc(endpoint.value || '')}"></div></div>
         <p class="billing-form-help">Kun nødvendigt for struktureret e-faktura. PDF og e-mail kræver ikke Peppol.</p>
@@ -1730,6 +1745,78 @@ function createApp() {
     } catch {
       button.disabled = false;
       toast('Kunne ikke udstede faktura');
+    } finally {
+      state.busy = false;
+    }
+  }
+
+  async function requestApproval(id, button) {
+    if (!id || state.busy || !canMutate()) return;
+    state.busy = true;
+    button.disabled = true;
+    try {
+      const body = await client.requestApproval(id);
+      state.billing = body.billing;
+      state.cached = false;
+      state.activeInvoice = body.invoice;
+      state.lastSyncedAt = new Date().toISOString();
+      render();
+      renderReview();
+      toast('Godkendelse anmodet');
+      void logAudit('request_approval', { invoiceId: id });
+    } catch {
+      button.disabled = false;
+      toast('Kunne ikke anmode om godkendelse');
+    } finally {
+      state.busy = false;
+    }
+  }
+
+  async function approveInvoice(id, button) {
+    if (!id || state.busy || !canMutate()) return;
+    const confirmed = await showConfirmDialog('Godkend og udsted faktura?');
+    if (!confirmed) return;
+    state.busy = true;
+    button.disabled = true;
+    try {
+      const body = await client.approveInvoice(id);
+      state.billing = body.billing;
+      state.cached = false;
+      state.activeInvoice = body.invoice;
+      state.lastSyncedAt = new Date().toISOString();
+      render();
+      renderReview();
+      toast(`Faktura ${body.invoice.number} er godkendt og udstedt`);
+      void logAudit('approve_invoice', { invoiceId: id });
+    } catch (error) {
+      button.disabled = false;
+      const msg = error?.code === 'self_approval_forbidden' ? 'Selv-godkendelse er ikke tilladt' : error?.code === 'permission_denied' ? 'Du har ikke tilladelse til at godkende' : 'Kunne ikke godkende faktura';
+      toast(msg);
+    } finally {
+      state.busy = false;
+    }
+  }
+
+  async function rejectApproval(id, button) {
+    if (!id || state.busy || !canMutate()) return;
+    const reason = prompt('Angiv årsag til afvisning (valgfrit):');
+    if (reason === null) return;
+    state.busy = true;
+    button.disabled = true;
+    try {
+      const body = await client.rejectApproval(id, reason || '');
+      state.billing = body.billing;
+      state.cached = false;
+      state.activeInvoice = body.invoice;
+      state.lastSyncedAt = new Date().toISOString();
+      render();
+      renderReview();
+      toast('Godkendelse afvist');
+      void logAudit('reject_approval', { invoiceId: id, reason });
+    } catch (error) {
+      button.disabled = false;
+      const msg = error?.code === 'permission_denied' ? 'Du har ikke tilladelse til at afvise' : 'Kunne ikke afvise godkendelse';
+      toast(msg);
     } finally {
       state.busy = false;
     }
@@ -1853,11 +1940,15 @@ function createApp() {
     };
     const nextNumber = Number(data.get('nextNumber'));
     const defaultServiceLabel = String(data.get('defaultServiceLabel') || '').trim();
+    const approvalPolicy = {
+      required: data.get('approvalRequired') === 'on',
+      allowSelfApproval: data.get('allowSelfApproval') === 'on',
+    };
     showFormError(form);
     state.busy = true;
     form.querySelectorAll('button,input').forEach((node) => { node.disabled = true; });
     try {
-      const body = await client.updateSettings({ issuer, defaultServiceLabel, invoiceSequence: { nextNumber } });
+      const body = await client.updateSettings({ issuer, defaultServiceLabel, invoiceSequence: { nextNumber }, approvalPolicy });
       state.billing = body.billing;
       state.cached = false;
       state.lastSyncedAt = new Date().toISOString();
@@ -2037,6 +2128,9 @@ function createApp() {
       return;
     }
     if (action.dataset.action === 'issue') return issueInvoice(action.dataset.invoiceId, action);
+    if (action.dataset.action === 'request-approval') return requestApproval(action.dataset.invoiceId, action);
+    if (action.dataset.action === 'approve-invoice') return approveInvoice(action.dataset.invoiceId, action);
+    if (action.dataset.action === 'reject-approval') return rejectApproval(action.dataset.invoiceId, action);
     if (action.dataset.action === 'download') return downloadInvoice(action.dataset.invoiceId, action);
     if (action.dataset.action === 'peppol') return downloadPeppolInvoice(action.dataset.invoiceId, action);
     if (action.dataset.action === 'deliver') return deliverInvoice(action.dataset.invoiceId, action);
