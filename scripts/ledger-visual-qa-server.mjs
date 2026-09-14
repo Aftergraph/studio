@@ -8,6 +8,10 @@ const projectRoot = path.resolve(root, '..');
 const port = Number(process.env.LEDGER_QA_PORT || 8765);
 const host = process.env.LEDGER_QA_HOST || '127.0.0.1';
 
+// FIX: Set AFTERGRAPH_DEMO_FIXTURES so billingFixtureState() actually seeds the store.
+// Without this env var, createAppServer ignores the fixtures option and serves empty state.
+process.env.AFTERGRAPH_DEMO_FIXTURES = 'true';
+
 const server = createAppServer({
   root: projectRoot,
   stateFile: path.join(projectRoot, '.runtime', 'ledger-qa-state.json'),
