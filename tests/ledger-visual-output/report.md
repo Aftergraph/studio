@@ -1,6 +1,6 @@
 # Ledger Visual QA Acceptance Report — Repaired
 
-**Generated:** 2026-09-14T09:23:54.522705Z
+**Generated:** 2026-09-14T09:27:15.146165Z
 **Base URL:** http://127.0.0.1:8769
 **Branch:** fix/ledger-qa-real
 **Commit:** 913ae84a

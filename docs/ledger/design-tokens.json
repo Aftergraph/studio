@@ -51,7 +51,7 @@
         "$type": "color"
       },
       "text-muted-dark": {
-        "$value": "#8993a4",
+        "$value": "#9ba5b7",
         "$type": "color"
       },
       "text-subtle": {
@@ -67,7 +67,7 @@
         "$type": "color"
       },
       "border-dark": {
-        "$value": "#1e2a45",
+        "$value": "#2a3655",
         "$type": "color"
       },
       "success": {

@@ -300,7 +300,7 @@
   .billing-table th,
   .billing-table td {
     padding: 0.5rem;
-    font-size: 0.8125rem;
+    font-size: 1rem;
   }
   .billing-pagination {
     flex-direction: column;
