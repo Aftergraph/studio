@@ -135,8 +135,8 @@ function renderLoginScreen(els, { error = '', secureWarning = false, onLogin }) 
   app.innerHTML = `
     <section class="billing-login" aria-labelledby="billing-login-title">
       <div class="billing-login-card">
-        <h1 id="billing-login-title">Log ind på Fakturering</h1>
-        <p>Indtast din magic-link token for at fortsætte.</p>
+        <h1 id="billing-login-title">Log ind på Ledger</h1>
+        <p class="billing-login-subtitle">Indtast din magic-link token for at fortsætte til fakturering.</p>
         ${warningHtml}
         <form id="billing-login-form" autocomplete="off">
           <label for="billing-login-token">Token</label>

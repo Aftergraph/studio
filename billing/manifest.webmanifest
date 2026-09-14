@@ -1,6 +1,6 @@
 {
-  "name": "Aftergraph Billing",
-  "short_name": "Billing",
+  "name": "Ledger by Aftergraph",
+  "short_name": "Ledger",
   "description": "Review-first invoicing from verified operational work.",
   "start_url": "/billing/",
   "scope": "/billing/",
