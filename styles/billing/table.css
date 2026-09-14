@@ -1,0 +1,51 @@
+.billing-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 1rem;
+}
+
+.billing-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.billing-table th,
+.billing-table td {
+  padding: 0.625rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border, #ddd);
+  white-space: nowrap;
+}
+
+.billing-table th {
+  font-weight: 600;
+  color: var(--text-2, #444);
+  background: var(--surface-2, #f5f5f5);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.billing-table th.is-numeric,
+.billing-table td.is-numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.billing-table tbody tr {
+  transition: background 150ms ease;
+}
+
+.billing-table tbody tr:hover {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+.billing-table tbody tr:hover td:first-child {
+  color: var(--accent);
+}
+
+html[data-theme="dark"] .billing-table th {
+  background: var(--surface);
+  color: var(--text-2);
+}

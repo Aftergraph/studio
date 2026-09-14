@@ -1,0 +1,34 @@
+/* ── Theme Toggle Button ── */
+.billing-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ag-brand-radius-button);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.billing-theme-toggle:hover {
+  background: var(--surface-strong);
+  color: var(--text);
+}
+
+.billing-theme-toggle svg {
+  width: 20px;
+  height: 20px;
+}
+
+.billing-theme-toggle .icon-moon { display: block; }
+
+.billing-theme-toggle .icon-sun { display: none; }
+
+html[data-theme="dark"] .billing-theme-toggle .icon-moon { display: none; }
+
+html[data-theme="dark"] .billing-theme-toggle .icon-sun { display: block; }

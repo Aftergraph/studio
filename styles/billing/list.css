@@ -1,0 +1,144 @@
+.billing-worklist {
+  padding-top: var(--ag-brand-space-lg);
+}
+
+.billing-list-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: var(--ag-brand-space-xl);
+  margin-bottom: var(--ag-brand-space-base);
+}
+
+.billing-list-heading h2 {
+  margin: 0;
+  font-size: var(--ag-brand-type-title);
+  letter-spacing: -0.02em;
+}
+
+.billing-list-heading p {
+  margin: 0;
+  max-width: 520px;
+  color: var(--text-3);
+  font-size: var(--ag-brand-type-body-sm);
+  text-align: right;
+}
+
+.billing-list {
+  border-top: 1px solid var(--border-strong);
+}
+
+.billing-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.35fr) minmax(160px, 0.85fr) minmax(220px, 1fr) auto;
+  gap: var(--ag-brand-space-lg);
+  align-items: center;
+  min-height: 112px;
+  padding: var(--ag-brand-space-lg) var(--ag-brand-space-md);
+  border-bottom: 1px solid var(--border);
+  transition: background 150ms ease, transform 100ms ease;
+  position: relative;
+}
+
+.billing-row:hover {
+  background: color-mix(in srgb, var(--accent) 3%, var(--surface));
+}
+
+.billing-row:hover .billing-row-name {
+  color: var(--accent);
+}
+
+.billing-row-main,
+.billing-row-meta,
+.billing-row-reason {
+  min-width: 0;
+}
+
+.billing-row-name {
+  margin: 0 0 var(--ag-brand-space-xs);
+  color: var(--text);
+  font-size: var(--ag-brand-type-body-lg);
+  font-weight: 720;
+  letter-spacing: -0.012em;
+}
+
+.billing-row-subtitle,
+.billing-row-reason,
+.billing-row-meta small {
+  color: var(--text-3);
+  font-size: var(--ag-brand-type-body-sm);
+  line-height: 1.45;
+}
+
+.billing-row-meta strong {
+  display: block;
+  color: var(--text-emphasis);
+  font-size: var(--ag-brand-type-subhead);
+  font-weight: 730;
+  font-variant-numeric: tabular-nums;
+}
+
+.billing-row-reason strong {
+  display: block;
+  margin-bottom: var(--ag-brand-space-xs);
+  color: var(--text-2);
+  font-size: var(--ag-brand-type-body-sm);
+  font-weight: 700;
+}
+
+.billing-status-dot {
+  display: inline-block;
+  width: var(--ag-brand-space-sm);
+  height: var(--ag-brand-space-sm);
+  margin-right: var(--ag-brand-space-sm);
+  border-radius: var(--ag-brand-radius-pill);
+  background: var(--text-3);
+}
+
+.billing-row[data-status="ready"] .billing-status-dot {
+  background: var(--success);
+}
+
+.billing-row[data-status="waiting"] .billing-status-dot {
+  background: var(--warning);
+}
+
+.billing-row[data-status="needs_info"] .billing-status-dot {
+  background: var(--danger);
+}
+
+.billing-row[data-status="invoiced"] .billing-status-dot {
+  background: var(--accent);
+}
+
+/* ── Visual Polish: Invoice List Cards (Mobile) ── */
+@media (max-width: 760px) {
+  .billing-row {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    margin-bottom: var(--ag-brand-space-md);
+    padding: var(--ag-brand-space-lg);
+    box-shadow: var(--shadow-soft);
+    transition: transform 150ms ease, box-shadow 150ms ease;
+  }
+
+  .billing-row:active {
+    transform: scale(0.98);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+
+  .billing-row:last-child {
+    margin-bottom: 0;
+  }
+
+  .billing-row-name {
+    font-size: var(--ag-brand-type-subhead);
+  }
+
+  .billing-status-dot {
+    width: 10px;
+    height: 10px;
+    margin-right: var(--ag-brand-space-xs);
+  }
+}

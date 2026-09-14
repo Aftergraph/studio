@@ -1,0 +1,85 @@
+.billing-queue-nav {
+  position: sticky;
+  top: var(--ag-brand-space-5xl);
+  z-index: 15;
+  padding: var(--ag-brand-space-sm) 0;
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
+  backdrop-filter: blur(16px);
+}
+
+.billing-tabs {
+  display: flex;
+  gap: var(--ag-brand-space-xs);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.billing-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.billing-tab {
+  flex: 0 0 auto;
+  min-height: 48px;
+  padding: 0 var(--ag-brand-space-lg);
+  border: 1px solid transparent;
+  border-radius: var(--ag-brand-radius-pill);
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--ag-brand-type-body);
+  font-weight: 680;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.billing-tab span {
+  margin-left: 5px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.billing-tab:hover {
+  background: var(--surface-strong);
+}
+
+.billing-tab.is-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  color: var(--text);
+  box-shadow: var(--shadow-soft), inset 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
+  position: relative;
+}
+
+.billing-tab.is-active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 2px;
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+/* Ensure minimum touch target of 44px on mobile */
+@media (pointer: coarse) {
+  .billing-tab,
+  .billing-primary-button,
+  .billing-secondary-button,
+  .billing-quiet-button,
+  .billing-icon-button,
+  .billing-theme-toggle {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .billing-field input,
+  .billing-field select,
+  .billing-field textarea {
+    min-height: 48px;
+    font-size: max(16px, var(--ag-brand-type-body));
+  }
+}

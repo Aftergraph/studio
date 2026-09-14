@@ -1,0 +1,46 @@
+.billing-header {
+  min-height: 64px;
+  padding: 0 var(--ag-brand-space-xl);
+  border-bottom: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ag-brand-space-md);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  transition: background 200ms ease, border-color 200ms ease;
+}
+
+.billing-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ag-brand-space-sm);
+  color: var(--text);
+  font-size: var(--ag-brand-type-subhead);
+  font-weight: 720;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.billing-brand strong {
+  font-weight: 760;
+}
+
+.billing-mark {
+  width: var(--ag-brand-space-sm);
+  height: var(--ag-brand-space-sm);
+  border-radius: var(--ag-brand-radius-pill);
+  background: var(--ag-control-cyan);
+  box-shadow: 0 0 0 var(--ag-brand-space-xs) color-mix(in srgb, var(--ag-control-cyan) 14%, transparent);
+}
+
+.billing-header-actions {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ag-brand-space-xs);
+}

@@ -1,0 +1,62 @@
+/* ── Visual Polish: Approval UI ── */
+.billing-approval-info {
+  margin: var(--ag-brand-space-sm) 0 0;
+  padding: var(--ag-brand-space-md);
+  border-radius: var(--ag-brand-radius-card);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  border-left: 3px solid var(--accent);
+  color: var(--text-2);
+  font-size: var(--ag-brand-type-body-sm);
+  line-height: 1.5;
+}
+
+.billing-approval-info.billing-approval-rejected {
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  border-left-color: var(--danger);
+  color: var(--danger);
+}
+
+.billing-approval-timeline {
+  margin-top: var(--ag-brand-space-lg);
+  padding-left: var(--ag-brand-space-lg);
+  border-left: 2px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ag-brand-space-md);
+}
+
+.billing-approval-event {
+  position: relative;
+  padding-left: var(--ag-brand-space-md);
+}
+
+.billing-approval-event::before {
+  content: '';
+  position: absolute;
+  left: calc(-1 * var(--ag-brand-space-lg) - 5px);
+  top: 6px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  border: 2px solid var(--surface);
+}
+
+.billing-approval-event.is-approved::before { background: var(--success); }
+
+.billing-approval-event.is-rejected::before { background: var(--danger); }
+
+.billing-approval-event.is-pending::before { background: var(--warning); }
+
+.billing-approval-event strong {
+  display: block;
+  font-size: var(--ag-brand-type-body-sm);
+  color: var(--text);
+}
+
+.billing-approval-event time {
+  display: block;
+  font-size: var(--ag-brand-type-ui);
+  color: var(--text-3);
+  margin-top: 2px;
+}

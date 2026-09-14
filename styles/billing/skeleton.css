@@ -1,0 +1,55 @@
+/* Skeleton loading state */
+.billing-skeleton {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--ag-brand-space-lg);
+  margin-top: var(--ag-brand-space-xl);
+}
+
+.billing-skeleton-card {
+  padding: var(--ag-brand-space-lg);
+  border-radius: var(--ag-brand-radius-card);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ag-brand-space-md);
+}
+
+.billing-skeleton-line {
+  height: var(--ag-brand-space-base);
+  border-radius: 6px;
+  background: linear-gradient(90deg, 
+    color-mix(in srgb, var(--text-3) 12%, transparent) 0%, 
+    color-mix(in srgb, var(--text-3) 20%, transparent) 50%, 
+    color-mix(in srgb, var(--text-3) 12%, transparent) 100%);
+  background-size: 200% 100%;
+  animation: billing-skeleton-shimmer 1.8s ease-in-out infinite;
+}
+
+.billing-skeleton-line.is-short { width: 40%; }
+
+.billing-skeleton-line.is-medium { width: 65%; }
+
+.billing-skeleton-line.is-long { width: 90%; }
+
+.billing-skeleton-line.is-title { height: var(--ag-brand-space-lg); width: 55%; }
+
+@keyframes billing-skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Loading State Enhancement ── */
+.billing-skeleton-card {
+  transition: opacity 200ms ease;
+}
+
+.billing-skeleton[aria-busy="false"] .billing-skeleton-card {
+  opacity: 0;
+  animation: billing-skeleton-fade-out 200ms ease forwards;
+}
+
+@keyframes billing-skeleton-fade-out {
+  to { opacity: 0; visibility: hidden; }
+}
