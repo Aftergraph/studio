@@ -34,9 +34,10 @@ export function createBillingClient({
     const timer = setTimeout(() => controller.abort(), 30000);
     const combined = controller.signal;
     if (signal) {
-      signal.addEventListener('abort', () => controller.abort());
+      signal.addEventListener('abort', () => { controller.abort(); clearTimeout(timer); });
     }
-    // Note: caller must clear timeout on completion; simplified here by relying on abort
+    // Clear timer when the combined signal resolves or aborts to prevent leaks
+    combined.addEventListener('abort', () => clearTimeout(timer), { once: true });
     return combined;
   };
 

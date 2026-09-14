@@ -164,6 +164,16 @@ export function tickRecurringScheduler(billing, { now, actor } = {}) {
     } catch (err) {
       // Log but don't fail other recurring invoices
       console.error(`[scheduler] Failed to generate invoice for ${recurring.id}:`, err.message);
+      // Record failure in audit log for observability
+      next.auditLog ||= [];
+      next.auditLog.push({
+        type: 'billing.recurring.tick_failed',
+        recurringId: recurring.id,
+        customerId: recurring.customerId,
+        actor: actor ?? 'scheduler',
+        error: err?.message || String(err),
+        timestamp: currentTime.toISOString(),
+      });
     }
   }
 
