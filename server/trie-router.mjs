@@ -5,7 +5,7 @@
  */
 export class TrieRouter {
   constructor() {
-    this._root = { children: {}, paramChild: null, handlers: {} };
+    this._root = { children: Object.create(null), paramChild: null, handlers: Object.create(null) };
   }
 
   add(method, pattern, handler) {
@@ -13,10 +13,10 @@ export class TrieRouter {
     let node = this._root;
     for (const part of parts) {
       if (part.startsWith(':')) {
-        if (!node.paramChild) node.paramChild = { name: part.slice(1), node: { children: {}, paramChild: null, handlers: {} } };
+        if (!node.paramChild) node.paramChild = { name: part.slice(1), node: { children: Object.create(null), paramChild: null, handlers: Object.create(null) } };
         node = node.paramChild.node;
       } else {
-        if (!node.children[part]) node.children[part] = { children: {}, paramChild: null, handlers: {} };
+        if (!node.children[part]) node.children[part] = { children: Object.create(null), paramChild: null, handlers: Object.create(null) };
         node = node.children[part];
       }
     }
@@ -33,15 +33,22 @@ export class TrieRouter {
         continue;
       }
       const segment = parts[idx];
-      // Static match first (higher priority)
+      // Param match pushed FIRST so static is popped FIRST (LIFO = static priority)
+      if (node.paramChild) {
+        let decoded;
+        try {
+          decoded = decodeURIComponent(segment);
+        } catch {
+          // Malformed percent encoding — skip this branch
+          continue;
+        }
+        const nextParams = Object.assign(Object.create(null), params);
+        nextParams[node.paramChild.name] = decoded;
+        stack.push({ node: node.paramChild.node, idx: idx + 1, params: nextParams });
+      }
+      // Static match pushed LAST so it's popped FIRST (higher priority)
       if (node.children[segment]) {
         stack.push({ node: node.children[segment], idx: idx + 1, params });
-      }
-      // Param match
-      if (node.paramChild) {
-        const nextParams = Object.assign(Object.create(null), params);
-        nextParams[node.paramChild.name] = decodeURIComponent(segment);
-        stack.push({ node: node.paramChild.node, idx: idx + 1, params: nextParams });
       }
     }
     return null;
