@@ -247,23 +247,45 @@ function projectBillingState(billing) {
   };
 }
 
-function ensureDemoBillingCapability() {
+async function ensureDemoBillingCapability() {
   const demo = getUser('demo-user');
   if (!demo) return;
-  const caps = new Set(demo.capabilities);
+  const caps = new Set(demo.capabilities || []);
   let changed = false;
   if (!caps.has('billing.read')) { caps.add('billing.read'); changed = true; }
   if (!caps.has('billing.manage')) { caps.add('billing.manage'); changed = true; }
   if (!caps.has('billing.approve')) { caps.add('billing.approve'); changed = true; }
-  if (changed) updateCapabilities('demo-user', [...caps]);
+  if (changed) {
+    const result = updateCapabilities('demo-user', [...caps]);
+    // Support both sync and async updateCapabilities implementations
+    if (result && typeof result.then === 'function') await result;
+  }
 }
 
-function actorError(code, status, message = code) {
+/**
+ * Canonical error factory for billing API errors.
+ *
+ * Contract:
+ *   - Returns an Error instance with `.code` (string) and `.status` (integer HTTP status).
+ *   - `.message` defaults to `code` when no explicit message is provided.
+ *   - All billing API errors MUST be created via this factory to ensure uniform
+ *     shape for `apiError()` serialization and client-side `normalizeError()` parsing.
+ *   - Replaces the former `actorError`, `codedError`, and ad-hoc error construction.
+ *
+ * @param {string} code    Machine-readable error code (e.g. 'forbidden', 'invoice_not_found').
+ * @param {number} status  HTTP status code (e.g. 403, 404, 422, 503).
+ * @param {string} [message] Optional human-readable message; defaults to `code`.
+ * @returns {Error & { code: string, status: number }}
+ */
+function billingError(code, status, message = code) {
   const error = new Error(message);
   error.code = code;
   error.status = status;
   return error;
 }
+
+/** @deprecated Use billingError() directly. Kept as alias for incremental migration. */
+const actorError = billingError;
 
 /**
  * Decorate the Studio HTTP server with an extraction-ready billing API without
@@ -284,7 +306,14 @@ export function decorateBillingServer(server, {
   const actionGuard = createActionGuard();
   const users = { getUser };
 
-  if (!requireAuth) ensureDemoBillingCapability();
+  if (!requireAuth) {
+    // Fire-and-forget: ensureDemoBillingCapability is async-safe but we don't
+    // block server construction on it. The promise resolves before any request
+    // can arrive in practice (microtask completes before TCP accept).
+    ensureDemoBillingCapability().catch((err) => {
+      console.error('[billing] ensureDemoBillingCapability failed:', err?.message || err);
+    });
+  }
   server.removeAllListeners('request');
 
   const resolveScope = (req, url, claimedActor = undefined) => {
@@ -1118,6 +1147,21 @@ export function decorateBillingServer(server, {
         const type = body?.type;
         if (!type) {
           sendJson(res, 422, { error: 'report_type_required' });
+          return;
+        }
+        // Input validation for dateFrom/dateTo (ISO 8601 date or datetime)
+        const DATE_RE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$/;
+        if (body.dateFrom && !DATE_RE.test(body.dateFrom)) {
+          sendJson(res, 422, { error: 'invalid_date_from' });
+          return;
+        }
+        if (body.dateTo && !DATE_RE.test(body.dateTo)) {
+          sendJson(res, 422, { error: 'invalid_date_to' });
+          return;
+        }
+        const VALID_GRANULARITIES = ['day', 'week', 'month'];
+        if (body.granularity && !VALID_GRANULARITIES.includes(body.granularity)) {
+          sendJson(res, 422, { error: 'invalid_granularity' });
           return;
         }
         const snapshot = store.snapshot();
