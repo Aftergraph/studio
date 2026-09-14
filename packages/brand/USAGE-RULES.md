@@ -1,15 +1,15 @@
 # Aftergraph Brand Usage Rules v1.0
 
 > Status: **provisional-not-trademark-cleared**. Visual identity rules for the
-> Aftergraph / ABDE Intelligence institutional graph brand. Part of the Brand OS
+> Aftergraph institutional graph brand. Part of the Brand OS
 > master kit; canonical sources live in `@aftergraph/brand` and remote `Aftergraph/brand`.
 
 ---
 
 ## 1. Core Brand Statement & Philosophy
 
-- **Name**: Aftergraph (Alternative / Institutional Descriptor: ABDE Intelligence)
-- **Tagline**: *"Infrastructure for governed autonomous intelligence"*
+- **Name**: Aftergraph
+- **Tagline**: *"Infrastructure for verifiable intelligent systems"*
 - **Grammar**: `graphs → boundaries → authority → execution → evidence → verified outcomes`
 - **Aesthetic**: Calm Intelligence, institutional confidence, cryptographic precision, zero decorative fluff, WCAG 2.2 AA accessibility.
 
@@ -71,7 +71,7 @@ The mark **may NOT**:
 
 ## 6. Export Rules & Source of Truth
 
-- **Single Source of Truth**: All visual assets derive from the SVG masters in `packages/brand/svg/`.
+- **Single Source of Truth**: All visual assets derive from the registries and SVG masters in this repository.
 - **Zero Manual Bitmaps**: Never manually paint or alter PNG/WebP exports in image editors. All raster assets must be programmatic rasterizations of the canonical SVGs.
 - **Accessibility in SVG**: All SVG masters must include `role="img"` and descriptive `aria-label` attributes.
 - **Real Typography in Diagrams**: Architectural diagrams must use real `<text>` nodes, never converted paths, preserving screen reader accessibility and searchability.
@@ -80,5 +80,26 @@ The mark **may NOT**:
 
 ## 7. Multi-Repo Governance & Dogfooding
 
-- Repositories in the Aftergraph organization (`trust-gateway`, `works-execution`, `aie`, `work-intelligence-v2`, `after-graph-governance`, `intelligence-systems-research`) consume brand tokens through `@aftergraph/brand` or the centralized token feed.
+- Repositories in the Aftergraph organization consume brand tokens through `@aftergraph/brand` or generated, provenance-bearing release artifacts.
 - **Separation of Concerns**: A shared visual identity does **not** convey shared execution claims. Runtime authority, durable execution, conformance guarantees, and scientific research claims remain strictly bounded within their respective repositories.
+
+---
+
+## 8. Product Naming (masterbrand)
+
+- **Masterbrand:** Aftergraph — *Infrastructure for verified intelligent systems.*
+- **Tier 1 products** carry the suffix form: Studio by Aftergraph,
+  Sentinel by Aftergraph, Work Intelligence by Aftergraph,
+  Continuum by Aftergraph.
+- **Infrastructure** uses the plain form: Aftergraph Runtime,
+  Trust Gateway, WORKS, Aftergraph Governance, Aftergraph Skills,
+  Aftergraph Models.
+- **Package namespace:** `@aftergraph/*` for all canonical packages.
+- **Forbidden as active identifiers:** `AVC`, `avc-*`, `@avc/*`,
+  `Autonomous Venture Company`, `venture-os-consumer`.
+  Historical records may retain old names for provenance only.
+- **No new AVC-branded surfaces:** no new product, package, UI string,
+  or document may introduce AVC naming; existing occurrences migrate
+  per the consolidation waves, design-hue decisions excepted
+  (AVC earth-tone palette vs institution palette is an owner decision,
+  not an automatic migration).

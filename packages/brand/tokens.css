@@ -15,6 +15,19 @@
   --ag-brand-decision-amber: #f0a64a;
   --ag-brand-system-blue: #4c8bd8;
   --ag-brand-danger: #ff6b7a;
+  --ag-state-canonical: #0c52ef;
+  --ag-state-observed: #2367ff;
+  --ag-state-proposed: #6346d8;
+  --ag-state-verified: #087b49;
+  --ag-state-unverified: #4f5868;
+  --ag-state-indeterminate: #4f5868;
+  --ag-state-stale: #8a5700;
+  --ag-state-revoked: #b52d3c;
+  --ag-state-conflict: #8a5700;
+  --ag-state-unknown: #4f5868;
+  --ag-state-withheld: #6346d8;
+  --ag-state-unavailable: #4f5868;
+  --ag-state-superseded: #205ca8;
 
   /* Typography Stacks */
   --ag-brand-font-interface: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -109,6 +122,19 @@ html[data-theme="dark"],
   --ag-brand-system-soft: rgba(76, 139, 216, 0.15);
   --ag-brand-danger-tone: #ff6b7a;
   --ag-brand-danger-soft: rgba(255, 107, 122, 0.16);
+  --ag-state-canonical: #42c7e8;
+  --ag-state-observed: #4c8bd8;
+  --ag-state-proposed: #7759e8;
+  --ag-state-verified: #24c4ad;
+  --ag-state-unverified: #8993a4;
+  --ag-state-indeterminate: #8993a4;
+  --ag-state-stale: #f0a64a;
+  --ag-state-revoked: #ff6b7a;
+  --ag-state-conflict: #f0a64a;
+  --ag-state-unknown: #8993a4;
+  --ag-state-withheld: #7759e8;
+  --ag-state-unavailable: #8993a4;
+  --ag-state-superseded: #4c8bd8;
 
   --ag-brand-shadow-flat: none;
   --ag-brand-shadow-raised: 0 4px 20px rgba(0, 0, 0, 0.35);

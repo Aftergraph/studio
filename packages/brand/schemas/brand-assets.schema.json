@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aftergraph.org/schemas/brand-assets-2.json",
+  "title": "Aftergraph Brand Adoption Contract",
+  "type": "object",
+  "required": ["schema_version", "brand", "surfaces", "assets", "provenance"],
+  "properties": {
+    "schema_version": { "const": 2 },
+    "brand": {
+      "type": "object",
+      "required": ["version", "class", "parent", "canonical_package"],
+      "properties": {
+        "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+        "class": { "enum": ["corporate", "product", "technology", "research", "governance", "internal"] },
+        "parent": { "const": "aftergraph" },
+        "canonical_package": { "const": "@aftergraph/brand" }
+      }
+    },
+    "surfaces": { "type": "object", "additionalProperties": { "type": "boolean" } },
+    "assets": {
+      "type": "object",
+      "required": ["identity", "icon", "social", "screenshots", "architecture", "motion", "press"],
+      "additionalProperties": { "enum": ["required", "optional", "not-applicable", "inherit", "master", "endorsed-product", "technology", "research", "runtime-evidence", "full", "product"] }
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["generated_from_brand", "source_commit"],
+      "properties": {
+        "generated_from_brand": { "type": "string" },
+        "source_commit": { "type": "string", "pattern": "^(WORKTREE|[0-9a-f]{40})$" }
+      }
+    }
+  }
+}

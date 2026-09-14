@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aftergraph.org/schemas/brand-registry-1.json",
+  "type": "object",
+  "required": ["schema_version", "brand_version", "master_brand", "legal", "classes", "products"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "brand_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "master_brand": { "const": "Aftergraph" },
+    "legal": {
+      "type": "object",
+      "required": ["status", "legal_review_state", "public_use_state"],
+      "properties": { "status": { "const": "provisional-not-trademark-cleared" } }
+    },
+    "classes": { "type": "object" },
+    "products": { "type": "object" }
+  }
+}

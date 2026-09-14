@@ -3,7 +3,7 @@
 // keys belong to the canonical authority store when multi-node execution lands.
 export const RESET_CONFIRMATION = 'RESET_WORKSPACE';
 
-export function createActionGuard({ ttlMs = 5000, now = () => Date.now() } = {}) {
+export function createActionGuard({ ttlMs = 5000, now = () => Date.now(), persist } = {}) {
   const records = new Map();
   const expire = () => {
     const time = now();
@@ -24,6 +24,9 @@ export function createActionGuard({ ttlMs = 5000, now = () => Date.now() } = {})
       if (!record) throw new Error(`unknown action key: ${key}`);
       const next = { state: 'success', result };
       records.set(key, { ...next, expiresAt: record.expiresAt });
+      if (persist && typeof persist.onComplete === 'function') {
+        try { persist.onComplete(key, next); } catch (_) { /* best-effort */ }
+      }
       return next;
     },
     fail(key, error) {

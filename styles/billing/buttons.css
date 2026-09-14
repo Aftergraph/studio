@@ -1,0 +1,101 @@
+.billing-quiet-button,
+.billing-icon-button,
+.billing-secondary-button,
+.billing-primary-button {
+  border: 0;
+  border-radius: var(--ag-brand-radius-button);
+  cursor: pointer;
+  min-height: 44px;
+  font-weight: 680;
+  transition: transform 150ms ease, background 150ms ease, border-color 150ms ease, opacity 150ms ease;
+}
+
+.billing-quiet-button {
+  justify-self: end;
+  padding: 0 var(--ag-brand-space-md);
+  background: transparent;
+  color: var(--text-2);
+}
+
+.billing-quiet-button:hover,
+.billing-icon-button:hover {
+  background: var(--surface-strong);
+  color: var(--text);
+}
+
+.billing-primary-button,
+.billing-secondary-button {
+  padding: 0 var(--ag-brand-space-md);
+  white-space: nowrap;
+}
+
+.billing-primary-button {
+  background: var(--text);
+  color: var(--canvas);
+  position: relative;
+  overflow: hidden;
+}
+
+.billing-primary-button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%);
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.billing-primary-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--text) 25%, transparent);
+}
+
+.billing-primary-button:hover::before {
+  opacity: 1;
+}
+
+.billing-primary-button:active {
+  transform: translateY(0);
+}
+
+.billing-secondary-button {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  position: relative;
+}
+
+.billing-secondary-button:hover {
+  background: var(--surface-strong);
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.billing-secondary-button:active {
+  transform: scale(0.98);
+}
+
+.billing-primary-button:disabled,
+.billing-secondary-button:disabled,
+.billing-quiet-button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+  transform: none;
+}
+
+.billing-icon-button {
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--ag-brand-type-headline);
+  line-height: 1;
+}
+
+/* Action button group refinement */
+.billing-form-actions .billing-primary-button + .billing-secondary-button,
+.billing-form-actions .billing-secondary-button + .billing-primary-button {
+  margin-left: var(--ag-brand-space-xs);
+}

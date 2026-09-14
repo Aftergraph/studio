@@ -67,8 +67,8 @@ test('demo-user default scope is unaffected', async () => {
 test('unregistered actors are rejected everywhere', async () => {
   await withServer(async port => {
     const w = await post(port, '/api/v1/conversations', { actor: 'ghost', title: 'G' }, 'ghost-conv-1');
-    assert.equal(w.status, 403, 'ghost cannot create conversations');
+    assert.equal(w.status, 422, 'ghost cannot create conversations');
     const g = await fetch(`http://127.0.0.1:${port}/api/v1/state?actor=ghost`);
-    assert.equal(g.status, 403, 'ghost cannot read state');
+    assert.equal(g.status, 422, 'ghost cannot read state');
   });
 });

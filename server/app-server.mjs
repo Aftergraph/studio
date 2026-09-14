@@ -17,13 +17,15 @@ import { listGrantableCapabilities } from '../src/user/capability-set.mjs';
 import { createGoal } from '../src/goal/goal-schema.mjs';
 import { createLesson } from '../src/goal/goal-lesson.mjs';
 import { assessGoalDrift } from '../src/goal/goal-drift.mjs';
-import { issueMagicToken, subjectFromAuthHeader, authSecretFromEnv } from '../src/auth/magic-link.mjs';
+import { issueMagicToken, subjectFromAuthHeader, authSecretFromEnv, isDevSecret } from '../src/auth/magic-link.mjs';
+import { createRequestScope } from './request-scope.mjs';
 import { createRateLimiter } from '../src/auth/rate-limit.mjs';
 import { createKillSwitch, engageKill, releaseKill, assertAutonomyAllowed } from '../src/autonomy/bounds.mjs';
 import { CostLedger } from '../src/economy/outcome-economy.mjs';
 import { createKnowledgeEntry, promoteKnowledge, isAuthoritative } from '../src/brain/knowledge.mjs';
 import { createServerLog } from '../src/distributed/server-log.mjs';
 import { createUpstreamHub } from '../src/integrations/upstream-hub.mjs';
+import { inspectStateBackup } from '../scripts/state_backup.mjs';
 import { createFederationApiHandler } from './federation-routes.mjs';
 
 
@@ -58,9 +60,26 @@ export function upstreamConfigFromEnv(env=process.env) {
   };
 }
 
-export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, upstreamConfig = null, federation = null, fixtures = true, authSecret = null, requireAuth = process.env.AFTERGRAPH_REQUIRE_AUTH === 'true', maxUserStores = 100 } = {}) {
+export function createAppServer({
+  root,
+  stateFile,
+  runtimeIntervalMs = 1250,
+  upstreamConfig = null,
+  federation = null,
+  fixtures = true,
+  authSecret = null,
+  requireAuth = process.env.AFTERGRAPH_REQUIRE_AUTH === 'true',
+  maxUserStores = 100,
+  releaseSha = process.env.AFTERGRAPH_RELEASE_SHA || 'unknown',
+  requireBackup = process.env.AFTERGRAPH_REQUIRE_BACKUP === 'true',
+  backupDir = process.env.AFTERGRAPH_BACKUP_DIR || null,
+  backupMaxAgeMs = Number(process.env.AFTERGRAPH_BACKUP_MAX_AGE_MS || 36 * 60 * 60 * 1000),
+} = {}) {
   const rootDir = resolveRoot(root);
-  const secret = authSecret || authSecretFromEnv();
+  const secret = authSecret || authSecretFromEnv(process.env, { requireProduction: requireAuth });
+  if (requireAuth && isDevSecret(secret)) {
+    throw new Error('AFTERGRAPH_AUTH_SECRET required for production authentication');
+  }
   // ponytail: requireAuth turns Bearer binding into enforcement. The operator
   // bootstraps with the boot token (valid 24h); email challenge is the
   // documented follow-up before multi-operator production.
@@ -169,44 +188,51 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
     let runtimeHub = hubFor(DEFAULT_ACTOR);
     let syncLog = logFor(DEFAULT_ACTOR);
     const rescope = async (actor) => {
-      const bearer = subjectFromAuthHeader(req, { secret });
-      // ponytail: enforcement mode — every API route except the auth booth
-      // itself requires a valid Bearer token.
-      if (requireAuth && !bearer && !url.pathname.startsWith('/api/v1/auth/')) {
-        const error = new Error('authentication required');
-        error.code = 'authentication_required'; error.status = 401; throw error;
-      }
-      const scoped = bearer || actor || queryActor;
-      // ponytail: fail-closed — only registered users own a workspace.
-      // demo-user is seeded at boot; everyone else must POST /api/v1/users first.
-      if (!getUser(scoped || DEFAULT_ACTOR)) {
-        const error = new Error('forbidden: unknown actor');
-        error.code = 'forbidden'; error.status = 403; throw error;
-      }
-      // ponytail: when a Bearer token is present it binds the request —
-      // a claimed actor that differs from the token subject is rejected.
-      const claimed = actor || queryActor;
-      if (bearer && claimed && bearer !== claimed) {
-        const error = new Error('forbidden: token subject mismatch');
-        error.code = 'forbidden'; error.status = 403; throw error;
-      }
-      store = storeFor(scoped);
-      runtimeHub = hubFor(scoped);
-      syncLog = logFor(scoped);
-      await store.readyP;
+      const isAuthRoute = url.pathname.startsWith('/api/v1/auth/');
+      const scope = await createRequestScope({
+        req, url, secret, requireAuth, storeFor,
+        claimedActor: actor,
+        isAuthRoute,
+      });
+      store = scope.store;
+      runtimeHub = hubFor(scope.actor);
+      syncLog = logFor(scope.actor);
     };
     if (url.pathname === '/healthz') {
-      sendJson(res, 200, { status:'ok', app:'aftergraph-workspace-v5-reference', api:API_VERSION });
+      sendJson(res, 200, { status:'ok', app:'aftergraph-workspace-v5-reference', api:API_VERSION, releaseSha });
       return;
     }
-    try { await rescope(); } catch (error) { sendApiError(res, error); return; }
-
+    if (url.pathname === '/readyz') {
+      try {
+        await store.readyP;
+        const persistence = Boolean(store.stateFile);
+        const configuredAuth = !isDevSecret(secret);
+        const backup = requireBackup
+          ? await inspectStateBackup({ backupDir, maxAgeMs: backupMaxAgeMs })
+          : null;
+        const backupReady = !requireBackup || backup?.status === 'fresh';
+        const ready = persistence && configuredAuth && releaseSha !== 'unknown' && backupReady;
+        const body = {
+          status: ready ? 'ready' : 'not_ready',
+          releaseSha,
+          persistence,
+          auth: { required: requireAuth, configured: configuredAuth },
+        };
+        if (requireBackup) body.backup = { required: true, ...backup };
+        sendJson(res, ready ? 200 : 503, body);
+      } catch (error) {
+        sendJson(res, 503, { status:'not_ready', releaseSha, error:'persistence_unavailable' });
+      }
+      return;
+    }
     if (url.pathname === '/api/v1/events' && req.method === 'GET') {
+      try { await rescope(); } catch (error) { sendApiError(res, error); return; }
       sse.attach(req,res,{state:store.snapshot(),runtimes:runtimeHub.snapshot()});
       return;
     }
 
     if (isApiRequest(url)) {
+      try { await rescope(); } catch (error) { sendApiError(res, error); return; }
       try {
         if (federationHandler?.(req,res,url)) return;
         if (url.pathname === '/api/v1/state' && req.method === 'GET') {
@@ -502,10 +528,16 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
           const mode = url.searchParams.get('mode') || 'historical';
           let temporal = { mode: 'historical', cursor: Math.max(0, Math.min(frames.length - 1, Math.trunc(cursor) || 0)), state: reconstructAt(frames, cursor), frames };
           if (mode === 'counterfactual') {
-            const hypothetical = JSON.parse(url.searchParams.get('event') || '{}');
+            let hypothetical;
+            try { hypothetical = JSON.parse(url.searchParams.get('event') || '{}'); } catch (e) {
+              sendJson(res, 422, { error: 'invalid_json', param: 'event', detail: e.message }); return;
+            }
             temporal = counterfactualAt(frames, cursor, hypothetical);
           } else if (mode === 'forecast') {
-            const steps = JSON.parse(url.searchParams.get('steps') || '[]');
+            let steps;
+            try { steps = JSON.parse(url.searchParams.get('steps') || '[]'); } catch (e) {
+              sendJson(res, 422, { error: 'invalid_json', param: 'steps', detail: e.message }); return;
+            }
             temporal = futureTrajectory(frames, cursor, steps);
           } else if (!frames.length) {
             temporal = { mode: 'historical', cursor: -1, state: {}, frames: [] };
@@ -654,6 +686,10 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
 
         if (url.pathname === '/api/v1/auth/magic-link' && req.method === 'POST') {
           const body=await readJson(req);
+          if (requireAuth && !subjectFromAuthHeader(req, { secret })) {
+            sendJson(res, 401, { error: 'authentication_required' });
+            return;
+          }
           await rescope(body?.actor);
           const throttle=magicLinkLimiter.hit(req.socket?.remoteAddress || 'unknown');
           if(!throttle.allowed){sendJson(res,429,{error:'rate_limited',retryAfterSec:throttle.retryAfterSec});return;}
@@ -680,7 +716,7 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
           const body=await readJson(req);
           const action=beginAction(req,body,'user.manage',url.pathname);
           try {
-            const user=createUser({id:body.id,name:body.name,role:body.role,capabilities:body.capabilities});
+            const user=createUser({id:body.id,name:body.name,role:body.role,workspaceId:body.workspaceId,capabilities:body.capabilities});
             completeAction(action.key,{status:'accepted'});
             sendJson(res,201,{version:API_VERSION,user});
           } catch(error){ actionGuard.fail(action.key,error?.message||error);sendJson(res,422,{error:error?.code||'invalid_user'}); }
@@ -815,7 +851,7 @@ export function createAppServer({ root, stateFile, runtimeIntervalMs = 1250, ups
     for (const hub of hubs.values()) { try { hub.stopAll(); } catch {} }
     sse.closeAll();
   });
-  server.workspace = { store, runtimeHub, upstreamHub, federation, ready, stores, hubs, bootToken };
+  server.workspace = { store, storeFor, runtimeHub, upstreamHub, federation, ready, stores, hubs, bootToken };
   // ponytail: close drains per-user persists first — teardown rmdir otherwise
   // races in-flight stateFile writes (CI ENOTEMPTY flake).
   const rawClose = server.close.bind(server);

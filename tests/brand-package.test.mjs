@@ -22,8 +22,8 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 
 test('brand package exports canonical institutional metadata and grammar', () => {
   assert.equal(BRAND_METADATA.name, 'Aftergraph');
-  assert.equal(BRAND_METADATA.altName, 'ABDE Intelligence');
-  assert.equal(BRAND_METADATA.tagline, 'Infrastructure for governed autonomous intelligence');
+  assert.equal(BRAND_METADATA.altName, undefined);
+  assert.equal(BRAND_METADATA.tagline, 'Infrastructure for verifiable intelligent systems');
   assert.match(BRAND_METADATA.grammar, /graphs → boundaries → authority → execution → evidence → verified outcomes/);
   assert.equal(BRAND_METADATA.status, 'provisional-not-trademark-cleared');
 
@@ -128,6 +128,7 @@ test('living shell packages/tokens directly dogfoods the official brand tokens',
 
 test('styles/tokens.css defines official institutional brand variables', () => {
   const css = readFileSync(path.join(root, 'styles/tokens.css'), 'utf8');
+  // Canonical institutional palette primitives (hardcoded)
   assert.match(css, /--ag-institution-black:\s*#080c14;/i);
   assert.match(css, /--ag-graph-midnight:\s*#0e1630;/i);
   assert.match(css, /--ag-evidence-white:\s*#f5f7fa;/i);
@@ -137,9 +138,12 @@ test('styles/tokens.css defines official institutional brand variables', () => {
   assert.match(css, /--ag-decision-amber:\s*#f0a64a;/i);
   assert.match(css, /--ag-system-blue:\s*#4c8bd8;/i);
 
-  // Dark mode mappings
-  assert.match(css, /html\[data-theme="dark"\][\s\S]*--bg:\s*#080c14;/);
-  assert.match(css, /html\[data-theme="dark"\][\s\S]*--canvas:\s*#0e1630;/);
-  assert.match(css, /html\[data-theme="dark"\][\s\S]*--accent:\s*#42c7e8;/);
-  assert.match(css, /html\[data-theme="dark"\][\s\S]*--success:\s*#24c4ad;/);
+  // R-003: Shell semantic mappings now use ADS var() aliases instead of hardcoded hex
+  assert.match(css, /@import\s+['"]\.\.\/packages\/brand\/tokens\.css['"]/);
+  assert.match(css, /--bg:\s*var\(--ag-brand-canvas\)/);
+  assert.match(css, /--canvas:\s*var\(--ag-brand-canvas-raised\)/);
+  assert.match(css, /--accent:\s*var\(--ag-brand-control\)/);
+  // R-011: success/warning overridden with accessible values for WCAG AA
+  assert.match(css, /--success:\s*#0b7a47/);
+  assert.match(css, /--warning:\s*#8a5700/);
 });

@@ -1,0 +1,26 @@
+.billing-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--ag-brand-space-xl) + env(safe-area-inset-bottom, 0px));
+  z-index: 50;
+  transform: translate(-50%, 20px) scale(0.95);
+  padding: var(--ag-brand-space-md) var(--ag-brand-space-lg);
+  border-radius: 12px;
+  background: var(--glass-bg);
+  color: var(--text);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-float);
+  font-size: var(--ag-brand-type-body-sm);
+  font-weight: 680;
+  opacity: 0;
+  pointer-events: none;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  transition: opacity 200ms cubic-bezier(0.16, 1, 0.3, 1), transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.billing-toast.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+  pointer-events: auto;
+}

@@ -1,0 +1,32 @@
+{
+  "$schema": "./schemas/registry.schema.json",
+  "schema_version": 1,
+  "brand_version": "1.1.0",
+  "master_brand": "Aftergraph",
+  "positioning": "Infrastructure and open research for verifiable intelligent systems.",
+  "legal": {
+    "name": "Aftergraph",
+    "owner": "NEEDS_LEGAL_RECORD",
+    "type": "master-brand",
+    "status": "provisional-not-trademark-cleared",
+    "legal_review_state": "needs-review",
+    "public_use_state": "active-provisional"
+  },
+  "classes": {
+    "corporate": ["brand", ".github", "aftergraph.org"],
+    "products": ["studio", "wi-frontend"],
+    "product_needs_review": ["sentinel"],
+    "technologies": ["works-execution", "trust-gateway", "runtime", "model-registry", "aftergraph-cron-fabric", "context-continuity", "wi-backend", "skills-vault"],
+    "research": ["aie", "afm", "continuum", "intelligence-systems-research", "llm-research-development"],
+    "governance": ["after-graph-governance"],
+    "internal": ["autonomous-venture-company", "sentinel-firetest", "sentinel-firetest2", "veranza"]
+  },
+  "products": {
+    "work-intelligence": { "display_name": "Work Intelligence", "status": "active", "accent": "system_blue" },
+    "studio": { "display_name": "Studio", "status": "active", "accent": "authority_violet" },
+    "sentinel": { "display_name": "Sentinel", "status": "needs-review", "blocker": "Aftergraph/brand#19 and Aftergraph/sentinel#7" }
+  },
+  "evidence_classes": ["E0", "E1", "E2", "E3", "E4", "E5", "E6"],
+  "legacy_public_terms": ["Provisional home of ABDE Intelligence", "ABDE Intelligence", "Autonomous Venture Company"],
+  "historical_terms": ["AVC"]
+}

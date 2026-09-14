@@ -1,8 +1,16 @@
 {
   "name": "@aftergraph/brand",
-  "version": "1.0.0",
-  "description": "Official brand identity, design tokens, visual assets, and UI contracts for Aftergraph / ABDE Intelligence",
+  "version": "1.1.0",
+  "description": "Canonical Brand OS, visual assets, semantic symbols, and UI contracts for Aftergraph",
   "type": "module",
+  "scripts": {
+    "generate": "node scripts/generate-icons.mjs && node scripts/generate-families.mjs",
+    "export-assets": "node scripts/export-assets.mjs",
+    "validate": "node scripts/validate.mjs",
+    "test": "node --test",
+    "check": "npm run generate && npm run validate && npm test"
+  },
+  "bin": { "assetgen": "./scripts/assetgen.mjs" },
   "main": "./index.mjs",
   "module": "./index.mjs",
   "types": "./types.d.ts",
@@ -32,7 +40,6 @@
   },
   "keywords": [
     "aftergraph",
-    "abde-intelligence",
     "design-system",
     "brand",
     "tokens",
@@ -50,6 +57,9 @@
     "manifest.json",
     "USAGE-RULES.md",
     "DESIGN-SYSTEM.md",
-    "svg"
+    "svg", "identity", "semantics", "social", "editorial", "product", "wallpaper",
+    "schemas", "scripts", "registry.json", "BRAND-ARCHITECTURE.md",
+    "NAMING-AND-LANGUAGE.md", "ACCESSIBILITY.md", "MOTION.md",
+    "SCREENSHOT-STANDARD.md", "RESEARCH-VISUAL-STANDARD.md", "PRESS-AND-MEDIA.md"
   ]
 }
