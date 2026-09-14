@@ -26,6 +26,7 @@ sed -E "s/(href|src)=\"([^\"]+\.(css|mjs))\"/\1=\"\2?v=$HASH\"/g" "$INPUT_FILE" 
 # Verify the sed actually changed something
 if grep -q "?v=$HASH" "$TMP_FILE"; then
   mv "$TMP_FILE" "$OUTPUT_FILE"
+chmod 644 "$OUTPUT_FILE"
   echo "Updated: $OUTPUT_FILE"
 else
   echo "WARNING: No .css or .mjs references found to update" >&2
