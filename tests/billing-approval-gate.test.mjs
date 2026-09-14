@@ -8,7 +8,7 @@ import {
   requestBillingApproval,
   approveBillingInvoice,
   rejectBillingApproval,
-} from '../../src/billing/mutations.mjs';
+} from '../src/billing/mutations.mjs';
 
 function baseBilling(settings = {}) {
   return {

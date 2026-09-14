@@ -583,6 +583,7 @@ export function decorateBillingServer(server, {
             issuer: body.issuer,
             defaultServiceLabel: body.defaultServiceLabel,
             invoiceSequence: body.invoiceSequence,
+            approvalPolicy: body.approvalPolicy,
           });
           draft.billing = result.billing;
           settings = result.settings;

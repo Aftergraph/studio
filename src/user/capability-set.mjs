@@ -16,6 +16,7 @@ const ALLOWLIST = Object.freeze([
   'goal.manage',
   'billing.read',
   'billing.manage',
+  'billing.approve',
   'billing.sync',
   'billing.actuals.correct',
 ]);
