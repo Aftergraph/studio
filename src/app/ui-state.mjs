@@ -11,6 +11,8 @@ export function createUIState(state={},device='desktop') {
     approvalOpen:false,
     approvalEvidenceOpen:false,
     paletteOpen:false,
+    mobileSidebarOpen:false,
+    activeSurface:null,
     paletteQuery:'',
     paletteIndex:0,
     artifactTab:'preview',

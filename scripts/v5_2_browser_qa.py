@@ -29,7 +29,7 @@ def rewrite_locals(name,source):
         source=re.sub(rf'\b{re.escape(old)}\b',new,source)
     return source
 
-def bundle_for(mode='chat'):
+def bundle_for(mode='chat',use_location=False):
     parts=[]
     for name in MODULES:
         source=rewrite_locals(name,(ROOT/name).read_text(encoding='utf-8'))
@@ -39,12 +39,13 @@ def bundle_for(mode='chat'):
         parts.append(source)
     bundle='\n'.join(parts)
     route="{kind:'mode',mode:'space',domain:'work'}" if mode=='space' else f"{{kind:'domain',domain:'{mode}'}}"
-    bundle=bundle.replace("const initialRoute=routeFromLocation(window.location);",f"const initialRoute={route};")
+    if not use_location:
+        bundle=bundle.replace("const initialRoute=routeFromLocation(window.location);",f"const initialRoute={route};")
     bundle=bundle.replace("if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('/sw.js').catch(()=>{});",'')
     return bundle
 
 def html():
-    css='\n'.join((ROOT/'styles'/name).read_text(encoding='utf-8') for name in ['tokens.css','reset.css','shell.css','components.css','views.css','motion.css','responsive.css'])
+    css='\n'.join((ROOT/'styles'/name).read_text(encoding='utf-8') for name in ['tokens.css','reset.css','shell.css','components.css','views.css','motion.css','responsive.css','canonical-shell.css'])
     return f'''<!doctype html><html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Aftergraph V5.2 QA</title><style>{css}</style></head><body><a class="skip-link" href="#main-content">Skip</a><div id="app"></div><div id="toast-region" class="toast-region" aria-live="polite"></div></body></html>'''
 
 def boot(browser,mode='chat',viewport=None):
@@ -58,13 +59,25 @@ def boot(browser,mode='chat',viewport=None):
     page.wait_for_timeout(100)
     return page,errors
 
+def boot_deployed(browser,mode):
+    page=browser.new_page(viewport={'width':1440,'height':1000},reduced_motion='no-preference')
+    errors=[]
+    page.on('pageerror',lambda e:errors.append(str(e)))
+    page.route('http://studio.test/**',lambda route: route.fulfill(status=200,content_type='text/html',body=html()) if route.request.resource_type=='document' else route.fulfill(status=404,body=''))
+    page.goto(f'http://studio.test/studio/{mode}',wait_until='domcontentloaded')
+    page.evaluate('window.__AFTERGRAPH_QA=true')
+    page.add_script_tag(type='module',content=bundle_for(mode,use_location=True))
+    page.wait_for_function('window.__aftergraphQA && window.__aftergraphQA.snapshot')
+    page.wait_for_timeout(50)
+    return page,errors
+
 def check(value,label):
     if not value: raise AssertionError(label)
     print('PASS',label)
 
 def run_all():
     with sync_playwright() as p:
-        chromium_bin='/usr/bin/chromium' if Path('/usr/bin/chromium').exists() else None
+        chromium_bin=next((str(p) for p in (Path('/usr/bin/chromium'),Path('/usr/local/bin/chromium')) if p.exists()),None)
         browser=p.chromium.launch(executable_path=chromium_bin,headless=True,args=['--no-sandbox','--disable-dev-shm-usage'])
 
         # Peer-review named concurrency gate: human edits composer while progress is patched.
@@ -104,11 +117,24 @@ def run_all():
         check(not errors,'Control failure test has no uncaught page errors')
         control.close()
 
-        # Purpose-built mobile shell contract.
+        # Canonical mobile shell: Chat/Work stay primary; contextual products live in one drawer.
         mobile,errors=boot(browser,'chat',{'width':390,'height':844})
-        check(mobile.locator('.ag-sidebar').is_hidden(),'390px hides desktop sidebar')
+        check(mobile.locator('.ag-sidebar').is_hidden(),'390px hides desktop sidebar until requested')
         nav=mobile.locator('[data-mobile-primary-nav="true"]')
-        check(nav.is_visible(),'390px exposes dedicated bottom primary nav')
+        check(nav.is_visible(),'390px exposes mobile primary navigation')
+        labels=[text.strip() for text in nav.locator('[data-human-nav]').all_text_contents()]
+        check(labels==['Chat','Work'],'mobile primary navigation is exactly Chat and Work')
+        menu=mobile.locator('[data-action="toggle-sidebar"]')
+        check(menu.is_visible(),'mobile workspace menu trigger is visible')
+        menu.click();mobile.wait_for_selector('.ag-sidebar.is-mobile-open')
+        check(mobile.locator('.ag-mobile-backdrop').count()==1,'mobile drawer overlays the canonical shell')
+        for destination in ['space','plugins','settings']:
+            target=mobile.locator(f'.ag-sidebar.is-mobile-open [data-shell-destination="{destination}"]')
+            box=target.bounding_box();check(bool(box and box['height']>=44),f'{destination} drawer target is at least 44 CSS px high')
+        backdrop=mobile.locator('.ag-mobile-backdrop');backdrop_box=backdrop.bounding_box()
+        check(bool(backdrop_box and backdrop_box['width']>340),'mobile backdrop exposes dismiss area outside drawer')
+        backdrop.click(position={'x':backdrop_box['width']-12,'y':backdrop_box['height']/2});mobile.wait_for_timeout(20)
+        check(mobile.locator('.ag-sidebar.is-mobile-open').count()==0,'mobile drawer closes without changing shell')
         boxes=[nav.locator('button').nth(i).bounding_box() for i in range(nav.locator('button').count())]
         check(all(box and (box['width']>=44 or box['height']>=44) for box in boxes),'mobile primary mode targets are at least 44 CSS px in one dimension')
         dims=mobile.evaluate('()=>({scrollWidth:document.documentElement.scrollWidth,clientWidth:document.documentElement.clientWidth})')
@@ -140,6 +166,15 @@ def run_all():
         check('Requires current state' in blocked.inner_text(),'degraded generated action explains freshness requirement')
         check(not errors,'generated action mobile QA has no page errors')
         gated.close()
+
+        # Cloudflare deployed-base simulation: browser URL keeps /studio while Studio resolves the same modes.
+        for mode,expected in [('chat','chat'),('work','work'),('space','space')]:
+            deployed,errors=boot_deployed(browser,mode)
+            snapshot=deployed.evaluate('window.__aftergraphQA.snapshot()')
+            check(deployed.url.endswith(f'/studio/{mode}'),f'/studio/{mode} retains deployed base path')
+            check(snapshot['primaryMode']==expected,f'/studio/{mode} selects {expected} mode')
+            check(not errors,f'/studio/{mode} deployed-base simulation has no page errors')
+            deployed.close()
 
         browser.close()
 

@@ -42,7 +42,7 @@ def bundle_for(domain='chat'):
     return bundle
 
 def html():
-    css='\n'.join((ROOT/'styles'/name).read_text(encoding='utf-8') for name in ['tokens.css','reset.css','shell.css','components.css','views.css','motion.css','responsive.css'])
+    css='\n'.join((ROOT/'styles'/name).read_text(encoding='utf-8') for name in ['tokens.css','reset.css','shell.css','components.css','views.css','motion.css','responsive.css','canonical-shell.css'])
     return f'''<!doctype html><html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>{css}</style></head><body><a class="skip-link" href="#main-content">Skip</a><div id="app"></div><div id="toast-region" class="toast-region" aria-live="polite"></div></body></html>'''
 
 def boot(browser,domain='chat',viewport=None):
@@ -163,7 +163,8 @@ with sync_playwright() as p:
     mobile=boot(browser,'chat',{'width':390,'height':844})
     merrors=[];mobile.on('pageerror',lambda e:merrors.append(str(e)))
     check(mobile.locator('.ag-sidebar').is_hidden(),'mobile removes desktop sidebar chrome')
-    check(mobile.locator('.ag-mode-switch button').count()==3,'V5 mobile preserves Chat/Work flows while adding Space')
+    check(mobile.locator('[data-mobile-primary-nav="true"] button').count()==2,'V5 mobile keeps Chat and Work as permanent primary modes')
+    check(mobile.locator('[data-shell-destination="space"]').count()==1,'V5 mobile keeps Space reachable through canonical drawer')
     dims=mobile.evaluate('()=>({s:document.documentElement.scrollWidth,c:document.documentElement.clientWidth})')
     check(dims['s']<=dims['c']+1,'390px layout has no page-level horizontal overflow')
     mobile.locator('[data-action="open-artifact"]').first.click();mobile.wait_for_timeout(160)
