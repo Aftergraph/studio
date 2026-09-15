@@ -18,7 +18,10 @@ function handler(req,res){
   if(u==='/tg/v1/approvals') return json(res,200,{approvals:[{id:'apr_up',status:'pending',tool:'deploy.prod'}]});
   if(u==='/tg/v2/need-you/now') return json(res,200,{items:[{id:'need_up',type:'approval',subject:'Deploy'}]});
   if(u==='/tg/v1/audit/verify') return json(res,200,{ok:true});
+  if(u==='/tg/v2/proposals'&&req.method==='POST') return json(res,201,{ok:true,proposal:{id:'proposal_ops',status:'draft'}});
+  if(u==='/tg/v2/proposals/proposal_ops/submit'&&req.method==='POST') return json(res,200,{ok:true,proposal:{id:'proposal_ops',status:'submitted'}});
   if(u==='/tg/v1/approvals/apr_up/approve'&&req.method==='POST') return json(res,200,{status:'approved'});
+  if(u==='/tg/v2/proposals/proposal_up/approve'&&req.method==='POST') return json(res,200,{ok:true,proposal:{id:'proposal_up',status:'approved',converted_to_mission_id:'wrk_0123456789abcdef0123456789abcdef'},works:{ok:true,work_id:'wrk_0123456789abcdef0123456789abcdef'}});
 
   if(u==='/works/healthz') return json(res,200,{status:'ok'});
   if(u==='/works/v1/works') return json(res,200,{works:[{id:'wrk_0123456789abcdef0123456789abcdef',state:'RUNNING',objective:'Real work'}]});
@@ -75,7 +78,12 @@ test('consequential operations remain explicit and service-owned',async()=>{
   calls.length=0;
   await withServer(handler,async base=>{
     const hub=createUpstreamHub(config(base));
+    const proposal=await hub.submitTrustGatewayProposal({objective:'Review customer communication',channel:'chat'});
+    assert.equal(proposal.proposal.id,'proposal_ops');
+    assert.equal(proposal.proposal.status,'submitted');
     assert.equal((await hub.decideTrustGatewayApproval('apr_up','approve')).status,'approved');
+    const proposalDecision=await hub.decideTrustGatewayProposal('proposal_up',{decision:'approve'});
+    assert.equal(proposalDecision.proposal.converted_to_mission_id,'wrk_0123456789abcdef0123456789abcdef');
     assert.equal((await hub.controlWork('wrk_0123456789abcdef0123456789abcdef','suspend')).state,'WAITING_HUMAN');
     assert.equal((await hub.cancelAieTask('task-up')).state,'canceled');
     await assert.rejects(()=>hub.promoteWorkIntelligence('wi_up',{}),/explicit human actor/);

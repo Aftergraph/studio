@@ -16,6 +16,11 @@ export function createTrustGatewayAdapter({baseUrl,token,timeout,fetchImpl}={}){
     needsYou:()=>http.get('/v2/need-you/now'),
     verifyAudit:()=>http.get('/v1/audit/verify'),
     audit:(since=0)=>http.get(`/v1/audit${since?`?since=${encodeURIComponent(String(since))}`:''}`),
+    createProposal:body=>http.post('/v2/proposals',body),
+    submitProposal:id=>http.post(`/v2/proposals/${encodeURIComponent(id)}/submit`,{}),
+    proposal:id=>http.get(`/v2/proposals/${encodeURIComponent(id)}`),
+    approveProposal:(id,body={})=>http.post(`/v2/proposals/${encodeURIComponent(id)}/approve`,body),
+    rejectProposal:(id,reason)=>http.post(`/v2/proposals/${encodeURIComponent(id)}/reject`,{reason}),
     decideApproval:(id,decision)=>http.post(`/v1/approvals/${encodeURIComponent(id)}/${approvalVerb(decision)}`,{}),
     action:(tool,args)=>http.post('/v1/actions',args===undefined?{tool}:{tool,args}),
   });
