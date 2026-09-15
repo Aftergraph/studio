@@ -43,7 +43,7 @@ def bundle_for(mode='space'):
     return bundle
 
 def html():
-    css='\n'.join((ROOT/'styles'/name).read_text(encoding='utf-8') for name in ['tokens.css','reset.css','shell.css','components.css','views.css','motion.css','responsive.css'])
+    css='\n'.join((ROOT/'styles'/name).read_text(encoding='utf-8') for name in ['tokens.css','reset.css','shell.css','components.css','views.css','motion.css','responsive.css','canonical-shell.css'])
     return f'''<!doctype html><html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Aftergraph V5 Agentic Operating Environment</title><style>{css}</style></head><body><a class="skip-link" href="#main-content">Skip</a><div id="app"></div><div id="toast-region" class="toast-region" aria-live="polite"></div></body></html>'''
 
 def boot(browser,mode='space',viewport=None):
@@ -65,7 +65,7 @@ with sync_playwright() as p:
     browser=p.chromium.launch(executable_path=chromium_bin,headless=True,args=['--no-sandbox','--disable-dev-shm-usage'])
     page,errs,warns=boot(browser,'space')
     check(page.locator('.ag-space-stage').is_visible(),'Space is a real first-class primary surface')
-    check(page.locator('.ag-mode-switch button').count()==3,'desktop exposes only Chat Work Space primary modes')
+    check(page.locator('.ag-mode-nav [data-human-nav]').count()==3,'desktop exposes Chat Work Space in canonical sidebar navigation')
     check(page.locator('.ag-space-surface').count()>=2,'Space restores durable docked objects')
     check(page.locator('[data-space-action="zoom"][data-zoom-level="mission"]').get_attribute('aria-current')=='step','semantic zoom starts at mission')
     page.locator('[data-space-action="zoom"][data-zoom-level="agent"]').click();page.wait_for_timeout(80)
@@ -107,7 +107,7 @@ with sync_playwright() as p:
 
     chat,cerrs,cwarns=boot(browser,'chat')
     check(chat.locator('.ag-conversation').is_visible(),'V5 preserves conversation-first Chat mode')
-    chat.get_by_role('tab',name='Space',exact=True).click();chat.wait_for_timeout(80)
+    chat.locator('.ag-mode-nav [data-human-nav="space"]').click();chat.wait_for_timeout(80)
     check(chat.locator('.ag-space-stage').is_visible(),'Chat morphs into Space without reload')
     chat.screenshot(path=str(ROOT/'screenshot-desktop-v5.png'),full_page=True)
     check(len(cerrs)==0,'Chat to Space transition has no uncaught errors')
@@ -115,7 +115,8 @@ with sync_playwright() as p:
 
     mobile,merrs,mwarns=boot(browser,'space',{'width':390,'height':844})
     check(mobile.locator('.ag-sidebar').is_hidden(),'mobile removes desktop sidebar')
-    check(mobile.locator('.ag-mode-switch button').count()==3,'mobile preserves Chat Work Space modes')
+    check(mobile.locator('[data-mobile-primary-nav="true"] button').count()==2,'mobile keeps Chat Work as permanent primary modes')
+    check(mobile.locator('[data-shell-destination="space"]').count()==1,'mobile keeps Space contextual and reachable')
     dims=mobile.evaluate('()=>({s:document.documentElement.scrollWidth,c:document.documentElement.clientWidth})')
     check(dims['s']<=dims['c']+1,'390px Space has no page-level horizontal overflow')
     check(mobile.locator('.ag-space-surface').count()>=2,'mobile keeps durable spatial objects')

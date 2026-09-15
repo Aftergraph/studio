@@ -65,7 +65,7 @@ def bundle_for(domain='chat'):
     return bundle
 
 def html():
-    css='\n'.join((ROOT/'styles'/name).read_text(encoding='utf-8') for name in ['tokens.css','reset.css','shell.css','components.css','views.css','motion.css','responsive.css'])
+    css='\n'.join((ROOT/'styles'/name).read_text(encoding='utf-8') for name in ['tokens.css','reset.css','shell.css','components.css','views.css','motion.css','responsive.css','canonical-shell.css'])
     return f'''<!doctype html><html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>{css}</style></head><body><a class="skip-link" href="#main-content">Skip</a><div id="app"></div><div id="toast-region" class="toast-region" aria-live="polite"></div></body></html>'''
 
 BRIDGE_JS=r'''
@@ -115,7 +115,7 @@ with tempfile.TemporaryDirectory(prefix='aftergraph-v5-bridge-') as td:
             snap=api(base,'/api/v1/state')['state']
             check(any(m.get('text')==unique for c in snap['conversations'] for m in c.get('messages',[])),'Chat write persists to real V5 backend')
 
-            page.get_by_role('tab',name='Space',exact=True).click();page.wait_for_timeout(130)
+            page.locator('.ag-mode-nav [data-human-nav="space"]').click();page.wait_for_timeout(130)
             check(page.locator('.ag-space-stage').is_visible(),'connected browser enters V5 Space')
             page.locator('[data-space-action="zoom"][data-zoom-level="agent"]').click();page.wait_for_timeout(180)
             snap=api(base,'/api/v1/state')['state'];space=next(x for x in snap['spaces'] if x['id']=='space_primary')
@@ -134,7 +134,7 @@ with tempfile.TemporaryDirectory(prefix='aftergraph-v5-bridge-') as td:
                 check(page.locator('.ag-composer').count()==1,'Living Workspace uses canonical shared composer in Space')
 
             # Return to Space and verify replay is server-owned.
-            page.get_by_role('tab',name='Space',exact=True).click();page.wait_for_timeout(100)
+            page.locator('.ag-mode-nav [data-human-nav="space"]').click();page.wait_for_timeout(100)
             replay_button=page.locator('[data-replay-index]').last
             target=int(replay_button.get_attribute('data-replay-index'));replay_button.click();page.wait_for_timeout(160)
             check(api(base,'/api/v1/state')['state']['replay']['cursor']==target,'replay cursor persists through V5 backend')
