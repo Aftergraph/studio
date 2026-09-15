@@ -750,9 +750,9 @@ export function bootstrapAftergraph(){
       agentId:mode==='Goal'?undefined:'agent_data',
     };
     state=appendChatMessage(state,conversationId,{type:'text',author:'user',text});
-    state=appendChatMessage(state,conversationId,reply);
+    if(!backendConnected)state=appendChatMessage(state,conversationId,reply);
     saveState();render();toast(`${mode} submitted`);
-    if(backendConnected)void syncBackend(apiClient.sendMessage(conversationId,{text,mode,actor:state.user.id,reply}));
+    if(backendConnected)void syncBackend(apiClient.sendMessage(conversationId,{text,mode,actor:state.user.id}));
   }
 
   function startRuntime(missionId){

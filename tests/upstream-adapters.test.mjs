@@ -28,6 +28,9 @@ function contractServer(req,res){
   if(req.url==='/v1/approvals/apr_1/approve'&&req.method==='POST') return json(res,200,{status:'approved'});
   if(req.url==='/v2/need-you/now') return json(res,200,{items:[{id:'need_1',type:'approval'}]});
   if(req.url==='/v1/audit/verify') return json(res,200,{ok:true,head:'abc'});
+  if(req.url==='/v2/proposals'&&req.method==='POST') return json(res,201,{ok:true,proposal:{id:'proposal_1',status:'draft'}});
+  if(req.url==='/v2/proposals/proposal_1/submit'&&req.method==='POST') return json(res,200,{ok:true,proposal:{id:'proposal_1',status:'submitted'}});
+  if(req.url==='/v2/proposals/proposal_1/approve'&&req.method==='POST') return json(res,200,{ok:true,proposal:{id:'proposal_1',status:'approved',converted_to_mission_id:'wrk_0123456789abcdef0123456789abcdef'},works:{ok:true,work_id:'wrk_0123456789abcdef0123456789abcdef'}});
 
   if(req.url==='/v1/works'&&req.method==='GET') return json(res,200,{works:[{id:'wrk_0123456789abcdef0123456789abcdef',state:'RUNNING'}]});
   if(req.url==='/v1/works/wrk_0123456789abcdef0123456789abcdef') return json(res,200,{work:{id:'wrk_0123456789abcdef0123456789abcdef',state:'RUNNING'}});
@@ -57,6 +60,13 @@ test('Trust Gateway adapter follows canonical approval, Needs You, identity and 
     assert.equal((await tg.needsYou()).items[0].id,'need_1');
     assert.equal((await tg.decideApproval('apr_1','approve')).status,'approved');
     assert.equal((await tg.verifyAudit()).ok,true);
+    const created=await tg.createProposal({objective:'Review customer communication',channel:'chat'});
+    assert.equal(created.proposal.status,'draft');
+    const submitted=await tg.submitProposal(created.proposal.id);
+    assert.equal(submitted.proposal.status,'submitted');
+    const approved=await tg.approveProposal(created.proposal.id);
+    assert.equal(approved.proposal.status,'approved');
+    assert.equal(approved.proposal.converted_to_mission_id,'wrk_0123456789abcdef0123456789abcdef');
     assert.equal(requests.find(r=>r.url==='/v2/whoami').authorization,'Bearer tg-secret');
   });
 });

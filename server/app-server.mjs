@@ -27,6 +27,7 @@ import { createServerLog } from '../src/distributed/server-log.mjs';
 import { createUpstreamHub } from '../src/integrations/upstream-hub.mjs';
 import { inspectStateBackup } from '../scripts/state_backup.mjs';
 import { createFederationApiHandler } from './federation-routes.mjs';
+import { buildTrustProposalFromActionIntent } from './business-ops-proposals.mjs';
 
 
 function resolveRoot(root) {
@@ -66,6 +67,7 @@ export function createAppServer({
   runtimeIntervalMs = 1250,
   upstreamConfig = null,
   federation = null,
+  conversationAgent = null,
   fixtures = true,
   authSecret = null,
   requireAuth = process.env.AFTERGRAPH_REQUIRE_AUTH === 'true',
@@ -268,6 +270,33 @@ export function createAppServer({
           return;
         }
 
+        upstreamMatch=url.pathname.match(/^\/api\/v1\/upstreams\/trust-gateway\/proposals\/([^/]+)\/decision$/);
+        if (upstreamMatch && req.method === 'POST') {
+          const body=await readJson(req);
+          if(!body?.actor||body.confirmed!==true){sendJson(res,422,{error:'explicit_confirmation_required'});return;}
+          const decision=String(body.decision||'');
+          if(!['approve','approved','reject','rejected','deny','denied'].includes(decision)){sendJson(res,422,{error:'invalid_proposal_decision'});return;}
+          await rescope(body.actor);
+          const proposalId=decodeURIComponent(upstreamMatch[1]);
+          const correlated=store.snapshot().conversations.some(conv=>(conv.messages||[]).some(message=>message.trustProposal?.id===proposalId));
+          if(!correlated){sendJson(res,404,{error:'proposal_correlation_not_found'});return;}
+          const result=await upstreamHub.decideTrustGatewayProposal(proposalId,{decision,reason:body.reason});
+          const proposal=result?.proposal;
+          if(!proposal||proposal.id!==proposalId){sendJson(res,502,{error:'trust_proposal_result_invalid'});return;}
+          const missionId=proposal.converted_to_mission_id||null;
+          const next=await store.mutate(draft=>{
+            for(const conv of draft.conversations){for(const message of conv.messages||[]){
+              if(message.trustProposal?.id!==proposalId)continue;
+              message.trustProposal={...message.trustProposal,status:String(proposal.status||'unknown'),...(missionId?{missionId}:{} )};
+            }}
+            draft.events.unshift({id:`ev_${Date.now()}`,type:`trust.proposal.${proposal.status||'updated'}`,text:`Trust proposal ${proposalId}: ${proposal.status||'updated'}`,time:'now'});
+            return draft;
+          });
+          broadcast({state:next,runtimes:runtimeHub.snapshot()});
+          sendJson(res,200,{version:API_VERSION,result,state:next});
+          return;
+        }
+
         upstreamMatch=url.pathname.match(/^\/api\/v1\/upstreams\/works\/([^/]+)\/control$/);
         if (upstreamMatch && req.method === 'POST') {
           const body=await readJson(req);
@@ -432,13 +461,57 @@ export function createAppServer({
             mode:String(body.mode || 'Ask'),
             ...(attachments.length?{attachments}:{}),
           });
-          if (body.reply && typeof body.reply === 'object' && String(body.reply.text || '').trim()) {
+          let reply = null;
+          let replyIsServerOwned = false;
+          if (typeof conversationAgent === 'function') {
+            reply = await conversationAgent({
+              conversationId, text, mode:String(body.mode || 'Ask'), actor:body.actor || 'user',
+              attachments, context:contextProjection(nextState, conversationId),
+            });
+            replyIsServerOwned = true;
+          } else if (body.reply && typeof body.reply === 'object') reply = body.reply;
+          if (reply && String(reply.text || '').trim()) {
+            const confidence=['observed','ambiguous','unknown'].includes(reply.confidence)?reply.confidence:undefined;
+            const contextRefs=Array.isArray(reply.contextRefs)?reply.contextRefs.filter(item=>typeof item==='string').slice(0,16):[];
+            const sourceIntent=replyIsServerOwned && reply.actionIntent && typeof reply.actionIntent==='object' ? reply.actionIntent : null;
+            const actionIntent=sourceIntent ? {
+              id:String(sourceIntent.id || ''),
+              semanticCapability:String(sourceIntent.semanticCapability || ''),
+              ...(sourceIntent.tenantId?{tenantId:String(sourceIntent.tenantId)}:{}),
+              ...(sourceIntent.subjectRef?{subjectRef:String(sourceIntent.subjectRef)}:{}),
+              ...(sourceIntent.effectClass?{effectClass:String(sourceIntent.effectClass)}:{}),
+              ...(Number.isInteger(sourceIntent.riskClass)?{riskClass:sourceIntent.riskClass}:{}),
+              ...(Array.isArray(sourceIntent.requiredAuthority)?{requiredAuthority:sourceIntent.requiredAuthority.filter(item=>typeof item==='string').slice(0,16)}:{}),
+              ...(sourceIntent.inputRef?{inputRef:String(sourceIntent.inputRef)}:{}),
+              ...(sourceIntent.expectedOutputRef?{expectedOutputRef:String(sourceIntent.expectedOutputRef)}:{}),
+              ...('verificationRequired' in sourceIntent?{verificationRequired:sourceIntent.verificationRequired===true}:{}),
+              status:'proposed',
+              authorityGranted:false,
+            } : undefined;
+            let trustProposal;
+            if (actionIntent) {
+              try {
+                const proposalBody=buildTrustProposalFromActionIntent({
+                  conversationId,actor:body.actor || 'user',contextRefs,actionIntent,
+                });
+                const submitted=await upstreamHub.submitTrustGatewayProposal(proposalBody);
+                const proposal=submitted?.proposal;
+                if(!proposal?.id||proposal.status!=='submitted')throw new Error('proposal_not_submitted');
+                trustProposal={source:'trust-gateway',id:String(proposal.id),status:'submitted'};
+              } catch {
+                trustProposal={source:'trust-gateway',id:null,status:'submission_failed',error:'proposal_submission_failed'};
+              }
+            }
             nextState = appendChatMessage(nextState, conversationId, {
-              author:String(body.reply.author || 'Friday'),
-              type:String(body.reply.type || 'agent_run'),
-              text:String(body.reply.text).trim(),
-              missionId:body.reply.missionId || undefined,
-              agentId:body.reply.agentId || undefined,
+              author:String(reply.author || 'Friday'),
+              type:String(reply.type || 'agent_run'),
+              text:String(reply.text).trim(),
+              missionId:reply.missionId || undefined,
+              agentId:reply.agentId || undefined,
+              confidence,
+              ...(contextRefs.length?{contextRefs}:{}),
+              ...(actionIntent?{actionIntent}:{}),
+              ...(trustProposal?{trustProposal}:{}),
             });
           }
           const next = await store.replace(nextState);

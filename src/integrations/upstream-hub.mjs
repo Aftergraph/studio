@@ -89,7 +89,20 @@ export function createUpstreamHub(config={}, {fetchImpl=globalThis.fetch}={}){
     governance,
     status,
     sync,
+    async submitTrustGatewayProposal(body){
+      const adapter=requireAdapter(tg,'trust-gateway');
+      const created=await adapter.createProposal(body);
+      const id=created?.proposal?.id;
+      if(!id) throw new Error('trust-gateway proposal create returned no id');
+      return adapter.submitProposal(id);
+    },
     decideTrustGatewayApproval:(id,decision)=>requireAdapter(tg,'trust-gateway').decideApproval(id,decision),
+    decideTrustGatewayProposal:(id,{decision,reason}={})=>{
+      const adapter=requireAdapter(tg,'trust-gateway');
+      if(['approve','approved'].includes(String(decision||''))) return adapter.approveProposal(id,{});
+      if(['reject','rejected','deny','denied'].includes(String(decision||''))) return adapter.rejectProposal(id,reason||'rejected');
+      throw new Error('proposal decision must be approve or reject');
+    },
     async controlWork(id,action,body={}){
       const adapter=requireAdapter(works,'works-execution');
       if(action==='suspend') return adapter.suspend(id,body);
