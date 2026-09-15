@@ -9,7 +9,9 @@ const SURFACE_ROUTES=Object.freeze({
 });
 
 export function appBasePath(locationLike={}) {
-  const pathname=String(locationLike?.pathname||'/');
+  const pathname=typeof locationLike==='string'
+    ? String(locationLike||'/')
+    : String(locationLike?.pathname||'/');
   return pathname==='/studio'||pathname.startsWith('/studio/')?'/studio':'';
 }
 

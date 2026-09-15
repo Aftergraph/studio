@@ -243,6 +243,7 @@ export function bootstrapAftergraph(){
   function navigateObject(type,id){state.activeDomain=domainForObject(type);ui.activeSurface=null;selectObject(type,id);try{history.pushState({},'',withAppBase(buildDeepLink(state.activeDomain,type,id),routeBase))}catch{};saveState();render()}
   function navigateSurface(id){
     const surface=SIDEBAR_DESTINATIONS.find(item=>item.id===id);if(!surface)return;
+    if(surface.kind==='mode'){navigateHuman(surface.id);return}
     state.activeDomain=surface.domain;ui.activeSurface=surface.id;ui.mobileSidebarOpen=false;saveState();
     try{history.pushState({},'',withAppBase(surface.route,routeBase))}catch{}
     render();

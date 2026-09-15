@@ -59,8 +59,8 @@ def boot(browser,mode='chat',viewport=None):
     page.wait_for_timeout(100)
     return page,errors
 
-def boot_deployed(browser,mode):
-    page=browser.new_page(viewport={'width':1440,'height':1000},reduced_motion='no-preference')
+def boot_deployed(browser,mode,viewport=None):
+    page=browser.new_page(viewport=viewport or {'width':1440,'height':1000},reduced_motion='no-preference')
     errors=[]
     page.on('pageerror',lambda e:errors.append(str(e)))
     page.route('http://studio.test/**',lambda route: route.fulfill(status=200,content_type='text/html',body=html()) if route.request.resource_type=='document' else route.fulfill(status=404,body=''))
@@ -175,6 +175,16 @@ def run_all():
             check(snapshot['primaryMode']==expected,f'/studio/{mode} selects {expected} mode')
             check(not errors,f'/studio/{mode} deployed-base simulation has no page errors')
             deployed.close()
+
+        deployed_mobile,errors=boot_deployed(browser,'chat',{'width':390,'height':844})
+        deployed_mobile.locator('[data-action="toggle-sidebar"]').click()
+        deployed_mobile.wait_for_selector('.ag-sidebar.is-mobile-open')
+        deployed_mobile.locator('.ag-sidebar.is-mobile-open [data-shell-destination="space"]').click()
+        deployed_mobile.wait_for_timeout(30)
+        check(deployed_mobile.url.endswith('/studio/space'),'mobile drawer Space navigation retains deployed /studio base path')
+        check(deployed_mobile.evaluate('window.__aftergraphQA.snapshot().primaryMode')=='space','mobile drawer Space navigation selects Space mode')
+        check(not errors,'mobile deployed-base drawer navigation has no page errors')
+        deployed_mobile.close()
 
         browser.close()
 

@@ -7,6 +7,8 @@ test('Studio base path is detected without affecting local routes',()=>{
   assert.equal(appBasePath({pathname:'/studio/chat'}),'/studio');
   assert.equal(withAppBase('/work',{pathname:'/studio/chat'}),'/studio/work');
   assert.equal(withAppBase('/space',{pathname:'/chat'}),'/space');
+  assert.equal(appBasePath('/studio'),'/studio');
+  assert.equal(withAppBase('/space','/studio'),'/studio/space');
 });
 
 test('local and /studio primary routes resolve identically',()=>{
