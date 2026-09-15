@@ -17,3 +17,12 @@
   .ag-direct-space{padding-bottom:calc(64px + env(safe-area-inset-bottom, 0px))}
   .ag-direct-space .ag-space-edge-controls{padding:8px 10px;overflow:auto}
 }
+
+/* Living Workspace — governed generated UI mobile contract */
+@media(max-width:760px){
+  .ag-generated-surface{max-width:100%;margin-top:12px;padding-top:10px}
+  .ag-genui-action{grid-template-columns:1fr;gap:9px;padding:10px 0 12px}
+  .ag-genui-action button{min-height:44px;width:100%;font-size:10px}
+  .ag-genui-metrics>div{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ag-genui-metrics span:nth-child(2n){border-right:0}
+}

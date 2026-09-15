@@ -4,12 +4,12 @@ from playwright.sync_api import sync_playwright
 
 ROOT=Path(__file__).resolve().parents[1]
 MODULES=[
- 'src/domain.mjs','src/router.mjs','src/billing/fixtures.mjs','src/state.mjs','src/search.mjs','src/economy/currency.mjs','src/auth/ui-actions.mjs','src/ui-helpers.mjs','src/workspace-shell.mjs','src/icons.mjs',
+ 'src/domain.mjs','src/router.mjs','src/billing/fixtures.mjs','src/state.mjs','src/search.mjs','src/economy/currency.mjs','src/auth/ui-actions.mjs','src/ui-helpers.mjs','src/workspace-shell.mjs','src/workspace/active-context.mjs','src/icons.mjs',
  'packages/tokens/index.mjs','packages/icons/index.mjs','packages/motion/index.mjs','packages/runtime-ui/index.mjs',
-    'packages/ui/shared.mjs','packages/ui/primitives/button.mjs','packages/ui/primitives/icon-button.mjs','packages/ui/primitives/input.mjs','packages/ui/primitives/menu.mjs','packages/ui/primitives/notice.mjs','packages/ui/conversation/turn.mjs','packages/ui/conversation/composer.mjs','packages/ui/conversation/response-status.mjs','packages/ui/work/work-summary.mjs','packages/ui/work/outcome-receipt.mjs','packages/ui/work/artifact.mjs','packages/ui/trust/approval.mjs','packages/ui/trust/auth-panel.mjs','packages/ui/trust/user-invite.mjs','packages/ui/trust/need-you.mjs','packages/ui/trust/evidence.mjs','packages/ui/trust/risk.mjs','packages/ui/agents/agent-card.mjs','packages/ui/agents/agent-presence.mjs','packages/ui/system/upstream-service-row.mjs','packages/ui/system/source-truth-badge.mjs','packages/ui/system/event-row.mjs','packages/ui/index.mjs',
- 'src/live-runtime.mjs','src/api-routes.mjs','src/storage-adapter.mjs','src/api-client.mjs','src/surface-lifecycle.mjs','src/backend-reconciliation.mjs',
+    'packages/ui/shared.mjs','packages/ui/primitives/button.mjs','packages/ui/primitives/icon-button.mjs','packages/ui/primitives/input.mjs','packages/ui/primitives/menu.mjs','packages/ui/primitives/notice.mjs','packages/ui/conversation/turn.mjs','packages/ui/conversation/composer.mjs','packages/ui/conversation/response-status.mjs','packages/ui/work/work-summary.mjs','packages/ui/work/outcome-receipt.mjs','packages/ui/work/artifact.mjs','packages/ui/trust/approval.mjs','packages/ui/trust/auth-panel.mjs','packages/ui/trust/user-invite.mjs','packages/ui/trust/need-you.mjs','packages/ui/trust/evidence.mjs','packages/ui/trust/risk.mjs','packages/ui/agents/agent-card.mjs','packages/ui/agents/agent-presence.mjs','packages/ui/system/upstream-service-row.mjs','packages/ui/system/source-truth-badge.mjs','packages/ui/system/event-row.mjs','packages/ui/system/active-context-bar.mjs','packages/ui/index.mjs',
+ 'src/live-runtime.mjs','src/api-routes.mjs','src/storage-adapter.mjs','src/api-client.mjs','src/surface-lifecycle.mjs','src/backend-reconciliation.mjs','src/action-guard.mjs',
  'packages/spatial/index.mjs','packages/presence/index.mjs','packages/interaction/index.mjs','packages/visualization/index.mjs','packages/composer/index.mjs',
- 'src/replay.mjs','src/spatial-lifecycle.mjs','src/app/ui-state.mjs','src/app/render-scheduler.mjs','src/runtime/backend-session.mjs','src/runtime/background-reconciliation.mjs','src/federation/browser-client.mjs','src/runtime/federation-session.mjs','src/views/chat-view.mjs','src/views/work-view.mjs','src/views/space-view.mjs','src/views/system-view.mjs','src/views/control-view.mjs','src/views/research-view.mjs','src/views/capabilities-view.mjs','src/app/bootstrap.mjs','src/main.mjs'
+ 'src/replay.mjs','src/spatial-lifecycle.mjs','src/genui/component-registry.mjs','src/genui/action-catalog.mjs','src/genui/interaction-envelope.mjs','src/genui/aftergraph-registry.mjs','src/genui/chat-surface.mjs','src/app/ui-state.mjs','src/app/render-scheduler.mjs','src/runtime/backend-session.mjs','src/runtime/background-reconciliation.mjs','src/federation/browser-client.mjs','src/runtime/federation-session.mjs','src/views/chat-view.mjs','src/views/work-view.mjs','src/views/space-view.mjs','src/views/system-view.mjs','src/views/control-view.mjs','src/views/research-view.mjs','src/views/capabilities-view.mjs','src/app/bootstrap.mjs','src/main.mjs'
 ]
 
 def rewrite_locals(name,source):
@@ -20,6 +20,10 @@ def rewrite_locals(name,source):
       'packages/composer/index.mjs':{'esc':'composerEsc','attr':'composerAttr','MODES':'COMPOSER_MODES'},
       'src/replay.mjs':{'clone':'replayClone'},
       'src/runtime/background-reconciliation.mjs':{'CLIENT_VIEW_KEYS':'RUNTIME_CLIENT_VIEW_KEYS'},
+      'src/workspace/active-context.mjs':{'conversationMissionId':'activeContextConversationMissionId'},
+      'src/genui/component-registry.mjs':{'fail':'genuiRegistryFail'},
+      'src/genui/interaction-envelope.mjs':{'fail':'genuiInteractionFail','unique':'genuiInteractionUnique','safeValues':'genuiInteractionSafeValues','createdAt':'genuiInteractionCreatedAt','blocked':'genuiInteractionBlocked'},
+      'src/genui/chat-surface.mjs':{'fallback':'genuiChatFallback'},
     }
     for old,new in maps.get(name,{}).items():source=re.sub(rf'\b{re.escape(old)}\b',new,source)
     return source
@@ -81,8 +85,9 @@ with sync_playwright() as p:
     check(evidence.locator('xpath=ancestor::*[@data-region][1]').get_attribute('data-region')=='primary','pointer drag docks a surface into another region')
     page.wait_for_function("el=>el.getAnimations().every(a=>a.playState!=='running')",arg=evidence.element_handle(),timeout=1500)
     check(evidence.evaluate("e=>e.getAnimations().filter(a=>a.playState==='running').length")==0,'new surface entrance motion settles once')
-    page.locator('[data-capability="Build"]').click();page.wait_for_timeout(50)
-    check(page.locator('.ag-intent-composer').get_attribute('data-intent-mode')=='Build','intent composer changes capability mode')
+    composer=page.locator('[data-ag-component="composer"]')
+    check(composer.count()==1 and composer.get_attribute('data-composer-mode')=='Ask','Space uses the shared first-party composer contract')
+    check(composer.locator('[data-context-ref^="mission:"]').count()>=1,'Space composer carries Active Context mission identity')
 
     agent=page.locator('.ag-presence-item[data-presence-id="agent_data"]')
     check(agent.count()==1,'agent presence is first-class')

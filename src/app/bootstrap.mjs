@@ -37,6 +37,10 @@ import { createFederationSession } from '../runtime/federation-session.mjs';
 import { renderResearchSurface } from '../views/research-view.mjs';
 import { renderCapabilitiesSurface } from '../views/capabilities-view.mjs';
 import { createStorageAdapter } from '../storage-adapter.mjs';
+import { createAftergraphGenerativeRegistry } from '../genui/aftergraph-registry.mjs';
+import { renderGeneratedMessageSurfaces } from '../genui/chat-surface.mjs';
+import { createAftergraphGeneratedActionCatalog } from '../genui/action-catalog.mjs';
+import { prepareGeneratedInteraction } from '../genui/interaction-envelope.mjs';
 
 
 export function bootstrapAftergraph(){
@@ -54,6 +58,8 @@ export function bootstrapAftergraph(){
   let replayTimer=null;
   const apiClient=createApiClient();
   const federationClient=createFederationBrowserClient();
+  const generativeRegistry=createAftergraphGenerativeRegistry();
+  const generatedActionCatalog=createAftergraphGeneratedActionCatalog();
   let federationSession=null;
   let federationSnapshot=Object.freeze({phase:'idle',complete:false,integrations:[],objects:[],capabilities:[],now:{coverage:{complete:false,unavailable:[]}},errors:[]});
   let backendConnected=false;
@@ -150,7 +156,8 @@ export function bootstrapAftergraph(){
     let notice=document.querySelector('#ag-connectivity-status');
     if(!notice){notice=document.createElement('div');notice.id='ag-connectivity-status';notice.className='ag-connectivity-status';notice.setAttribute('aria-live','polite');document.body.append(notice)}
     const copy={
-      degraded:'Live state unavailable · consequential actions require current authority.',
+      resyncing:'Reconnecting · refreshing current workspace state.',
+      degraded:'Could not refresh current state · showing stale data. Consequential actions require current authority.',
     };
     notice.dataset.state=phase;notice.textContent=copy[phase]||'';notice.hidden=!copy[phase];notice.setAttribute('role',phase==='degraded'?'alert':'status');
   }
@@ -163,6 +170,7 @@ export function bootstrapAftergraph(){
     document.querySelector('.ag-backend-state')?.setAttribute('data-state',phase);
     updateConnectivityNotice(phase);
     refreshActiveContextStrip();
+    refreshGeneratedSurfaces();
   }
   function backendFailed(error){
     backendConnected=false;backendRuntimes={};backendSession?.stop?.();backendSession=null;
@@ -294,13 +302,27 @@ export function bootstrapAftergraph(){
     const context=deriveActiveContext(state,ui,ui.backendStatus||'offline');
     host.innerHTML=AGActiveContextBar({context,mode:activeMode()});
   }
+  function refreshGeneratedSurfaces(){
+    const conversation=currentConversation();
+    if(!conversation)return;
+    const activeContext=deriveActiveContext(state,ui,ui.backendStatus||'offline');
+    document.querySelectorAll('.ag-generated-surface[data-genui-message-id][data-genui-index]').forEach(surface=>{
+      const message=conversation.messages?.find(item=>item.id===surface.dataset.genuiMessageId);
+      const index=Number(surface.dataset.genuiIndex);
+      if(!message||!Number.isInteger(index)||index<0)return;
+      const template=document.createElement('template');
+      template.innerHTML=renderGeneratedMessageSurfaces({message,registry:generativeRegistry,context:{surface:'chat',contextId:activeContext.contextId,freshness:activeContext.freshness.state,interactionStates:ui.generatedInteractions||{}}});
+      const replacement=template.content.querySelectorAll('.ag-generated-surface')[index];
+      if(replacement)surface.replaceWith(replacement);
+    });
+  }
 
   function renderSharedComposer({mode=state.composerMode||'Ask'}={}){
     const context=deriveActiveContext(state,ui,ui.backendStatus||'offline');
     const refs=[context.mission,...context.artifacts.slice(0,1)].filter(Boolean).map(ref=>({type:ref.type,id:ref.id,label:ref.title}));
     const intent=normalizeIntent({mode,context:refs});
-    const phase=context.freshness.phase;
-    const intentHint=['current','resyncing'].includes(phase)?'':`${context.freshness.label} context · live authority may be required before consequential actions.`;
+    const freshness=context.freshness.state;
+    const intentHint=['current','resyncing'].includes(freshness)?'':`${freshness} context · live authority may be required before consequential actions.`;
     return AGComposer({mode:intent.mode,context:intent.context,intentHint});
   }
 
@@ -322,7 +344,9 @@ export function bootstrapAftergraph(){
     let extra='';
     if(message.type==='plan'&&mission)extra=AGTrajectory({steps:mission.steps,compact:false});
     if(message.type==='agent_run'&&agent)extra=`<div class="ag-inline-agent">${AGAgentPresence({name:agent.name,state:agent.state,task:agent.task})}<div class="ag-live-progress"><i style="width:${mission?.progress||68}%"></i></div><small>${mission?.progress||68}%</small></div>`;
-    return `<article class="ag-turn assistant"><div class="ag-agent-glyph"><span class="ag-mark micro"><i></i><i></i></span></div><div class="ag-turn-content"><p>${escapeHtml(message.text)}</p>${extra}</div></article>`;
+    const activeContext=deriveActiveContext(state,ui,ui.backendStatus||'offline');
+    const generated=renderGeneratedMessageSurfaces({message,registry:generativeRegistry,context:{surface:'chat',contextId:activeContext.contextId,freshness:activeContext.freshness.state,interactionStates:ui.generatedInteractions||{}}});
+    return `<article class="ag-turn assistant"><div class="ag-agent-glyph"><span class="ag-mark micro"><i></i><i></i></span></div><div class="ag-turn-content"><p>${escapeHtml(message.text)}</p>${extra}${generated}</div></article>`;
   }
   function renderMessage(message){return message.author==='user'?renderUserMessage(message):renderAgentMessage(message)}
 
@@ -794,6 +818,43 @@ export function bootstrapAftergraph(){
   }
   function handleReplayAction(action){if(action==='play'){startReplay();return}if(action==='pause'){stopReplay();render();return}}
 
+  function resolveGeneratedAuthority(request={}){
+    const target=request.targetRefs?.[0]||null;
+    const missionExists=target?.type==='mission'&&state.missions.some(item=>item.id===target.id);
+    if(!missionExists)return {status:'pending'};
+    if(['mission.run','mission.pause','mission.resume'].includes(request.action))return {status:'resolved',owner:'studio-runtime',operation:request.action,requiresApproval:false};
+    return {status:'pending'};
+  }
+
+  function handleGeneratedAction(el){
+    const surface=el.closest('.ag-generated-surface');
+    if(!surface){toast('Generated action context unavailable');return}
+    const messageId=surface.dataset.genuiMessageId||'';
+    const index=Number(surface.dataset.genuiIndex);
+    const message=currentConversation()?.messages?.find(item=>item.id===messageId)||null;
+    const node=Number.isInteger(index)&&index>=0?message?.generatedUI?.[index]:null;
+    if(!node){toast('Generated action source unavailable');return}
+    const activeContext=deriveActiveContext(state,ui,ui.backendStatus||'offline');
+    try{
+      const result=prepareGeneratedInteraction({
+        registry:generativeRegistry,
+        actionCatalog:generatedActionCatalog,
+        node,
+        context:{surface:'chat',contextId:activeContext.contextId,freshness:activeContext.freshness.state},
+        actorState:state,
+        actorId:state.user.id,
+        resolveAuthority:resolveGeneratedAuthority,
+      });
+      ui.generatedInteractions={...(ui.generatedInteractions||{}),[surface.dataset.genuiInstance]:result};
+      render();
+      toast(result.status==='prepared'?'Action prepared':`Action blocked: ${result.reason||'policy'}`);
+    }catch(error){
+      ui.diagnostic={kind:'generated-interaction',code:error?.code||'prepare_failed'};
+      toast('Generated action could not be prepared');
+      render();
+    }
+  }
+
   function executePalette(el){
     const kind=el.dataset.resultKind,id=el.dataset.resultId;ui.paletteOpen=false;
     if(kind==='domain'){navigateDomain(el.dataset.resultDomain||id);return}
@@ -802,7 +863,9 @@ export function bootstrapAftergraph(){
   }
 
   app.addEventListener('click',event=>{
-    const el=event.target.closest('button,[data-action],[data-auth-action],[data-space-action],[data-presence-action],[data-space-add],[data-replay-index],[data-viz-action],[data-capability],[data-context-remove],[data-composer-action],[data-replay-action]');if(!el)return;
+    const el=event.target.closest('button,[data-action],[data-auth-action],[data-space-action],[data-presence-action],[data-space-add],[data-replay-index],[data-viz-action],[data-capability],[data-context-remove],[data-composer-action],[data-replay-action],[data-generated-action]');if(!el)return;
+    const data=el.dataset;
+    if(data.generatedAction){handleGeneratedAction(el);return}
     if(el.dataset.authAction){void handleAuthClick(el);return}
     if(el.dataset.spaceAction){handleSpaceAction(el);return}
     if(el.dataset.spaceCommand){updateSpace({type:'space.mode',mode:el.dataset.spaceCommand});return}
@@ -919,6 +982,13 @@ export function bootstrapAftergraph(){
       state=next;saveState();renderScheduler.update(next,backendRuntimes);return true;
     },
     openDomain:(domain)=>{navigateDomain(domain);return state.activeDomain},
+    injectGeneratedUI:(node)=>{
+      state=appendChatMessage(state,state.activeConversationId,{type:'generated',author:'Friday',text:'Generated workspace view',generatedUI:[node]});
+      const message=currentConversation()?.messages?.at(-1)||null;
+      saveState();render();return message?.id||null;
+    },
+    generatedInteractions:()=>structuredClone(ui.generatedInteractions||{}),
+    setBackendStatus:(phase)=>{setBackendPhase(phase);return ui.backendStatus},
     setFederationSnapshot:(snapshot)=>{federationSnapshot=Object.freeze({...snapshot});render();return federationSnapshot.phase},
     injectRemoteApproval:(approval)=>{
       const current=state.upstreams?.trustGateway?.approvals||[];

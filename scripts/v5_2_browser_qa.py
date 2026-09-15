@@ -4,12 +4,12 @@ from playwright.sync_api import sync_playwright
 
 ROOT=Path(__file__).resolve().parents[1]
 MODULES=[
- 'src/domain.mjs','src/router.mjs','src/billing/fixtures.mjs','src/state.mjs','src/search.mjs','src/economy/currency.mjs','src/auth/ui-actions.mjs','src/ui-helpers.mjs','src/workspace-shell.mjs','src/icons.mjs',
+ 'src/domain.mjs','src/router.mjs','src/billing/fixtures.mjs','src/state.mjs','src/search.mjs','src/economy/currency.mjs','src/auth/ui-actions.mjs','src/ui-helpers.mjs','src/workspace-shell.mjs','src/workspace/active-context.mjs','src/icons.mjs',
  'packages/tokens/index.mjs','packages/icons/index.mjs','packages/motion/index.mjs','packages/runtime-ui/index.mjs',
- 'packages/ui/shared.mjs','packages/ui/primitives/button.mjs','packages/ui/primitives/icon-button.mjs','packages/ui/primitives/input.mjs','packages/ui/primitives/menu.mjs','packages/ui/primitives/notice.mjs','packages/ui/conversation/turn.mjs','packages/ui/conversation/composer.mjs','packages/ui/conversation/response-status.mjs','packages/ui/work/work-summary.mjs','packages/ui/work/outcome-receipt.mjs','packages/ui/work/artifact.mjs','packages/ui/trust/approval.mjs','packages/ui/trust/auth-panel.mjs','packages/ui/trust/user-invite.mjs','packages/ui/trust/need-you.mjs','packages/ui/trust/evidence.mjs','packages/ui/trust/risk.mjs','packages/ui/agents/agent-card.mjs','packages/ui/agents/agent-presence.mjs','packages/ui/system/upstream-service-row.mjs','packages/ui/system/source-truth-badge.mjs','packages/ui/system/event-row.mjs','packages/ui/index.mjs',
- 'src/live-runtime.mjs','src/api-routes.mjs','src/storage-adapter.mjs','src/api-client.mjs','src/surface-lifecycle.mjs','src/backend-reconciliation.mjs',
+ 'packages/ui/shared.mjs','packages/ui/primitives/button.mjs','packages/ui/primitives/icon-button.mjs','packages/ui/primitives/input.mjs','packages/ui/primitives/menu.mjs','packages/ui/primitives/notice.mjs','packages/ui/conversation/turn.mjs','packages/ui/conversation/composer.mjs','packages/ui/conversation/response-status.mjs','packages/ui/work/work-summary.mjs','packages/ui/work/outcome-receipt.mjs','packages/ui/work/artifact.mjs','packages/ui/trust/approval.mjs','packages/ui/trust/auth-panel.mjs','packages/ui/trust/user-invite.mjs','packages/ui/trust/need-you.mjs','packages/ui/trust/evidence.mjs','packages/ui/trust/risk.mjs','packages/ui/agents/agent-card.mjs','packages/ui/agents/agent-presence.mjs','packages/ui/system/upstream-service-row.mjs','packages/ui/system/source-truth-badge.mjs','packages/ui/system/event-row.mjs','packages/ui/system/active-context-bar.mjs','packages/ui/index.mjs',
+ 'src/live-runtime.mjs','src/api-routes.mjs','src/storage-adapter.mjs','src/api-client.mjs','src/surface-lifecycle.mjs','src/backend-reconciliation.mjs','src/action-guard.mjs',
  'packages/spatial/index.mjs','packages/presence/index.mjs','packages/interaction/index.mjs','packages/visualization/index.mjs','packages/composer/index.mjs',
- 'src/replay.mjs','src/spatial-lifecycle.mjs','src/app/ui-state.mjs','src/app/render-scheduler.mjs','src/runtime/backend-session.mjs','src/runtime/background-reconciliation.mjs','src/federation/browser-client.mjs','src/runtime/federation-session.mjs','src/views/chat-view.mjs','src/views/work-view.mjs','src/views/space-view.mjs','src/views/system-view.mjs','src/views/control-view.mjs','src/views/research-view.mjs','src/views/capabilities-view.mjs','src/app/bootstrap.mjs','src/main.mjs'
+ 'src/replay.mjs','src/spatial-lifecycle.mjs','src/genui/component-registry.mjs','src/genui/action-catalog.mjs','src/genui/interaction-envelope.mjs','src/genui/aftergraph-registry.mjs','src/genui/chat-surface.mjs','src/app/ui-state.mjs','src/app/render-scheduler.mjs','src/runtime/backend-session.mjs','src/runtime/background-reconciliation.mjs','src/federation/browser-client.mjs','src/runtime/federation-session.mjs','src/views/chat-view.mjs','src/views/work-view.mjs','src/views/space-view.mjs','src/views/system-view.mjs','src/views/control-view.mjs','src/views/research-view.mjs','src/views/capabilities-view.mjs','src/app/bootstrap.mjs','src/main.mjs'
 ]
 
 def rewrite_locals(name,source):
@@ -20,6 +20,10 @@ def rewrite_locals(name,source):
       'packages/composer/index.mjs':{'esc':'composerEsc','attr':'composerAttr','MODES':'COMPOSER_MODES'},
       'src/replay.mjs':{'clone':'replayClone'},
       'src/runtime/background-reconciliation.mjs':{'CLIENT_VIEW_KEYS':'RUNTIME_CLIENT_VIEW_KEYS'},
+      'src/workspace/active-context.mjs':{'conversationMissionId':'activeContextConversationMissionId'},
+      'src/genui/component-registry.mjs':{'fail':'genuiRegistryFail'},
+      'src/genui/interaction-envelope.mjs':{'fail':'genuiInteractionFail','unique':'genuiInteractionUnique','safeValues':'genuiInteractionSafeValues','createdAt':'genuiInteractionCreatedAt','blocked':'genuiInteractionBlocked'},
+      'src/genui/chat-surface.mjs':{'fallback':'genuiChatFallback'},
     }
     for old,new in maps.get(name,{}).items():
         source=re.sub(rf'\b{re.escape(old)}\b',new,source)
@@ -112,6 +116,30 @@ def run_all():
         check(mobile.locator('[data-focus-key="composer-input"]').is_visible(),'mobile composer remains reachable')
         check(not errors,'mobile shell QA has no page errors')
         mobile.close()
+
+        # Governed generated UI: prepare only through semantic authority handoff.
+        genui,errors=boot(browser,'chat')
+        genui.evaluate("window.__aftergraphQA.setBackendStatus('current')")
+        genui.evaluate("window.__aftergraphQA.injectGeneratedUI({componentId:'ActionProposal',version:'1.0.0',instanceId:'qa_release_prepare',props:{title:'Prepare release',detail:'Prepare the verified candidate without executing it.',action:'release.prepare',targetType:'mission',targetId:'mission_q4'}})")
+        action=genui.locator('[data-genui-instance="qa_release_prepare"] [data-generated-action="release.prepare"]')
+        check(action.count()==1 and action.is_enabled(),'generated action is preparable only in current context')
+        action.click();genui.wait_for_timeout(30)
+        interaction=genui.evaluate("window.__aftergraphQA.generatedInteractions().qa_release_prepare")
+        check(interaction['status']=='prepared' and interaction['authority']['status']=='pending','generated action stops at prepared authority-pending state')
+        check(interaction['executionAllowed'] is False,'generated action cannot self-execute')
+        check(not errors,'generated action desktop QA has no page errors')
+        genui.close()
+
+        gated,errors=boot(browser,'chat',{'width':390,'height':844})
+        gated.evaluate("window.__aftergraphQA.setBackendStatus('current')")
+        gated.evaluate("window.__aftergraphQA.injectGeneratedUI({componentId:'ActionProposal',version:'1.0.0',instanceId:'qa_mobile_action',props:{title:'Run mission',detail:'Prepare the governed mission command.',action:'mission.run',targetType:'mission',targetId:'mission_q4'}})")
+        gated.evaluate("window.__aftergraphQA.setBackendStatus('degraded')")
+        gated.wait_for_timeout(30)
+        blocked=gated.locator('[data-genui-instance="qa_mobile_action"] [data-generated-action="mission.run"]')
+        check(blocked.is_disabled(),'degraded generated action fails closed')
+        check('Requires current state' in blocked.inner_text(),'degraded generated action explains freshness requirement')
+        check(not errors,'generated action mobile QA has no page errors')
+        gated.close()
 
         browser.close()
 

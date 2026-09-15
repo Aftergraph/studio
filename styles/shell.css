@@ -110,5 +110,4 @@ html[data-theme="dark"] .primary-button{background:#fff;color:#101216;border-col
 /* V5.2 Calm Intelligence: the desktop sidebar is the single primary mode navigation. */
 .ag-mode-switch{display:none}
 
-.ag-connectivity-status{position:static;z-index:90;left:50%;top:calc(var(--ag-topbar,58px) + 10px);transform:translateX(-50%);max-width:min(520px,calc(100vw - 28px));padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:color-mix(in srgb,var(--panel) 94%,transparent);box-shadow:0 12px 34px rgba(0,0,0,.22);backdrop-filter:blur(16px);font-size:10px;line-height:1.35;color:var(--muted);pointer-events:none}.ag-connectivity-status[hidden]{display:none}.ag-connectivity-status[data-state="resyncing"],.ag-connectivity-status[data-state="stale"]{color:var(--warning);border-color:color-mix(in srgb,var(--warning) 28%,var(--line))}.ag-connectivity-status[data-state="degraded"]{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 30%,var(--line))}
-@media(max-width:760px){.ag-connectivity-status{top:64px;border-radius:12px;text-align:center}}
+.ag-connectivity-status{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0;pointer-events:none}.ag-connectivity-status[hidden]{display:none}
