@@ -508,6 +508,7 @@ export function bootstrapAftergraph(){
       {id:'delegate',kind:'command',title:'Delegate to agent',subtitle:'Assign work to the right capability',icon:'agents'},
       {id:'show-control',kind:'command',title:'Show needs you',subtitle:'Approvals, budget and credentials',icon:'control'},
       {id:'toggle-immersive',kind:'command',title:ui.immersive?'Exit immersive mode':'Enter immersive mode',subtitle:'Let the active work take the space',icon:'spark'},
+      {id:'aftergraph-launcher',kind:'command',title:'Aftergraph Launcher',subtitle:'Find, understand, act and verify across Aftergraph',icon:'search'},
       ...commandDomainEntries().map(d=>({id:d.domain,kind:'domain',domain:d.domain,title:`Open ${d.title||d.domain}`,subtitle:d.description,icon:d.domain})),
     ];
     const federatedObjects=(federationSnapshot.objects||[]).map(x=>({id:x.graphId,kind:'object',type:x.type,domain:domainForObject(x.type),title:x.payload?.title||x.payload?.name||x.canonicalId||x.graphId,subtitle:`${String(x.type||'object').replaceAll('_',' ')} · ${x.sourceIntegration||x.canonicalOwner||'federated'} · ${x.freshness||'stale'}`,icon:domainForObject(x.type)}));
@@ -730,6 +731,7 @@ export function bootstrapAftergraph(){
       case 'open-space':state.activeDomain='work';state.primaryMode='space';try{history.pushState({},'', '/space')}catch{};break;
       case 'delegate':state.composerMode='Delegate';state.activeDomain='chat';state.primaryMode='chat';toast('Delegate mode ready');break;
       case 'open-palette':ui.paletteOpen=true;ui.paletteQuery='';ui.paletteIndex=0;break;
+      case 'aftergraph-launcher':window.location.assign('https://aftergraph.org/launch');return;
       case 'close-palette':ui.paletteOpen=false;break;
       case 'open-auth':ui.auth={...(ui.auth||{}),open:true,error:'',created:null,inviteError:''};if(backendConnected&&(state.user.capabilities||[]).includes('user.manage')&&!ui.auth.grantable){void apiClient.listCapabilities().then(payload=>{ui.auth={...(ui.auth||{}),grantable:payload?.capabilities||[]};render()}).catch(()=>{})}break;
       case 'close-auth':ui.auth={...(ui.auth||{}),open:false,error:''};break;
