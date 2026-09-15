@@ -15,7 +15,9 @@ test('registered renderers escape generated text and preserve inspectable object
   assert.equal(result.ok,true);
   assert.match(result.html,/Evidence &lt;script&gt;/);
   assert.match(result.html,/data-object-ref="evidence:ev_1"/);
-  assert.doesNotMatch(result.html,/<script>|<b>pass<\/b>/);
+  const lowered=result.html.toLowerCase();
+  assert.equal(lowered.includes('<script'),false);
+  assert.equal(lowered.includes('<b>pass</b>'),false);
 });
 
 test('ActionProposal is current-state gated and does not encode an endpoint',()=>{

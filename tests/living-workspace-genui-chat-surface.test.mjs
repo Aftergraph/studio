@@ -21,7 +21,9 @@ test('unknown generated components become safe structured fallbacks, never raw m
   ]}});
   assert.match(html,/data-genui-error="unknown_component"/);
   assert.match(html,/Structured response unavailable/);
-  assert.doesNotMatch(html,/<script>|<iframe/);
+  const lowered=html.toLowerCase();
+  assert.equal(lowered.includes('<script'),false);
+  assert.equal(lowered.includes('<iframe'),false);
 });
 
 test('stale command surfaces remain visible but disabled in Chat',()=>{
