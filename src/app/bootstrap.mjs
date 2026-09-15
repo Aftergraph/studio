@@ -6,9 +6,10 @@ import { escapeHtml, attentionCount, compactMoney, progressLabel, authorityLabel
 import { formatMoney, eurosToCents } from '../economy/currency.mjs';
 import { requestAuthToken, signInWithToken, signOut, inviteUser } from '../auth/ui-actions.mjs';
 import { PRIMARY_NAV, canonicalDomainForNav, commandDomainEntries } from '../workspace-shell.mjs';
+import { deriveActiveContext, alignModeToActiveContext, conversationIdForMission } from '../workspace/active-context.mjs';
 import { icon } from '../icons.mjs';
 import { AGIcon } from '../../packages/icons/index.mjs';
-import { AGTrajectory, AGArtifact, AGApproval, AGAuthPanel, AGUserInvite, AGNeedYou, AGComposer, AGAgentPresence, AGAgentCluster, AGActionDock, AGOutcomeReceipt, AGCommandPalette, AGPulseRail, AGContextSummary, AGMemoryItem, AGWorkSummary, AGTelemetryStrip, AGAgentCard, AGDelegationStrip, AGConnectionRow, AGArtifactRow, AGEventRow, AGUpstreamServiceRow, AGExternalWorkRow, AGDetectionProposalRow, AGSourceTruthBadge } from '../../packages/ui/index.mjs';
+import { AGTrajectory, AGArtifact, AGApproval, AGAuthPanel, AGUserInvite, AGNeedYou, AGComposer, AGAgentPresence, AGAgentCluster, AGActionDock, AGOutcomeReceipt, AGCommandPalette, AGPulseRail, AGContextSummary, AGMemoryItem, AGWorkSummary, AGTelemetryStrip, AGAgentCard, AGDelegationStrip, AGConnectionRow, AGArtifactRow, AGEventRow, AGUpstreamServiceRow, AGExternalWorkRow, AGDetectionProposalRow, AGSourceTruthBadge, AGActiveContextBar } from '../../packages/ui/index.mjs';
 import { composeLivingLayout } from '../../packages/runtime-ui/index.mjs';
 import { animateElement, morphSurface, prefersReducedMotion } from '../../packages/motion/index.mjs';
 import { createLiveRuntime, stepMission, pauseMission, resumeMission } from '../live-runtime.mjs';
@@ -19,7 +20,7 @@ import { AGSpace, AGSemanticZoom, AGDock, AGContextLens, reduceSpatialState, nex
 import { derivePresence, AGPresenceRail } from '../../packages/presence/index.mjs';
 import { resolveInteraction } from '../../packages/interaction/index.mjs';
 import { AGTrajectoryGraph, AGEvidenceGraph, AGReplayTimeline } from '../../packages/visualization/index.mjs';
-import { AGIntentComposer, normalizeIntent } from '../../packages/composer/index.mjs';
+import { normalizeIntent } from '../../packages/composer/index.mjs';
 import { buildReplayFrames } from '../replay.mjs';
 import { diffSurfaceEntries } from '../spatial-lifecycle.mjs';
 import { createUIState } from './ui-state.mjs';
@@ -149,9 +150,7 @@ export function bootstrapAftergraph(){
     let notice=document.querySelector('#ag-connectivity-status');
     if(!notice){notice=document.createElement('div');notice.id='ag-connectivity-status';notice.className='ag-connectivity-status';notice.setAttribute('aria-live','polite');document.body.append(notice)}
     const copy={
-      resyncing:'Reconnecting · refreshing current workspace state…',
-      stale:'Connection interrupted · showing last-known state.',
-      degraded:'Could not refresh current state · showing stale data; execution controls are unavailable.',
+      degraded:'Live state unavailable · consequential actions require current authority.',
     };
     notice.dataset.state=phase;notice.textContent=copy[phase]||'';notice.hidden=!copy[phase];notice.setAttribute('role',phase==='degraded'?'alert':'status');
   }
@@ -163,6 +162,7 @@ export function bootstrapAftergraph(){
     document.querySelector('.ag-app')?.setAttribute('data-backend-state',phase==='current'?'connected':'local');
     document.querySelector('.ag-backend-state')?.setAttribute('data-state',phase);
     updateConnectivityNotice(phase);
+    refreshActiveContextStrip();
   }
   function backendFailed(error){
     backendConnected=false;backendRuntimes={};backendSession?.stop?.();backendSession=null;
@@ -222,6 +222,11 @@ export function bootstrapAftergraph(){
     render();
   }
   function navigateHuman(id){
+    ui=alignModeToActiveContext(state,ui,id);
+    if(id==='chat'){
+      const conversationId=conversationIdForMission(state,ui.selectedMissionId);
+      if(conversationId)state.activeConversationId=conversationId;
+    }
     if(id==='space'){state.primaryMode='space';state.activeDomain='work';saveState();try{history.pushState({},'', '/space')}catch{};render();return}
     state.primaryMode=id;navigateDomain(canonicalDomainForNav(id)||id)
   }
@@ -275,6 +280,28 @@ export function bootstrapAftergraph(){
         <button class="ag-profile" data-action="open-auth" aria-label="Sign in as ${escapeHtml(state.user.id)}" title="Signed in as ${escapeHtml(state.user.id)} — open sign in">${initials(state.user.name)}</button>
       </div>
     </header>`;
+  }
+
+
+  function renderActiveContextStrip(){
+    const context=deriveActiveContext(state,ui,ui.backendStatus||'offline');
+    return `<div class="ag-active-context-strip">${AGActiveContextBar({context,mode:activeMode()})}</div>`;
+  }
+
+  function refreshActiveContextStrip(){
+    const host=document.querySelector('.ag-active-context-strip');
+    if(!host)return;
+    const context=deriveActiveContext(state,ui,ui.backendStatus||'offline');
+    host.innerHTML=AGActiveContextBar({context,mode:activeMode()});
+  }
+
+  function renderSharedComposer({mode=state.composerMode||'Ask'}={}){
+    const context=deriveActiveContext(state,ui,ui.backendStatus||'offline');
+    const refs=[context.mission,...context.artifacts.slice(0,1)].filter(Boolean).map(ref=>({type:ref.type,id:ref.id,label:ref.title}));
+    const intent=normalizeIntent({mode,context:refs});
+    const phase=context.freshness.phase;
+    const intentHint=['current','resyncing'].includes(phase)?'':`${context.freshness.label} context · live authority may be required before consequential actions.`;
+    return AGComposer({mode:intent.mode,context:intent.context,intentHint});
   }
 
 
@@ -336,7 +363,7 @@ export function bootstrapAftergraph(){
     const takeover=mission?.controlMode==='takeover'?`<div class="ag-takeover-ribbon"><span>${AGIcon('shield',{size:15})}<strong>You are driving.</strong> Agent execution is paused until you hand control back.</span><button data-action="handback" data-id="${mission.id}">Hand back</button></div>`:'';
     const messages=conv.messages.map(renderMessage).join('')+renderInsightBlock(mission)+renderOutcome(mission);
     const actions=AGActionDock({actions:[{label:'Artifact',action:'open-artifact',icon:'artifact'},{label:'Delegate',action:'delegate',icon:'agents'},{label:'Context',action:'context-preview',icon:'inspect'},{label:'Needs you',action:'show-control',icon:'approval',meta:String(attentionCount(state))}]});
-    const composer=AGComposer({mode:state.composerMode});
+    const composer=renderSharedComposer({mode:state.composerMode});
     const meta=`<div class="ag-composer-meta"><span>${mission?.controlMode==='takeover'?'Human-controlled':'Ready'}</span><span>${mission?.evidenceCount||0} evidence${mission?.budget?` · ${compactMoney(mission.budget.used,mission.budget.currency)} used`:''}</span></div>`;
     const artifact=layout.artifact.presentation==='split'?`<div class="ag-resize-handle" role="separator" tabindex="0" aria-label="Resize artifact" aria-orientation="vertical" aria-valuemin="34" aria-valuemax="56" aria-valuenow="${ui.artifactWidth}"><i></i></div>${renderArtifactSurface('split')}`:'';
     return renderChatView({header,takeover,messages,live:renderLiveStrip(mission),actions,composer,meta,artifact,artifactOpen:layout.artifact.presentation==='split',liveState,controlMode:mission?.controlMode||'observe'});
@@ -368,7 +395,7 @@ export function bootstrapAftergraph(){
     const header=`<header><div><small>Mission</small><h1>${escapeHtml(mission.title)}</h1><p>${escapeHtml(mission.objective)}</p></div><div><button class="ag-button" data-action="${mission.controlMode==='takeover'?'handback':'takeover'}" data-id="${mission.id}">${AGIcon('shield',{size:14})} ${mission.controlMode==='takeover'?'Hand back':'Take over'}</button><button class="ag-button primary" data-action="${runtimeFor(mission.id)?.status==='running'?'pause-live':'run-live'}">${AGIcon(runtimeFor(mission.id)?.status==='running'?'pause':'play',{size:14})} ${runtimeFor(mission.id)?.status==='running'?'Pause':'Run'}</button></div></header>`;
     const attention=mission.state==='awaiting_approval'?AGNeedYou({id:'need_prod_inline',type:'approval',title:'Production action needs approval',severity:'high',detail:'Inspect risk, rollback and evidence before execution.'}):'';
     const artifact=ui.artifactOpen?`<div class="ag-resize-handle" role="separator" tabindex="0" aria-label="Resize artifact" aria-valuemin="34" aria-valuemax="56" aria-valuenow="${ui.artifactWidth}"><i></i></div>${renderArtifactSurface('split')}`:'';
-    return renderWorkView({rail,header,summary:AGWorkSummary({mission,compact:true}),attention,outcome:renderOutcome(mission),trajectory:AGTrajectory({steps:mission.steps}),artifact,artifactOpen:ui.artifactOpen});
+    return renderWorkView({rail,header,summary:AGWorkSummary({mission,compact:true}),attention,outcome:renderOutcome(mission),trajectory:AGTrajectory({steps:mission.steps}),composer:renderSharedComposer({mode:state.composerMode}),artifact,artifactOpen:ui.artifactOpen});
   }
 
 
@@ -411,13 +438,11 @@ export function bootstrapAftergraph(){
     const space=currentSpace();
     const presence=derivePresence({user:state.user,agents:state.agents,followedAgentId:ui.followedAgentId});
     const frames=buildReplayFrames(state.events);
-    const intentContext=[{type:'mission',id:mission.id,label:mission.title},{type:'artifact',id:currentArtifact()?.id,label:currentArtifact()?.title}].filter(item=>item.id&&!ui.hiddenIntentContextKeys.includes(`${item.type}:${item.id}`));
-    const intent=normalizeIntent({mode:ui.intentMode,context:intentContext,attachments:ui.intentAttachments});
     const layoutControls=`<div class="ag-space-mode-controls" role="group" aria-label="Space layout"><button type="button" class="${space?.mode==='balanced'?'active':''}" data-space-command="balanced">Balanced</button><button type="button" class="${space?.mode==='focus'?'active':''}" data-space-command="focus">Focus</button><button type="button" class="${space?.mode==='overview'?'active':''}" data-space-command="overview">Overview</button></div>`;
     const toolbar=`${AGSemanticZoom({level:space?.zoom?.level||'mission',objectId:space?.zoom?.objectId||semanticObjectId(space?.zoom?.level||'mission')})}${AGDock({items:[{kind:'artifact',label:'Artifact'},{kind:'agent',label:'Agent'},{kind:'evidence',label:'Evidence'},{kind:'replay',label:'Replay'}]})}${layoutControls}`;
     const canvas=AGSpace({space,renderSurfaceBody:renderSpaceSurfaceBody});
     const context=`${AGContextLens({level:space?.zoom?.level||'mission',objectId:space?.zoom?.objectId||semanticObjectId(space?.zoom?.level||'mission'),detail:space?.focusedSurfaceId?`Focused ${space.focusedSurfaceId}`:'Workspace overview'})}${AGPresenceRail({presence,collapsed:!ui.presenceOpen})}<section class="ag-space-time"><header><span><small>Time layer</small><strong>Replay</strong></span><button type="button" data-space-add="replay">Open</button></header>${AGReplayTimeline({frames,activeIndex:state.replay?.cursor||0,playing:Boolean(state.replay?.playing)})}</section>`;
-    return renderSpaceView({toolbar,canvas,context,composer:AGIntentComposer({intent,capabilities:['Ask','Research','Build','Create','Delegate','Automate']}),spaceId:space?.id||'space_primary',mode:space?.mode||'balanced'});
+    return renderSpaceView({toolbar,canvas,context,composer:renderSharedComposer({mode:state.composerMode}),spaceId:space?.id||'space_primary',mode:space?.mode||'balanced'});
   }
 
 
@@ -617,7 +642,7 @@ export function bootstrapAftergraph(){
     const artifactMobile=ui.artifactOpen&&ui.device==='mobile';
     const shellClass=[ui.immersive?'is-immersive':'',layout.gravity.mode==='approval-focus'?'attention-gravity':'',mission?.verified?'has-settled-outcome':''].filter(Boolean).join(' ');
     const globalPulse=activeMode()==='space'?'':renderPulseRail(mission);
-    app.innerHTML=`<div class="ag-app ${shellClass}" data-backend-state="${backendConnected?'connected':'local'}" data-attention="${layout.gravity.mode}" data-theme-state="${layout.ambient.mode}" style="--artifact-width:${ui.artifactWidth}%">${renderAmbient(layout,mission)}${renderSidebar()}<section class="ag-frame">${renderTopbar()}<div class="ag-body">${renderView()}</div></section>${artifactMobile?renderArtifactSurface('fullscreen'):''}${globalPulse}${renderContextInspector()}${renderApprovalFocus()}${renderAuthFocus()}${renderPalette()}</div>`;
+    app.innerHTML=`<div class="ag-app ${shellClass}" data-backend-state="${backendConnected?'connected':'local'}" data-attention="${layout.gravity.mode}" data-theme-state="${layout.ambient.mode}" style="--artifact-width:${ui.artifactWidth}%">${renderAmbient(layout,mission)}${renderSidebar()}<section class="ag-frame">${renderTopbar()}${renderActiveContextStrip()}<div class="ag-body">${renderView()}</div></section>${artifactMobile?renderArtifactSurface('fullscreen'):''}${globalPulse}${renderContextInspector()}${renderApprovalFocus()}${renderAuthFocus()}${renderPalette()}</div>`;
     postRender(mission,layout);
   }
 
@@ -646,7 +671,7 @@ export function bootstrapAftergraph(){
   function handleComposerSubmit(form){
     const input=form.querySelector('textarea[name="message"]');const text=input?.value.trim();if(!text)return;
     ui.followLatest=true;ui.forceFollowLatest=true;
-    const conversationId=state.activeConversationId;
+    const conversationId=conversationIdForMission(state,ui.selectedMissionId)||state.activeConversationId;
     const mode=state.composerMode||'Ask';
     const reply={
       type:mode==='Goal'?'plan':'agent_run',
