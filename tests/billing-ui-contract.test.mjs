@@ -163,13 +163,14 @@ test('Studio Work launches Billing as a product without adding a fourth primary 
   const work = await text('src/views/work-view.mjs');
   const shell = await text('src/workspace-shell.mjs');
   const index = await text('index.html');
-  assert.match(work, /href="\/billing\/"/);
+  assert.match(work, /data-shell-destination="billing"/);
   assert.match(work, /Aftergraph Billing/);
   assert.match(index, /styles\/billing-launcher\.css/);
   assert.match(shell, /id:'chat'/);
   assert.match(shell, /id:'work'/);
   assert.match(shell, /id:'space'/);
-  assert.doesNotMatch(shell, /id:'billing'/);
+  assert.match(shell, /id:'billing'.*route:'\/billing'/s);
+  assert.doesNotMatch(shell.match(/PRIMARY_NAV[\s\S]*?\];/)?.[0]||'', /id:'billing'/);
 });
 
 test('issued invoice review exposes artifact download, delivery action and delivery status', async () => {

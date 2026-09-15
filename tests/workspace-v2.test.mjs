@@ -25,7 +25,7 @@ test('mobile artifact work is full-screen while canonical inspector stays sheet-
   const layout = deriveWorkspaceLayout({device:'mobile',domain:'chat',artifactOpen:true,inspectorOpen:true});
   assert.equal(layout.artifactPresentation, 'fullscreen');
   assert.equal(layout.inspectorPresentation, 'sheet');
-  assert.equal(layout.mobileModes.length, 3);
+  assert.equal(layout.mobileModes.length, 2);
 });
 
 test('destructive approval becomes focused control presentation', () => {

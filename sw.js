@@ -1,6 +1,6 @@
 const CACHE = 'aftergraph-workspace-v5-agentic-1';
 const SHELL = [
-  '/', '/index.html', '/styles/tokens.css', '/styles/reset.css', '/styles/shell.css', '/styles/components.css', '/styles/views.css', '/styles/motion.css', '/styles/responsive.css', '/manifest.webmanifest',
+  '/', '/index.html', '/styles/tokens.css', '/styles/reset.css', '/styles/shell.css', '/styles/components.css', '/styles/views.css', '/styles/motion.css', '/styles/responsive.css', '/styles/canonical-shell.css', '/manifest.webmanifest',
   '/src/main.mjs', '/src/domain.mjs', '/src/router.mjs', '/src/state.mjs',
   '/src/search.mjs', '/src/ui-helpers.mjs', '/src/workspace-shell.mjs',
   '/src/icons.mjs', '/src/live-runtime.mjs', '/src/api-client.mjs', '/src/surface-lifecycle.mjs', '/src/replay.mjs',

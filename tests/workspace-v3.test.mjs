@@ -48,7 +48,7 @@ test('mobile uses mode switch rather than persistent four-item navigation', () =
     inspectorOpen:true,
     destructiveApproval:false,
   });
-  assert.deepEqual(layout.mobileModes.map(x => x.id), ['chat','work','space']);
+  assert.deepEqual(layout.mobileModes.map(x => x.id), ['chat','work']);
   assert.equal(layout.artifactPresentation, 'fullscreen');
   assert.equal(layout.inspectorPresentation, 'sheet');
 });

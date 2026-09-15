@@ -26,7 +26,8 @@ def run_all():
             dims = page.evaluate('()=>({scrollWidth:document.documentElement.scrollWidth,clientWidth:document.documentElement.clientWidth})')
             check(dims['scrollWidth'] <= dims['clientWidth'] + 1, f'{width}px rev={rev} no horizontal overflow')
             if width < 768:
-                check(page.locator('[data-mobile-primary-nav="true"] button').count() == 3, f'{width}px rev={rev} mobile primary nav is Chat Work Space only')
+                check(page.locator('[data-mobile-primary-nav="true"] button').count() == 2, f'{width}px rev={rev} mobile primary nav is Chat Work only')
+                check(page.locator('[data-shell-destination="space"]').count() == 1, f'{width}px rev={rev} Space remains reachable through canonical drawer')
             else:
                 check(page.locator('.ag-mode-nav [data-human-nav]').count() == 3, f'{width}px rev={rev} desktop primary navigation is exactly three modes')
             check(page.locator('[data-ag-component="composer"] [aria-label="Send"]').count() == 1, f'{width}px rev={rev} primary send action visible')

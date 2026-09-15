@@ -1,11 +1,11 @@
 import { DOMAINS, getDomain, domainForObject } from '../domain.mjs';
-import { routeFromLocation, buildDeepLink } from '../router.mjs';
+import { routeFromLocation, buildDeepLink, appBasePath, withAppBase } from '../router.mjs';
 import { createInitialState, resolveNeed, decideApproval, setTakeover, appendChatMessage, conversationMissionId } from '../state.mjs';
 import { searchIndex } from '../search.mjs';
 import { escapeHtml, attentionCount, compactMoney, progressLabel, authorityLabel, capabilityLabel } from '../ui-helpers.mjs';
 import { formatMoney, eurosToCents } from '../economy/currency.mjs';
 import { requestAuthToken, signInWithToken, signOut, inviteUser } from '../auth/ui-actions.mjs';
-import { PRIMARY_NAV, canonicalDomainForNav, commandDomainEntries } from '../workspace-shell.mjs';
+import { PRIMARY_NAV, MOBILE_PRIMARY_MODES, SIDEBAR_DESTINATIONS, canonicalDomainForNav, commandDomainEntries } from '../workspace-shell.mjs';
 import { deriveActiveContext, alignModeToActiveContext, conversationIdForMission } from '../workspace/active-context.mjs';
 import { icon } from '../icons.mjs';
 import { AGIcon } from '../../packages/icons/index.mjs';
@@ -56,8 +56,9 @@ export function bootstrapAftergraph(){
   let liveRuntime=null;
   let liveTimer=null;
   let replayTimer=null;
-  const apiClient=createApiClient();
-  const federationClient=createFederationBrowserClient();
+  const routeBase=appBasePath(window.location);
+  const apiClient=createApiClient({baseUrl:routeBase});
+  const federationClient=createFederationBrowserClient({baseUrl:routeBase});
   const generativeRegistry=createAftergraphGenerativeRegistry();
   const generatedActionCatalog=createAftergraphGeneratedActionCatalog();
   let federationSession=null;
@@ -77,7 +78,8 @@ export function bootstrapAftergraph(){
 
   const initialRoute=routeFromLocation(window.location);
   if(initialRoute.kind==='domain'){state.activeDomain=initialRoute.domain;if(['chat','work'].includes(initialRoute.domain))state.primaryMode=initialRoute.domain}
-  if(initialRoute.kind==='mode'){state.primaryMode=initialRoute.mode;state.activeDomain=initialRoute.domain}
+  if(initialRoute.kind==='mode'){state.primaryMode=initialRoute.mode;state.activeDomain=initialRoute.domain;ui.activeSurface=null}
+  if(initialRoute.kind==='surface'){state.activeDomain=initialRoute.domain;ui.activeSurface=initialRoute.surface}
   if(initialRoute.kind==='object'){
     state.activeDomain=initialRoute.domain;
     selectObject(initialRoute.type,initialRoute.id);
@@ -102,7 +104,7 @@ export function bootstrapAftergraph(){
   function currentConversation(){return state.conversations.find(c=>c.id===state.activeConversationId)||state.conversations[0]}
   function currentAgent(){return state.agents.find(a=>a.id===ui.selectedAgentId)||state.agents[0]}
   function currentSpace(){return (state.spaces||[]).find(space=>space.id===state.activeSpaceId)||(state.spaces||[])[0]}
-  function activeMode(){if(state.primaryMode==='space'&&state.activeDomain==='work')return 'space';return state.activeDomain==='work'?'work':'chat'}
+  function activeMode(){if(ui.activeSurface){const surface=SIDEBAR_DESTINATIONS.find(item=>item.id===ui.activeSurface);return surface?.domain==='work'?'work':null}if(state.primaryMode==='space'&&state.activeDomain==='work')return 'space';if(state.activeDomain==='work')return 'work';if(state.activeDomain==='chat')return 'chat';return null}
   function runtimeFor(missionId){
     if(backendConnected&&backendRuntimes?.[missionId])return backendRuntimes[missionId];
     if(liveRuntime?.missionId===missionId)return liveRuntime;
@@ -196,7 +198,6 @@ export function bootstrapAftergraph(){
         validatePayload:validateWorkspacePayload,
       });
       backendSession.start();
-      void refreshFederation();
       void apiClient.syncUpstreams().then(upstreamPayload=>applyUpstreamPayload(upstreamPayload)).catch(error=>console.warn('Aftergraph upstream sync unavailable',error?.code||error));
       return true;
     }catch(error){backendFailed(error);return false}
@@ -225,9 +226,10 @@ export function bootstrapAftergraph(){
   }
 
   function navigateDomain(domain){
-    state.activeDomain=getDomain(domain).id;if(['chat','work'].includes(state.activeDomain))state.primaryMode=state.activeDomain;saveState();
-    try{history.pushState({},'',`/${state.activeDomain}`)}catch{}
+    ui.activeSurface=null;ui.mobileSidebarOpen=false;state.activeDomain=getDomain(domain).id;if(['chat','work'].includes(state.activeDomain))state.primaryMode=state.activeDomain;saveState();
+    try{history.pushState({},'',withAppBase(`/${state.activeDomain}`,routeBase))}catch{}
     render();
+    if(['research','capabilities'].includes(state.activeDomain))void refreshFederation();
   }
   function navigateHuman(id){
     ui=alignModeToActiveContext(state,ui,id);
@@ -235,10 +237,16 @@ export function bootstrapAftergraph(){
       const conversationId=conversationIdForMission(state,ui.selectedMissionId);
       if(conversationId)state.activeConversationId=conversationId;
     }
-    if(id==='space'){state.primaryMode='space';state.activeDomain='work';saveState();try{history.pushState({},'', '/space')}catch{};render();return}
+    if(id==='space'){state.primaryMode='space';state.activeDomain='work';ui.activeSurface=null;ui.mobileSidebarOpen=false;saveState();try{history.pushState({},'',withAppBase('/space',routeBase))}catch{};render();return}
     state.primaryMode=id;navigateDomain(canonicalDomainForNav(id)||id)
   }
-  function navigateObject(type,id){state.activeDomain=domainForObject(type);selectObject(type,id);try{history.pushState({},'',buildDeepLink(state.activeDomain,type,id))}catch{};saveState();render()}
+  function navigateObject(type,id){state.activeDomain=domainForObject(type);ui.activeSurface=null;selectObject(type,id);try{history.pushState({},'',withAppBase(buildDeepLink(state.activeDomain,type,id),routeBase))}catch{};saveState();render()}
+  function navigateSurface(id){
+    const surface=SIDEBAR_DESTINATIONS.find(item=>item.id===id);if(!surface)return;
+    state.activeDomain=surface.domain;ui.activeSurface=surface.id;ui.mobileSidebarOpen=false;saveState();
+    try{history.pushState({},'',withAppBase(surface.route,routeBase))}catch{}
+    render();
+  }
 
   function toast(text){const el=document.createElement('div');el.className='toast';el.textContent=text;toastRegion.append(el);setTimeout(()=>el.remove(),2200)}
 
@@ -251,7 +259,7 @@ export function bootstrapAftergraph(){
       {title:'RenOS v2',conversationId:'conv_code',accent:'cyan'},
     ];
     const recents=state.conversations.slice(0,6);
-    return `<aside class="ag-sidebar" aria-label="Workspace navigation">
+    return `<aside class="ag-sidebar ${ui.mobileSidebarOpen?'is-mobile-open':''}" aria-label="Workspace navigation">
       ${renderBrand()}
       <div class="ag-side-actions">
         <button class="ag-new" data-action="new-chat">${icon('plus',{size:16})}<span>New</span><kbd>⌘N</kbd></button>
@@ -261,6 +269,8 @@ export function bootstrapAftergraph(){
         ${PRIMARY_NAV.map(item=>`<button class="${activeMode()===item.id?'active':''}" data-human-nav="${item.id}" aria-current="${activeMode()===item.id?'page':'false'}">${icon(item.id,{size:17})}<span>${escapeHtml(item.label)}</span></button>`).join('')}
       </nav>
       <div class="ag-side-scroll">
+        <div class="ag-side-section"><span>Workspace</span></div>
+        <div class="ag-shell-destinations">${SIDEBAR_DESTINATIONS.map(item=>`<button data-shell-destination="${item.id}" class="${ui.activeSurface===item.id?'active':''}">${icon(item.id==='settings'?'system':item.id==='plugins'?'connect':item.id==='projects'?'work':'artifact',{size:14})}${escapeHtml(item.label)}</button>`).join('')}</div>
         <div class="ag-side-section"><span>Projects</span><button data-action="new-goal" aria-label="Create project">+</button></div>
         <div class="ag-projects">${projects.map((p,i)=>`<button data-conversation="${p.conversationId}" class="${state.activeConversationId===p.conversationId?'active':''}"><i class="project-dot ${p.accent}"></i><span>${escapeHtml(p.title)}</span></button>`).join('')}</div>
         <div class="ag-side-section"><span>Recents</span></div>
@@ -277,8 +287,8 @@ export function bootstrapAftergraph(){
   function renderTopbar(){
     const mission=state.activeDomain==='chat'?chatMission():currentMission();
     return `<header class="ag-topbar">
-      <button class="ag-mobile-brand" data-action="open-palette" aria-label="Open command palette"><span class="ag-mark mini"><i></i><i></i></span></button>
-      <div class="ag-mode-switch" role="tablist" aria-label="Primary workspace modes" data-mobile-primary-nav="true">${PRIMARY_NAV.map(item=>`<button role="tab" aria-selected="${activeMode()===item.id}" class="${activeMode()===item.id?'active':''}" data-human-nav="${item.id}">${escapeHtml(item.label)}</button>`).join('')}</div>
+      <button class="ag-mobile-brand" data-action="toggle-sidebar" aria-label="Open workspace navigation" aria-expanded="${ui.mobileSidebarOpen}"><span class="ag-mark mini"><i></i><i></i></span></button>
+      <div class="ag-mode-switch" role="tablist" aria-label="Primary workspace modes" data-mobile-primary-nav="true">${MOBILE_PRIMARY_MODES.map(item=>`<button role="tab" aria-selected="${activeMode()===item.id}" class="${activeMode()===item.id?'active':''}" data-human-nav="${item.id}">${escapeHtml(item.label)}</button>`).join('')}</div>
       <button class="ag-global-command" data-action="open-palette">${icon('search',{size:15})}<span>Search, ask, or run a command…</span><kbd>⌘K</kbd></button>
       <div class="ag-top-actions">
         ${AGAgentCluster({agents:state.agents})}
@@ -644,11 +654,45 @@ export function bootstrapAftergraph(){
     });
   }
 
+  function renderCanonicalSurface(id){
+    const surface=SIDEBAR_DESTINATIONS.find(item=>item.id===id)||null;
+    if(!surface)return renderFallbackDomain();
+    let title=surface.label,description='Contextual Studio surface',body='';
+    switch(id){
+      case 'projects':
+        description='Conversations, missions and outcomes grouped without leaving Studio.';
+        body=`<div class="ag-canonical-grid">${state.missions.map(m=>`<button class="ag-canonical-card" data-mission="${m.id}"><small>${escapeHtml(m.state)}</small><strong>${escapeHtml(m.title)}</strong><span>${escapeHtml(m.objective)}</span><b>${m.progress}%</b></button>`).join('')}</div>`;break;
+      case 'plugins':
+        description='Connected capabilities stay scoped and inspectable inside the same workspace.';
+        body=`<div class="ag-canonical-list">${state.connections.map(connection=>AGConnectionRow({connection})).join('')}</div>`;break;
+      case 'remote':
+        description='Remote execution endpoints and agents remain projections, not a second control plane.';
+        body=`<div class="ag-canonical-grid">${state.agents.map(agent=>AGAgentCard({agent})).join('')}</div>`;break;
+      case 'settings':
+        description='Identity, capabilities and runtime state for this Studio workspace.';
+        body=`${AGContextSummary({conversation:currentConversation()?.title||'None',mission:currentMission()?.title||'None',agent:currentMission()?.agent||'Friday',authority:authorityLabel(state.user.capabilities),evidence:currentMission()?.evidenceCount||0,backend:backendConnected?'connected':'local'})}`;break;
+      case 'billing':{
+        description='Billing is projected into Studio; financial authority remains governed by Billing capabilities.';
+        const billing=state.billing||{};const completed=(billing.visits||[]).filter(v=>v.status==='completed').length;
+        body=`<div class="ag-canonical-metrics"><span><strong>${(billing.customers||[]).length}</strong><small>Customers</small></span><span><strong>${completed}</strong><small>Completed visits</small></span><span><strong>${(billing.invoices||[]).length}</strong><small>Invoices</small></span></div><div class="ag-canonical-list">${(billing.visits||[]).slice(0,8).map(v=>`<div class="ag-canonical-row"><span><strong>${escapeHtml(v.id)}</strong><small>${escapeHtml(v.status)}</small></span><span>${v.actual?.workMinutes?`${v.actual.workMinutes} work min`:'Scheduled'}</span></div>`).join('')}</div>`;break;
+      }
+      default: body='<p class="ag-domain-empty">Surface unavailable.</p>';
+    }
+    return `<main id="main-content" class="ag-domain-page ag-canonical-surface" data-canonical-surface="${escapeHtml(id)}"><header class="ag-domain-header"><div><small>Studio</small><h1>${escapeHtml(title)}</h1><p>${escapeHtml(description)}</p></div><span>Canonical shell</span></header><section class="ag-domain-section">${body}</section></main>`;
+  }
+
+  function renderEmptyWorkspace(mode='Chat'){
+    const connected=ui.backendStatus==='current';
+    const title=connected?`No ${mode.toLowerCase()} data yet`:'Connecting to workspace';
+    const detail=connected?'Create or select work from the canonical Studio shell.':'Studio is ready. Current workspace state will appear when the governed backend projection is available.';
+    return `<main id="main-content" class="ag-domain-page ag-empty-workspace" data-empty-mode="${escapeHtml(mode.toLowerCase())}"><section><span class="ag-mark mini" aria-hidden="true"><i></i><i></i></span><small>Aftergraph Studio</small><h1>${escapeHtml(title)}</h1><p>${escapeHtml(detail)}</p>${mode==='Chat'?'<button class="ag-button primary" data-action="new-chat">Start a conversation</button>':''}</section></main>`;
+  }
+
   const domainRenderers={now:renderNowDomain,agents:renderAgentsDomain,brain:renderBrainDomain,research:()=>renderResearchSurface(federationSnapshot),capabilities:()=>renderCapabilitiesSurface(federationSnapshot),output:renderOutputDomain,control:renderControlDomain,connect:renderConnectDomain,system:renderSystemDomain};
   function renderFallbackDomain(){
     const domain=getDomain(state.activeDomain);return `<main id="main-content" class="ag-domain-page" data-domain-surface="${escapeHtml(domain.id)}">${renderDomainHeader(domain)}<p class="ag-domain-empty">This domain is registered but has no active surface for the current capability set.</p></main>`;
   }
-  function renderView(){if(state.primaryMode==='space'&&state.activeDomain==='work')return renderSpace();if(state.activeDomain==='chat')return renderChat();if(state.activeDomain==='work')return renderWork();return (domainRenderers[state.activeDomain]||renderFallbackDomain)()}
+  function renderView(){if(ui.activeSurface)return renderCanonicalSurface(ui.activeSurface);if(state.primaryMode==='space'&&state.activeDomain==='work'){if(!state.spaces?.length||!state.missions.length)return renderEmptyWorkspace('Space');return renderSpace()}if(state.activeDomain==='chat'){if(!state.conversations.length)return renderEmptyWorkspace('Chat');return renderChat()}if(state.activeDomain==='work'){if(!state.missions.length)return renderEmptyWorkspace('Work');return renderWork()}return (domainRenderers[state.activeDomain]||renderFallbackDomain)()}
 
   function currentLivingLayout(){
     const mission=state.activeDomain==='chat'?chatMission():currentMission();
@@ -666,7 +710,7 @@ export function bootstrapAftergraph(){
     const artifactMobile=ui.artifactOpen&&ui.device==='mobile';
     const shellClass=[ui.immersive?'is-immersive':'',layout.gravity.mode==='approval-focus'?'attention-gravity':'',mission?.verified?'has-settled-outcome':''].filter(Boolean).join(' ');
     const globalPulse=activeMode()==='space'?'':renderPulseRail(mission);
-    app.innerHTML=`<div class="ag-app ${shellClass}" data-backend-state="${backendConnected?'connected':'local'}" data-attention="${layout.gravity.mode}" data-theme-state="${layout.ambient.mode}" style="--artifact-width:${ui.artifactWidth}%">${renderAmbient(layout,mission)}${renderSidebar()}<section class="ag-frame">${renderTopbar()}${renderActiveContextStrip()}<div class="ag-body">${renderView()}</div></section>${artifactMobile?renderArtifactSurface('fullscreen'):''}${globalPulse}${renderContextInspector()}${renderApprovalFocus()}${renderAuthFocus()}${renderPalette()}</div>`;
+    app.innerHTML=`<div class="ag-app ${shellClass}" data-backend-state="${backendConnected?'connected':'local'}" data-attention="${layout.gravity.mode}" data-theme-state="${layout.ambient.mode}" style="--artifact-width:${ui.artifactWidth}%">${renderAmbient(layout,mission)}${ui.mobileSidebarOpen?'<button class="ag-mobile-backdrop" data-action="toggle-sidebar" aria-label="Close workspace navigation"></button>':''}${renderSidebar()}<section class="ag-frame">${renderTopbar()}${renderActiveContextStrip()}<div class="ag-body">${renderView()}</div></section>${artifactMobile?renderArtifactSurface('fullscreen'):''}${globalPulse}${renderContextInspector()}${renderApprovalFocus()}${renderAuthFocus()}${renderPalette()}</div>`;
     postRender(mission,layout);
   }
 
@@ -775,11 +819,12 @@ export function bootstrapAftergraph(){
 
   function runAction(action,el={dataset:{}}){
     switch(action){
-      case 'new-chat':{ui.followLatest=true;ui.forceFollowLatest=true;ui.messageScrollTop=0;const id=`conv_${Date.now()}`;const title='New conversation';state.conversations.unshift({id,missionId:null,title,updated:'now',status:'idle',messages:[]});state.activeConversationId=id;state.activeDomain='chat';state.primaryMode='chat';ui.artifactOpen=false;saveState();if(backendConnected)void syncBackend(apiClient.createConversation({id,title}));break}
-      case 'new-goal':state.activeDomain='work';state.primaryMode='work';ui.selectedMissionId='mission_q4';break;
-      case 'open-space':state.activeDomain='work';state.primaryMode='space';try{history.pushState({},'', '/space')}catch{};break;
-      case 'delegate':state.composerMode='Delegate';state.activeDomain='chat';state.primaryMode='chat';toast('Delegate mode ready');break;
+      case 'new-chat':{ui.activeSurface=null;ui.mobileSidebarOpen=false;ui.followLatest=true;ui.forceFollowLatest=true;ui.messageScrollTop=0;const id=`conv_${Date.now()}`;const title='New conversation';state.conversations.unshift({id,missionId:null,title,updated:'now',status:'idle',messages:[]});state.activeConversationId=id;state.activeDomain='chat';state.primaryMode='chat';ui.artifactOpen=false;saveState();if(backendConnected)void syncBackend(apiClient.createConversation({id,title}));break}
+      case 'new-goal':ui.activeSurface=null;ui.mobileSidebarOpen=false;state.activeDomain='work';state.primaryMode='work';ui.selectedMissionId='mission_q4';break;
+      case 'open-space':state.activeDomain='work';state.primaryMode='space';ui.activeSurface=null;ui.mobileSidebarOpen=false;try{history.pushState({},'',withAppBase('/space',routeBase))}catch{};break;
+      case 'delegate':ui.activeSurface=null;ui.mobileSidebarOpen=false;state.composerMode='Delegate';state.activeDomain='chat';state.primaryMode='chat';toast('Delegate mode ready');break;
       case 'open-palette':ui.paletteOpen=true;ui.paletteQuery='';ui.paletteIndex=0;break;
+      case 'toggle-sidebar':ui.mobileSidebarOpen=!ui.mobileSidebarOpen;break;
       case 'aftergraph-launcher':window.location.assign('https://aftergraph.org/launch');return;
       case 'close-palette':ui.paletteOpen=false;break;
       case 'open-auth':ui.auth={...(ui.auth||{}),open:true,error:'',created:null,inviteError:''};if(backendConnected&&(state.user.capabilities||[]).includes('user.manage')&&!ui.auth.grantable){void apiClient.listCapabilities().then(payload=>{ui.auth={...(ui.auth||{}),grantable:payload?.capabilities||[]};render()}).catch(()=>{})}break;
@@ -803,7 +848,7 @@ export function bootstrapAftergraph(){
       case 'promote-memory':if(el.dataset.id){const key=`memory:${el.dataset.id}`;if(!beginUiAction(key))break;const evidence=state.artifacts.find(a=>a.verified)?.id;if(!backendConnected||!evidence){toast('Promotion needs server connection and verified evidence');endUiAction(key);break;}void apiClient.promoteMemory(el.dataset.id,{actor:state.user.id,evidence}).then(payload=>{applyBackendPayload(payload);toast('Memory promoted');endUiAction(key)}).catch(error=>{toast('Memory promotion failed');endUiAction(key);console.warn('Memory promotion failed',error?.code||error)})}break;
       case 'engage-kill':if(el.dataset.scope){const key=`kill:${el.dataset.scope}`;if(!beginUiAction(key))break;if(!backendConnected){toast('Kill switch needs server connection');endUiAction(key);break;}void apiClient.engageKill(el.dataset.scope,{actor:state.user.id,reason:'manual engage from Control'}).then(payload=>{ui.killStates={...(ui.killStates||{}),[el.dataset.scope]:!!payload?.switch?.engaged};toast('Autonomy halted');endUiAction(key)}).catch(error=>{toast('Kill engage failed');endUiAction(key);console.warn('Kill engage failed',error?.code||error)})}break;
       case 'release-kill':if(el.dataset.scope){const key=`kill:${el.dataset.scope}`;if(!beginUiAction(key))break;if(!backendConnected){toast('Kill switch needs server connection');endUiAction(key);break;}void apiClient.releaseKill(el.dataset.scope,{actor:state.user.id}).then(payload=>{ui.killStates={...(ui.killStates||{}),[el.dataset.scope]:!!payload?.switch?.engaged};toast('Autonomy resumed');endUiAction(key)}).catch(error=>{toast('Kill release failed');endUiAction(key);console.warn('Kill release failed',error?.code||error)})}break;
-      case 'copy-link':{const type=el.dataset.type,id=el.dataset.id;const link=location.origin+buildDeepLink(domainForObject(type),type,id);navigator.clipboard?.writeText(link).catch(()=>{});toast('Deep link copied');break}
+      case 'copy-link':{const type=el.dataset.type,id=el.dataset.id;const link=location.origin+withAppBase(buildDeepLink(domainForObject(type),type,id),routeBase);navigator.clipboard?.writeText(link).catch(()=>{});toast('Deep link copied');break}
       case 'sync-upstreams':if(backendConnected){void apiClient.syncUpstreams().then(payload=>{applyUpstreamPayload(payload);toast('Source truth synchronized')}).catch(error=>{console.warn('Upstream sync failed',error?.code||error);toast('Upstream sync failed')})}break;
       case 'reset-demo':stopRuntimeTimer();try{localStorage.removeItem(STORAGE_KEY)}catch{};state=createInitialState();liveRuntime=null;backendRuntimes={};toast('Demo reset');if(backendConnected)void syncBackend(apiClient.reset());break;
       default:if(action)toast(action.replaceAll('-',' '));
@@ -863,9 +908,10 @@ export function bootstrapAftergraph(){
   }
 
   app.addEventListener('click',event=>{
-    const el=event.target.closest('button,[data-action],[data-auth-action],[data-space-action],[data-presence-action],[data-space-add],[data-replay-index],[data-viz-action],[data-capability],[data-context-remove],[data-composer-action],[data-replay-action],[data-generated-action]');if(!el)return;
+    const el=event.target.closest('button,[data-action],[data-auth-action],[data-space-action],[data-presence-action],[data-space-add],[data-replay-index],[data-viz-action],[data-capability],[data-context-remove],[data-composer-action],[data-replay-action],[data-generated-action],[data-shell-destination]');if(!el)return;
     const data=el.dataset;
     if(data.generatedAction){handleGeneratedAction(el);return}
+    if(data.shellDestination){navigateSurface(data.shellDestination);return}
     if(el.dataset.authAction){void handleAuthClick(el);return}
     if(el.dataset.spaceAction){handleSpaceAction(el);return}
     if(el.dataset.spaceCommand){updateSpace({type:'space.mode',mode:el.dataset.spaceCommand});return}
@@ -877,9 +923,9 @@ export function bootstrapAftergraph(){
     if(el.dataset.contextRemove){if(!ui.hiddenIntentContextKeys.includes(el.dataset.contextRemove))ui.hiddenIntentContextKeys.push(el.dataset.contextRemove);render();return}
     if(el.dataset.composerAction){if(el.dataset.composerAction==='attach'){document.querySelector('.ag-intent-composer [data-intent-files]')?.click();return}if(el.dataset.composerAction==='context-picker'){ui.inspectorKind='context';ui.inspectorOpen=true;render();return}if(el.dataset.composerAction==='capability-picker'){document.querySelector('.ag-intent-capabilities button')?.focus();toast('Choose a capability above');return}}
     if(el.dataset.vizAction==='inspect-node'){ui.inspectorOpen=true;ui.inspectorKind='context';render();return}
-    if(el.dataset.humanNav){navigateHuman(el.dataset.humanNav);return}
-    if(el.dataset.conversation){ui.followLatest=true;ui.forceFollowLatest=true;ui.messageScrollTop=0;state.activeConversationId=el.dataset.conversation;const conv=state.conversations.find(c=>c.id===el.dataset.conversation);if(conv?.missionId)ui.selectedMissionId=conv.missionId;state.activeDomain=conv?.missionId?'work':'chat';state.primaryMode=conv?.missionId?'work':'chat';ui.artifactOpen=false;saveState();render();return}
-    if(el.dataset.mission){ui.selectedMissionId=el.dataset.mission;state.activeDomain='work';state.primaryMode='work';ui.artifactOpen=false;render();return}
+    if(el.dataset.humanNav){ui.mobileSidebarOpen=false;navigateHuman(el.dataset.humanNav);return}
+    if(el.dataset.conversation){ui.mobileSidebarOpen=false;ui.activeSurface=null;ui.followLatest=true;ui.forceFollowLatest=true;ui.messageScrollTop=0;state.activeConversationId=el.dataset.conversation;const conv=state.conversations.find(c=>c.id===el.dataset.conversation);if(conv?.missionId)ui.selectedMissionId=conv.missionId;state.activeDomain=conv?.missionId?'work':'chat';state.primaryMode=conv?.missionId?'work':'chat';ui.artifactOpen=false;saveState();render();return}
+    if(el.dataset.mission){ui.mobileSidebarOpen=false;ui.activeSurface=null;ui.selectedMissionId=el.dataset.mission;state.activeDomain='work';state.primaryMode='work';ui.artifactOpen=false;render();return}
     if(el.dataset.agent){ui.selectedAgentId=el.dataset.agent;ui.inspectorKind='agent';ui.inspectorOpen=true;render();return}
     if(el.dataset.connection){ui.selectedConnectionId=el.dataset.connection;ui.inspectorKind='connection';ui.inspectorOpen=true;render();return}
     if(el.dataset.artifact){ui.selectedArtifactId=el.dataset.artifact;ui.artifactOpen=true;render();return}
@@ -937,6 +983,7 @@ export function bootstrapAftergraph(){
     if(mod&&event.key.toLowerCase()==='k'){event.preventDefault();ui.paletteOpen=true;ui.paletteQuery='';render();return}
     if(mod&&event.key.toLowerCase()==='n'){event.preventDefault();runAction('new-chat');render();return}
     if(event.key==='Escape'){
+      if(ui.mobileSidebarOpen){ui.mobileSidebarOpen=false;render();return}
       if(ui.paletteOpen){ui.paletteOpen=false;render();return}
       if(ui.approvalOpen){ui.approvalOpen=false;ui.approvalEvidenceOpen=false;render();return}
       if(ui.inspectorOpen){ui.inspectorOpen=false;render();return}
@@ -949,12 +996,12 @@ export function bootstrapAftergraph(){
     if(event.target?.matches('.ag-resize-handle')&&['ArrowLeft','ArrowRight'].includes(event.key)){event.preventDefault();ui.artifactWidth=Math.max(34,Math.min(56,ui.artifactWidth+(event.key==='ArrowLeft'?1:-1)));render()}
   });
 
-  window.addEventListener('popstate',()=>{const r=routeFromLocation(window.location);if(r.kind==='mode'){state.primaryMode=r.mode;state.activeDomain=r.domain}else{state.activeDomain=r.domain;if(['chat','work'].includes(r.domain))state.primaryMode=r.domain}if(r.kind==='object')selectObject(r.type,r.id);render()});
+  window.addEventListener('popstate',()=>{const r=routeFromLocation(window.location);ui.mobileSidebarOpen=false;if(r.kind==='mode'){state.primaryMode=r.mode;state.activeDomain=r.domain;ui.activeSurface=null}else if(r.kind==='surface'){state.activeDomain=r.domain;ui.activeSurface=r.surface}else{state.activeDomain=r.domain;ui.activeSurface=null;if(['chat','work'].includes(r.domain))state.primaryMode=r.domain}if(r.kind==='object')selectObject(r.type,r.id);render()});
   window.addEventListener('resize',()=>{const d=detectDevice();if(d!==ui.device){ui.device=d;render()}});
   document.addEventListener('visibilitychange',()=>{if(document.hidden&&liveTimer){stopRuntimeTimer()}});
 
   try{document.documentElement.dataset.theme=localStorage.getItem('aftergraph-theme')||'dark'}catch{document.documentElement.dataset.theme='dark'}
-  if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register(withAppBase('/sw.js',routeBase)).catch(()=>{});
   renderScheduler=createRenderScheduler({
     root:app,
     renderView:()=>render(),

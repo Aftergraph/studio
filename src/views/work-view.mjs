@@ -1,5 +1,5 @@
 export function renderWorkView({rail='',header='',summary='',attention='',outcome='',trajectory='',composer='',artifact='',artifactOpen=false}={}){
-  const billingLauncher=`<a class="ag-billing-launcher" href="/billing/" aria-label="Open Aftergraph Billing"><span class="ag-billing-launcher-mark" aria-hidden="true"></span><span><strong>Aftergraph Billing</strong><small>Review invoice-ready work</small></span><span class="ag-billing-launcher-arrow" aria-hidden="true">→</span></a>`;
+  const billingLauncher=`<button type="button" class="ag-billing-launcher" data-shell-destination="billing" aria-label="Open Aftergraph Billing"><span class="ag-billing-launcher-mark" aria-hidden="true"></span><span><strong>Aftergraph Billing</strong><small>Review invoice-ready work</small></span><span class="ag-billing-launcher-arrow" aria-hidden="true">→</span></button>`;
   return `<main id="main-content" class="ag-workspace-work ag-calm-work ${artifactOpen?'with-artifact':''}">
     <aside class="ag-mission-rail">${rail}</aside>
     <section class="ag-work-canvas ${artifactOpen?'with-artifact':''}">
