@@ -66,6 +66,7 @@ export function createAppServer({
   runtimeIntervalMs = 1250,
   upstreamConfig = null,
   federation = null,
+  conversationAgent = null,
   fixtures = true,
   authSecret = null,
   requireAuth = process.env.AFTERGRAPH_REQUIRE_AUTH === 'true',
@@ -432,13 +433,20 @@ export function createAppServer({
             mode:String(body.mode || 'Ask'),
             ...(attachments.length?{attachments}:{}),
           });
-          if (body.reply && typeof body.reply === 'object' && String(body.reply.text || '').trim()) {
+          let reply = null;
+          if (typeof conversationAgent === 'function') {
+            reply = await conversationAgent({
+              conversationId, text, mode:String(body.mode || 'Ask'), actor:body.actor || 'user',
+              attachments, context:contextProjection(nextState, conversationId),
+            });
+          } else if (body.reply && typeof body.reply === 'object') reply = body.reply;
+          if (reply && String(reply.text || '').trim()) {
             nextState = appendChatMessage(nextState, conversationId, {
-              author:String(body.reply.author || 'Friday'),
-              type:String(body.reply.type || 'agent_run'),
-              text:String(body.reply.text).trim(),
-              missionId:body.reply.missionId || undefined,
-              agentId:body.reply.agentId || undefined,
+              author:String(reply.author || 'Friday'),
+              type:String(reply.type || 'agent_run'),
+              text:String(reply.text).trim(),
+              missionId:reply.missionId || undefined,
+              agentId:reply.agentId || undefined,
             });
           }
           const next = await store.replace(nextState);
