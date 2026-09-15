@@ -441,12 +441,32 @@ export function createAppServer({
             });
           } else if (body.reply && typeof body.reply === 'object') reply = body.reply;
           if (reply && String(reply.text || '').trim()) {
+            const confidence=['observed','ambiguous','unknown'].includes(reply.confidence)?reply.confidence:undefined;
+            const contextRefs=Array.isArray(reply.contextRefs)?reply.contextRefs.filter(item=>typeof item==='string').slice(0,16):[];
+            const sourceIntent=reply.actionIntent && typeof reply.actionIntent==='object' ? reply.actionIntent : null;
+            const actionIntent=sourceIntent ? {
+              id:String(sourceIntent.id || ''),
+              semanticCapability:String(sourceIntent.semanticCapability || ''),
+              ...(sourceIntent.tenantId?{tenantId:String(sourceIntent.tenantId)}:{}),
+              ...(sourceIntent.subjectRef?{subjectRef:String(sourceIntent.subjectRef)}:{}),
+              ...(sourceIntent.effectClass?{effectClass:String(sourceIntent.effectClass)}:{}),
+              ...(Number.isInteger(sourceIntent.riskClass)?{riskClass:sourceIntent.riskClass}:{}),
+              ...(Array.isArray(sourceIntent.requiredAuthority)?{requiredAuthority:sourceIntent.requiredAuthority.filter(item=>typeof item==='string').slice(0,16)}:{}),
+              ...(sourceIntent.inputRef?{inputRef:String(sourceIntent.inputRef)}:{}),
+              ...(sourceIntent.expectedOutputRef?{expectedOutputRef:String(sourceIntent.expectedOutputRef)}:{}),
+              ...('verificationRequired' in sourceIntent?{verificationRequired:sourceIntent.verificationRequired===true}:{}),
+              status:'proposed',
+              authorityGranted:false,
+            } : undefined;
             nextState = appendChatMessage(nextState, conversationId, {
               author:String(reply.author || 'Friday'),
               type:String(reply.type || 'agent_run'),
               text:String(reply.text).trim(),
               missionId:reply.missionId || undefined,
               agentId:reply.agentId || undefined,
+              confidence,
+              ...(contextRefs.length?{contextRefs}:{}),
+              ...(actionIntent?{actionIntent}:{}),
             });
           }
           const next = await store.replace(nextState);

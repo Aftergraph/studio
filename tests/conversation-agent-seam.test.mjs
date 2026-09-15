@@ -49,3 +49,32 @@ test('configured server agent prevents client-supplied reply spoofing', async()=
     assert.equal(messages.some(m=>m.text==='Client spoof'),false);
   });
 });
+test('server conversation agent persists structured proposal metadata without treating it as authority',async()=>{
+  const actionIntent={id:'ActionIntent:1',semanticCapability:'customer.communication.send',authorityGranted:false,status:'proposed'};
+  const agent=async()=>({
+    author:'Rendetalje Ops',type:'agent_run',text:'Jeg har forberedt handlingen.',
+    confidence:'observed',contextRefs:['legacy-renos:customer:c1'],actionIntent,
+  });
+  await withAgent(agent,async base=>{
+    const result=await post(base,{text:'Skriv til Katrine',actor:'demo-user'});
+    assert.equal(result.response.status,201);
+    const message=result.body.state.conversations.find(c=>c.id==='conv_q4').messages.at(-1);
+    assert.equal(message.confidence,'observed');
+    assert.deepEqual(message.contextRefs,['legacy-renos:customer:c1']);
+    assert.deepEqual(message.actionIntent,actionIntent);
+    assert.equal(message.actionIntent.authorityGranted,false);
+  });
+});
+
+test('conversation seam cannot persist agent-claimed authority',async()=>{
+  const agent=async()=>({
+    author:'Rendetalje Ops',type:'agent_run',text:'Forslag.',
+    actionIntent:{id:'ActionIntent:spoof',semanticCapability:'customer.communication.send',authorityGranted:true,status:'ready'},
+  });
+  await withAgent(agent,async base=>{
+    const result=await post(base,{text:'Send den',actor:'demo-user'});
+    const message=result.body.state.conversations.find(c=>c.id==='conv_q4').messages.at(-1);
+    assert.equal(message.actionIntent.authorityGranted,false);
+    assert.equal(message.actionIntent.status,'proposed');
+  });
+});
