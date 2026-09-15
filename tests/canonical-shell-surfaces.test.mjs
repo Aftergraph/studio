@@ -15,5 +15,6 @@ test('contextual products render inside the canonical Studio frame',()=>{
 test('surface navigation stays internal and base-aware',()=>{
   assert.match(bootstrap,/function navigateSurface/);
   assert.match(bootstrap,/withAppBase\(surface\.route,routeBase\)/);
+  assert.match(bootstrap,/surface\.kind==='mode'.*navigateHuman\(surface\.id\)/s);
   assert.doesNotMatch(bootstrap,/window\.location\.assign\([^)]*billing/i);
 });
