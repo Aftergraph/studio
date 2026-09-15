@@ -22,7 +22,6 @@ export { AGUpstreamServiceRow, AGExternalWorkRow, AGDetectionProposalRow } from 
 export { AGSourceTruthBadge } from './system/source-truth-badge.mjs';
 export { AGEventRow, AGConnectionRow, AGMemoryItem, AGKillSwitch } from './system/event-row.mjs';
 export { AGInstitutionSummary } from './system/institution-summary.mjs';
+export { AGActiveContextBar } from './system/active-context-bar.mjs';
 
-export const COMPONENTS = Object.freeze(['AGSurface','AGSplitSurface','AGInspector','AGSheet','AGArtifact','AGArtifactToolbar','AGTrajectory','AGProgress',
-  'AGApproval','AGNeedYou','AGEvidence','AGComposer','AGAgentPresence','AGAgentCluster','AGActionDock','AGOutcomeReceipt','AGCommandPalette','AGPulseRail',
-  'AGButton','AGIconButton','AGInput','AGTabs','AGRow','AGMetric','AGNotice','AGSkeleton','AGContextSummary','AGMemoryItem','AGKillSwitch','AGWorkSummary','AGTelemetryStrip','AGAgentCard','AGDelegationStrip','AGInstitutionSummary','AGConnectionRow','AGArtifactRow','AGEventRow','AGUpstreamServiceRow','AGExternalWorkRow','AGDetectionProposalRow','AGSourceTruthBadge']);
+export const COMPONENTS = Object.freeze(['AGSurface','AGSplitSurface','AGInspector','AGSheet','AGArtifact','AGArtifactToolbar','AGTrajectory','AGProgress','AGApproval','AGNeedYou','AGEvidence','AGComposer','AGAgentPresence','AGAgentCluster','AGActionDock','AGOutcomeReceipt','AGCommandPalette','AGPulseRail','AGButton','AGIconButton','AGInput','AGTabs','AGRow','AGMetric','AGNotice','AGSkeleton','AGContextSummary','AGMemoryItem','AGKillSwitch','AGWorkSummary','AGTelemetryStrip','AGAgentCard','AGDelegationStrip','AGInstitutionSummary','AGConnectionRow','AGArtifactRow','AGEventRow','AGUpstreamServiceRow','AGExternalWorkRow','AGDetectionProposalRow','AGSourceTruthBadge','AGActiveContextBar']);

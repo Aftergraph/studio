@@ -62,3 +62,20 @@ test('Kill UI: pending action disables controls', () => {
   assert.ok(html.includes('disabled'), 'controls disabled while pending');
   assert.ok(!html.includes('data-action="engage-kill"'), 'no clickable engage while pending');
 });
+
+test('Autonomy hub: pause waits for an in-flight step so canonical state is stable on return', async () => {
+  let state={missions:[{id:'mH',state:'running',progress:10,steps:[{state:'running'},{state:'pending'}],evidenceCount:1}]};
+  const store={snapshot:()=>structuredClone(state),replace:async next=>{await new Promise(resolve=>setTimeout(resolve,30));state=structuredClone(next);return state;}};
+  const hub=new MissionRuntimeHub({store,intervalMs:100000});
+  await hub.start('mH');
+  const stepping=hub.step('mH');
+  await new Promise(resolve=>setTimeout(resolve,5));
+  const paused=await hub.pause('mH');
+  const pausedProgress=paused.state.missions[0].progress;
+  assert.equal(store.snapshot().missions[0].progress,pausedProgress,'pause response must not outrun canonical store state');
+  await stepping;
+  await new Promise(resolve=>setTimeout(resolve,40));
+  assert.equal(store.snapshot().missions[0].progress,pausedProgress);
+  assert.equal(hub.runtime('mH').status,'paused');
+  hub.stopAll();
+});

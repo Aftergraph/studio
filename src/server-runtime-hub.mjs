@@ -11,6 +11,7 @@ export class MissionRuntimeHub {
     this.isHalted = isHalted;
     this.runtimes = new Map();
     this.timers = new Map();
+    this.operations = new Map();
   }
 
   snapshot() {
@@ -24,8 +25,19 @@ export class MissionRuntimeHub {
 
   runtime(missionId) { return this.runtimes.get(missionId) || null; }
 
+  enqueue(missionId, operation) {
+    const previous=this.operations.get(missionId)||Promise.resolve();
+    const current=previous.catch(()=>{}).then(operation);
+    this.operations.set(missionId,current);
+    return current.finally(()=>{ if(this.operations.get(missionId)===current)this.operations.delete(missionId); });
+  }
+
   async start(missionId) {
     this.stopTimer(missionId);
+    return this.enqueue(missionId,()=>this.startNow(missionId));
+  }
+
+  async startNow(missionId) {
     let runtime = createLiveRuntime(this.store.snapshot(), missionId);
     if (runtime.status === 'awaiting_approval') {
       this.runtimes.set(missionId, runtime);
@@ -40,6 +52,10 @@ export class MissionRuntimeHub {
   }
 
   async step(missionId) {
+    return this.enqueue(missionId,()=>this.stepNow(missionId));
+  }
+
+  async stepNow(missionId) {
     let runtime = this.runtimes.get(missionId) || createLiveRuntime(this.store.snapshot(), missionId);
     runtime = clone(runtime);
     if (this.isHalted(missionId)) {
@@ -60,15 +76,24 @@ export class MissionRuntimeHub {
   }
 
   async pause(missionId) {
+    this.stopTimer(missionId);
+    return this.enqueue(missionId,()=>this.pauseNow(missionId));
+  }
+
+  async pauseNow(missionId) {
     const current = this.runtimes.get(missionId) || createLiveRuntime(this.store.snapshot(), missionId);
     const runtime = pauseMission(current);
     this.runtimes.set(missionId, runtime);
-    this.stopTimer(missionId);
     await this.emit();
     return clone(runtime);
   }
 
   async resume(missionId) {
+    this.stopTimer(missionId);
+    return this.enqueue(missionId,()=>this.resumeNow(missionId));
+  }
+
+  async resumeNow(missionId) {
     const current = this.runtimes.get(missionId) || createLiveRuntime(this.store.snapshot(), missionId);
     const runtime = resumeMission(current);
     this.runtimes.set(missionId, runtime);
@@ -79,6 +104,7 @@ export class MissionRuntimeHub {
 
   async reset() {
     this.stopAll();
+    await Promise.allSettled([...this.operations.values()]);
     this.runtimes.clear();
     await this.emit();
   }
