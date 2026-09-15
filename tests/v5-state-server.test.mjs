@@ -87,6 +87,19 @@ test('V7.3 temporal endpoint returns historical, counterfactual and forecast pro
     assert.equal(forecast.body.temporal.executed,false);
   });
 });
+
+test('R-008 temporal endpoint returns 422 on invalid JSON in query params',async()=>{
+  await withServer(async base=>{
+    const badEvent=await json(`${base}/api/v1/temporal?mode=counterfactual&cursor=0&event=${encodeURIComponent('{invalid')}`);
+    assert.equal(badEvent.response.status,422);
+    assert.equal(badEvent.body.error,'invalid_json');
+    assert.equal(badEvent.body.param,'event');
+    const badSteps=await json(`${base}/api/v1/temporal?mode=forecast&cursor=0&steps=${encodeURIComponent('not-json')}`);
+    assert.equal(badSteps.response.status,422);
+    assert.equal(badSteps.body.error,'invalid_json');
+    assert.equal(badSteps.body.param,'steps');
+  });
+});
 test('multimodal intent attachment metadata persists through the full-stack chat contract',async()=>{
   await withServer(async base=>{
     const write=await json(`${base}/api/v1/conversations/conv_q4/messages`,{

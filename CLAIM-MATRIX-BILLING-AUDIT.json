@@ -1,0 +1,74 @@
+[
+  {
+    "claim": "Offline mode is deliberately read-only; Billing data never persisted to browser storage; writes never queued/replayed offline",
+    "source": "docs/billing/APP.md:56",
+    "implemented": "yes",
+    "tested": "yes",
+    "status": "VERIFIED",
+    "evidence": "AUDIT_REPORT.md:57 confirms memory-only projection; PWA tests assert no Billing read-cache; sw.js:32 throws on cache miss"
+  },
+  {
+    "claim": "Issued invoices are immutable semantic snapshots exportable as deterministic PDF/JSON/UBL",
+    "source": "docs/billing/APP.md:45",
+    "implemented": "yes",
+    "tested": "yes",
+    "status": "VERIFIED",
+    "evidence": "FIN-301 DONE (15 API tests); EXTRACTION.md:47 confirms immutable issuer/customer/service snapshots"
+  },
+  {
+    "claim": "Existing financial actuals cannot be silently overwritten; conflicts fail closed; correction requires governed workflow",
+    "source": "docs/billing/APP.md:74, AUDIT_REMEDIATION_TASKS.md:74,83",
+    "implemented": "yes",
+    "tested": "yes",
+    "status": "VERIFIED",
+    "evidence": "FIN-301 + FIN-302 DONE; 18/18 API, 5/5 browser-client, 13/13 UI-contract tests pass"
+  },
+  {
+    "claim": "Delivery requires provider receipt with messageId + deliveredAt; fails closed on invalid/missing receipt",
+    "source": "docs/PRODUCTION.md:74, server/billing-delivery.mjs:84-89",
+    "implemented": "yes",
+    "tested": "yes",
+    "status": "VERIFIED",
+    "evidence": "billing-delivery.test.mjs:21-34; billing-delivery-adapter.test.mjs:18-52; mutations.mjs:224-236 validates receipt shape"
+  },
+  {
+    "claim": "Billing UI meets WCAG 2.2 AA (22 axe passes, 0 violations)",
+    "source": "docs/billing/AUDIT_REMEDIATION_TASKS.md:105, QA-REPORT-V6.md:39",
+    "implemented": "yes",
+    "tested": "yes",
+    "status": "VERIFIED",
+    "evidence": "A11Y-802 DONE; fresh production axe run 22 pass/0 fail; UI contract 13/13"
+  },
+  {
+    "claim": "Peppol BIS Billing 3.0 UBL export is supported and enabled only when external validation passes",
+    "source": "docs/billing/RELEASE.md:29, src/billing/document-profile.mjs:8",
+    "implemented": "partial",
+    "tested": "partial",
+    "status": "UNVERIFIED",
+    "evidence": "COMP-601 BLOCKED: fail-closed guard + 17 API tests pass, but production validator contract/config authority missing (AUDIT_REPORT.md:101 L2-CLAIM-001)"
+  },
+  {
+    "claim": "Source sync/resync is idempotent; submitSync uses idempotency-key; offline-event-log merge is first-writer-wins",
+    "source": "src/api-client.mjs:105, src/distributed/server-log.mjs:2, docs/billing/APP.md:74",
+    "implemented": "yes",
+    "tested": "yes",
+    "status": "VERIFIED",
+    "evidence": "17/17 source-contract tests pass; v81-distributed-offline-client.test.mjs covers submitSync/readSync idempotency; server-log reuses idempotent merge"
+  },
+  {
+    "claim": "Missing external Peppol validator fails closed; no false 200 compliance export",
+    "source": "docs/billing/AUDIT_REMEDIATION_TASKS.md:85, AUDIT_REPORT.md:101",
+    "implemented": "yes",
+    "tested": "yes",
+    "status": "VERIFIED",
+    "evidence": "Fail-closed guard implemented + 17 Billing API tests pass; production deployment blocked until validator configured (expected behavior)"
+  },
+  {
+    "claim": "Reconnect restores current state after offline period",
+    "source": "docs/billing/RELEASE.md:14",
+    "implemented": "yes",
+    "tested": "yes",
+    "status": "VERIFIED",
+    "evidence": "Browser-QA PASS includes reconnect flow; v5-2 SSE resync tests cover offline->resyncing->current transitions"
+  }
+]

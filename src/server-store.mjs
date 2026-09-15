@@ -11,6 +11,7 @@ export class WorkspaceStateStore {
     this.state = clone(initialState);
     this.loaded = false;
     this.writeChain = Promise.resolve();
+    this.mutationChain = Promise.resolve();
   }
 
   async init() {
@@ -30,26 +31,43 @@ export class WorkspaceStateStore {
 
   // ponytail: drain lets server close await in-flight persists so test
   // teardown never rmdirs a directory with pending per-user state writes.
-  drain() { return this.writeChain.catch(() => {}); }
+  drain() {
+    return Promise.all([
+      this.mutationChain.catch(() => {}),
+      this.writeChain.catch(() => {}),
+    ]);
+  }
+
+  enqueueMutation(operation) {
+    const result = this.mutationChain.then(operation, operation);
+    this.mutationChain = result.catch(() => {});
+    return result;
+  }
 
   async replace(nextState) {
-    this.state = clone(nextState);
-    await this.persist();
-    return this.snapshot();
+    return this.enqueueMutation(async () => {
+      this.state = clone(nextState);
+      await this.persist();
+      return this.snapshot();
+    });
   }
 
   async mutate(mutator) {
-    const next = clone(this.state);
-    const result = await mutator(next);
-    this.state = clone(result ?? next);
-    await this.persist();
-    return this.snapshot();
+    return this.enqueueMutation(async () => {
+      const next = clone(this.state);
+      const result = await mutator(next);
+      this.state = clone(result ?? next);
+      await this.persist();
+      return this.snapshot();
+    });
   }
 
   async reset() {
-    this.state = clone(this.seed);
-    await this.persist();
-    return this.snapshot();
+    return this.enqueueMutation(async () => {
+      this.state = clone(this.seed);
+      await this.persist();
+      return this.snapshot();
+    });
   }
 
   async persist() {

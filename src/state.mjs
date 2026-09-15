@@ -1,4 +1,5 @@
 import { createSpatialState, reduceSpatialState } from '../packages/spatial/index.mjs';
+import { billingFixtureState, emptyBillingState } from './billing/fixtures.mjs';
 
 function createDefaultSpace() {
   let space=createSpatialState({id:'space_primary',device:'desktop'});
@@ -85,6 +86,7 @@ export function createInitialState({ fixtures = true } = {}) {
       { id:'ev4', type:'evidence.sealed', text:'Staging verification evidence sealed', time:'10:27' },
     ],
     telemetry:{ online:true, runtime:'healthy', chain:'verified', cost:8.49, activeRuns:3, queued:1, evidence:64, latency:148 },
+    billing: fixtures ? billingFixtureState() : emptyBillingState(),
     fixtureMode: Boolean(fixtures),
     source: fixtures ? 'demo-fixture' : 'runtime-empty',
   };
