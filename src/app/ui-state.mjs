@@ -29,6 +29,7 @@ export function createUIState(state={},device='desktop') {
     intentAttachments:[],
     backendStatus:'offline',
     diagnostic:null,
+    generatedInteractions:{},
     controlError:'',
     resyncMetric:null,
     auth:{ open:false, panel:'request', userId:'', token:'', error:'' },
