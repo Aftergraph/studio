@@ -5,10 +5,15 @@ import { createAppServer as createWorkspaceAppServer, upstreamConfigFromEnv } fr
 import { decorateBillingServer } from './server/billing-server.mjs';
 import { billingDeliveryAdapterFromEnv } from './server/billing-delivery.mjs';
 import { billingDocumentValidatorFromEnv } from './server/billing-document-validator.mjs';
+import { rendetaljeOpsConversationAgentFromEnv } from './server/rendetalje-ops-agent.mjs';
 
 export function createAppServer(options = {}) {
+  const conversationAgent = Object.prototype.hasOwnProperty.call(options, 'conversationAgent')
+    ? options.conversationAgent
+    : rendetaljeOpsConversationAgentFromEnv();
   const billingOptions = {
     ...options,
+    conversationAgent,
     billingDeliveryAdapter: Object.prototype.hasOwnProperty.call(options, 'billingDeliveryAdapter')
       ? options.billingDeliveryAdapter
       : billingDeliveryAdapterFromEnv(),
