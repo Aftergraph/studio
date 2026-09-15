@@ -17,9 +17,14 @@ export async function signInWithToken({ client, token } = {}) {
   if (!token) throw new Error('token required');
   const me = await client.authMe({ token });
   if (!me?.userId) throw new Error('token not accepted');
-  const user = await client.readUser(me.userId);
   client.setAuthToken(token);
-  return { user, token };
+  try {
+    const user = await client.readUser(me.userId);
+    return { user, token };
+  } catch (error) {
+    client.setAuthToken(null);
+    throw error;
+  }
 }
 
 export function signOut({ client } = {}) {

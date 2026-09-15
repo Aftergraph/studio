@@ -201,7 +201,7 @@ export function createAppServer({
       syncLog = logFor(scope.actor);
     };
     if (url.pathname === '/healthz') {
-      sendJson(res, 200, { status:'ok', app:'aftergraph-workspace-v5-reference', api:API_VERSION, releaseSha });
+      sendJson(res, 200, { status:'ok', app:'aftergraph-workspace-v5-reference', api:API_VERSION, releaseSha, auth:{ required:requireAuth } });
       return;
     }
     if (url.pathname === '/readyz') {

@@ -71,6 +71,33 @@ def boot_deployed(browser,mode,viewport=None):
     page.wait_for_timeout(50)
     return page,errors
 
+def boot_auth_required(browser):
+    page=browser.new_page(viewport={'width':390,'height':844},reduced_motion='no-preference')
+    errors=[]; protected=[]; console_errors=[]; http_errors=[]
+    page.on('pageerror',lambda e:errors.append(str(e)))
+    page.on('console',lambda msg: console_errors.append(msg.text) if msg.type=='error' else None)
+    page.on('response',lambda response: http_errors.append((response.status,response.url)) if response.status>=400 else None)
+    def route_request(route):
+        url=route.request.url
+        path='/' + url.split('://',1)[-1].split('/',1)[1].split('?',1)[0] if '/' in url.split('://',1)[-1] else '/'
+        if route.request.resource_type=='document': return route.fulfill(status=200,content_type='text/html',body=html())
+        if path=='/studio/healthz': return route.fulfill(status=200,content_type='application/json',body='{"status":"ok","auth":{"required":true}}')
+        if path=='/studio/sw.js': return route.fulfill(status=200,content_type='application/javascript',body='')
+        if path in ('/packages/brand/tokens.css','/studio/packages/brand/tokens.css'):
+            return route.fulfill(status=200,content_type='text/css',body=(ROOT/'packages/brand/tokens.css').read_text(encoding='utf-8'))
+        if path in ('/favicon.ico','/studio/favicon.ico'): return route.fulfill(status=204,body='')
+        if path.startswith('/studio/api/'):
+            protected.append(path)
+            return route.fulfill(status=401,content_type='application/json',body='{"error":"authentication_required"}')
+        return route.fulfill(status=404,body='')
+    page.route('http://studio.test/**',route_request)
+    page.goto('http://studio.test/studio/chat',wait_until='domcontentloaded')
+    page.evaluate('window.__AFTERGRAPH_QA=true')
+    page.add_script_tag(type='module',content=bundle_for('chat',use_location=True))
+    page.wait_for_function('window.__aftergraphQA && window.__aftergraphQA.snapshot')
+    page.wait_for_timeout(150)
+    return page,errors,protected,console_errors,http_errors
+
 def check(value,label):
     if not value: raise AssertionError(label)
     print('PASS',label)
@@ -185,6 +212,13 @@ def run_all():
         check(deployed_mobile.evaluate('window.__aftergraphQA.snapshot().primaryMode')=='space','mobile drawer Space navigation selects Space mode')
         check(not errors,'mobile deployed-base drawer navigation has no page errors')
         deployed_mobile.close()
+
+        auth_page,errors,protected,console_errors,http_errors=boot_auth_required(browser)
+        check(auth_page.evaluate("document.documentElement.dataset.backend")=='auth-required','auth-required cold boot exposes authentication phase')
+        check(protected==[],'auth-required cold boot makes no protected API or SSE requests before sign-in')
+        check(not console_errors,f'auth-required cold boot has no console errors; http_errors={http_errors}')
+        check(not errors,'auth-required cold boot has no page errors')
+        auth_page.close()
 
         browser.close()
 
