@@ -166,7 +166,6 @@ export function bootstrapAftergraph(){
   function setBackendPhase(phase){
     ui.backendStatus=phase;
     backendConnected=phase==='current';
-    if(phase==='current')void restoreAuthSession();
     document.documentElement.dataset.backend=phase==='current'?'connected':phase;
     document.querySelector('.ag-app')?.setAttribute('data-backend-state',phase==='current'?'connected':'local');
     document.querySelector('.ag-backend-state')?.setAttribute('data-state',phase);
@@ -185,7 +184,10 @@ export function bootstrapAftergraph(){
   }
   async function connectBackend(){
     if(!location.protocol.startsWith('http'))return false;
-    if(!await apiClient.detect())return false;
+    let health;try{health=await apiClient.health()}catch{return false}
+    if(health?.status!=='ok')return false;
+    const authenticated=await restoreAuthSession();
+    if(health?.auth?.required&&!authenticated){setBackendPhase('auth-required');return true}
     try{
       backendSession?.stop?.();
       backendSession=createBackendSession({
@@ -773,15 +775,15 @@ export function bootstrapAftergraph(){
   // ponytail: login wiring lives here; pure flows in src/auth/ui-actions.mjs.
   let authRestored=false;
   async function restoreAuthSession(){
-    if(authRestored)return;authRestored=true;
+    if(authRestored)return Boolean(ui.auth?.userId);authRestored=true;
     let saved=null;try{saved=pickStorage().getItem('aftergraph.auth.token')}catch{}
-    if(!saved)return;
+    if(!saved)return false;
     try{
       const {user}=await signInWithToken({client:apiClient,token:saved});
       state.user={id:user.id,name:user.name||user.id,role:user.role||'member',capabilities:user.capabilities||[]};
       ui.auth={...(ui.auth||{}),userId:user.id};
-      saveState();render();toast(`Signed in as ${user.id}`);
-    }catch{try{pickStorage().removeItem('aftergraph.auth.token')}catch{}}
+      saveState();render();toast(`Signed in as ${user.id}`);return true;
+    }catch{try{pickStorage().removeItem('aftergraph.auth.token')}catch{};signOut({client:apiClient});return false}
   }
   async function handleAuthClick(el){
     const action=el.dataset.authAction;

@@ -28,11 +28,21 @@ test('request rejects blank user id without calling backend', async () => {
   assert.deepEqual(client.calls, []);
 });
 
-test('sign-in binds token, loads user and sets client token', async () => {
+test('sign-in binds token before protected user read', async () => {
   const client = fakeClient();
   const result = await signInWithToken({ client, token: 'v1.alice.exp.sig' });
   assert.equal(result.user.id, 'alice');
-  assert.ok(client.calls.some(([k, v]) => k === 'token' && v === 'v1.alice.exp.sig'), 'client token set');
+  assert.deepEqual(client.calls.slice(0, 3), [
+    ['me'],
+    ['token', 'v1.alice.exp.sig'],
+    ['read', 'alice'],
+  ]);
+});
+
+test('sign-in clears a bound token when protected user read fails', async () => {
+  const client = fakeClient({ meId: 'missing' });
+  await assert.rejects(() => signInWithToken({ client, token: 'v1.alice.exp.sig' }), /user_not_found/);
+  assert.equal(client.current, null);
 });
 
 test('sign-out clears the client token', () => {

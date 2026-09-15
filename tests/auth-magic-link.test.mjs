@@ -54,6 +54,9 @@ test('auth server: requireAuth mode rejects bare actors, accepts tokens', async 
   try {
     const port = server.address().port;
     assert.ok(server.workspace.bootToken, 'bootstraps a demo-user token');
+    const health = await fetch(`http://127.0.0.1:${port}/healthz`);
+    assert.equal(health.status, 200);
+    assert.equal((await health.json()).auth?.required, true, 'health advertises required authentication without exposing credentials');
     const bare = await post(port, '/api/v1/memory', { actor: 'demo-user', scope: 's', label: 'l', value: 'v', source: 't' }, 'strict-bare-1');
     assert.equal(bare.status, 401, 'bare actor rejected in requireAuth mode');
     const authed = await post(port, '/api/v1/memory', { actor: 'demo-user', scope: 's', label: 'l', value: 'v', source: 't' }, 'strict-ok-1', { authorization: `Bearer ${server.workspace.bootToken}` });

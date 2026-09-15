@@ -21,6 +21,13 @@ test('API client detects backend and reads canonical state', async () => {
   assert.deepEqual(await client.state(), {state:{activeDomain:'chat'},runtimes:{}});
 });
 
+test('API client exposes health metadata for auth-aware bootstrap', async () => {
+  const client = createApiClient({ fetchImpl:fetchStub({
+    'GET /healthz':{body:{status:'ok',auth:{required:true}}},
+  }), baseUrl:'http://local' });
+  assert.deepEqual(await client.health(), {status:'ok',auth:{required:true}});
+});
+
 test('API client exposes fullstack mutations', async () => {
   const seen=[];
   const fetchImpl=async (url,options={})=>{

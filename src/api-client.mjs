@@ -54,6 +54,7 @@ export function createApiClient({ baseUrl='', fetchImpl=globalThis.fetch, EventS
 
   return Object.freeze({
     setAuthToken(token){authToken=token||null;return authToken;},
+    health(){return request(apiHealthz())},
     async detect(){try{const body=await request(apiHealthz());return body?.status==='ok'}catch{return false}},
     state(){return request(apiState())},
     stateWithMeta(){return requestWithMeta(apiState())},
