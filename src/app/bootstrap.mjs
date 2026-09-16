@@ -9,7 +9,7 @@ import { PRIMARY_NAV, MOBILE_PRIMARY_MODES, SIDEBAR_DESTINATIONS, canonicalDomai
 import { deriveActiveContext, alignModeToActiveContext, conversationIdForMission } from '../workspace/active-context.mjs';
 import { icon } from '../icons.mjs';
 import { AGIcon } from '../../packages/icons/index.mjs';
-import { AGTrajectory, AGArtifact, AGApproval, AGAuthPanel, AGUserInvite, AGNeedYou, AGComposer, AGAgentPresence, AGAgentCluster, AGActionDock, AGOutcomeReceipt, AGCommandPalette, AGPulseRail, AGContextSummary, AGMemoryItem, AGWorkSummary, AGTelemetryStrip, AGAgentCard, AGDelegationStrip, AGConnectionRow, AGArtifactRow, AGEventRow, AGUpstreamServiceRow, AGExternalWorkRow, AGDetectionProposalRow, AGSourceTruthBadge, AGActiveContextBar } from '../../packages/ui/index.mjs';
+import { AGTrajectory, AGArtifact, AGApproval, AGAuthPanel, AGUserInvite, AGNeedYou, AGComposer, AGAgentPresence, AGAgentCluster, AGActionDock, AGOutcomeReceipt, AGCommandPalette, AGPulseRail, AGContextSummary, AGMemoryItem, AGWorkSummary, AGTelemetryStrip, AGAgentCard, AGDelegationStrip, AGConnectionRow, AGArtifactRow, AGEventRow, AGUpstreamServiceRow, AGExternalWorkRow, AGDetectionProposalRow, AGSourceTruthBadge, AGVerificationProvenance, AGActiveContextBar } from '../../packages/ui/index.mjs';
 import { composeLivingLayout } from '../../packages/runtime-ui/index.mjs';
 import { animateElement, morphSurface, prefersReducedMotion } from '../../packages/motion/index.mjs';
 import { createLiveRuntime, stepMission, pauseMission, resumeMission } from '../live-runtime.mjs';
@@ -46,6 +46,7 @@ import { prepareGeneratedInteraction } from '../genui/interaction-envelope.mjs';
 export function bootstrapAftergraph(){
 
   const STORAGE_KEY='aftergraph-workspace-v5';
+  const VERIFICATION_REFRESH_MS=10000;
   const app=document.querySelector('#app');
   const toastRegion=document.querySelector('#toast-region');
   // ponytail: localStorage access throws on opaque origins (set_content/file);
@@ -56,6 +57,7 @@ export function bootstrapAftergraph(){
   let liveRuntime=null;
   let liveTimer=null;
   let replayTimer=null;
+  let verificationRefreshTimer=null;
   const routeBase=appBasePath(window.location);
   const apiClient=createApiClient({baseUrl:routeBase});
   const federationClient=createFederationBrowserClient({baseUrl:routeBase});
@@ -102,6 +104,35 @@ export function bootstrapAftergraph(){
   function currentArtifact(){return state.artifacts.find(a=>a.id===ui.selectedArtifactId)||state.artifacts[0]}
   function currentApproval(){return state.approvals.find(a=>a.id===ui.selectedApprovalId)||state.approvals[0]}
   function currentConversation(){return state.conversations.find(c=>c.id===state.activeConversationId)||state.conversations[0]}
+  function verificationContextConversationId(){
+    if(state.activeDomain==='work')return conversationIdForMission(state,ui.selectedMissionId)||null;
+    return state.activeConversationId||null;
+  }
+  async function refreshVerificationProjection(){
+    if(!backendConnected){ui.verificationProjection=null;ui.verificationConversationId=null;return null}
+    const conversationId=verificationContextConversationId();
+    if(!conversationId){ui.verificationProjection=null;ui.verificationConversationId=null;return null}
+    if(ui.verificationRefreshInFlight===conversationId)return null;
+    ui.verificationRefreshInFlight=conversationId;
+    try{
+      const payload=await apiClient.context(conversationId);
+      if(verificationContextConversationId()!==conversationId)return null;
+      ui.verificationProjection=payload?.outcomeVerification??null;
+      ui.verificationConversationId=conversationId;
+      render();
+      return ui.verificationProjection;
+    }catch{
+      if(verificationContextConversationId()===conversationId){ui.verificationProjection={status:'unknown'};ui.verificationConversationId=conversationId;render()}
+      return null;
+    }finally{if(ui.verificationRefreshInFlight===conversationId)ui.verificationRefreshInFlight=null}
+  }
+  function stopVerificationRefresh(){if(verificationRefreshTimer){clearInterval(verificationRefreshTimer);verificationRefreshTimer=null}}
+  function startVerificationRefresh(){
+    stopVerificationRefresh();
+    if(!backendConnected)return;
+    void refreshVerificationProjection();
+    verificationRefreshTimer=setInterval(()=>{if(backendConnected)void refreshVerificationProjection()},VERIFICATION_REFRESH_MS);
+  }
   function currentAgent(){return state.agents.find(a=>a.id===ui.selectedAgentId)||state.agents[0]}
   function currentSpace(){return (state.spaces||[]).find(space=>space.id===state.activeSpaceId)||(state.spaces||[])[0]}
   function activeMode(){if(ui.activeSurface){const surface=SIDEBAR_DESTINATIONS.find(item=>item.id===ui.activeSurface);return surface?.domain==='work'?'work':null}if(state.primaryMode==='space'&&state.activeDomain==='work')return 'space';if(state.activeDomain==='work')return 'work';if(state.activeDomain==='chat')return 'chat';return null}
@@ -115,6 +146,7 @@ export function bootstrapAftergraph(){
     if(payload?.runtimes)backendRuntimes=payload.runtimes;
     saveState();
     if(renderNow)render();
+    if(backendConnected)void refreshVerificationProjection();
   }
   function applyUpstreamPayload(payload,{renderNow=true}={}){
     state=reconcileUpstreamSync(state,payload);
@@ -152,6 +184,7 @@ export function bootstrapAftergraph(){
       backendRuntimes=nextRuntimes;saveState();renderScheduler?.update(state,backendRuntimes);return;
     }
     state=nextState;backendRuntimes=nextRuntimes;saveState();
+    if(backendConnected)void refreshVerificationProjection();
     if(renderScheduler)renderScheduler.update(nextState,nextRuntimes);else render();
   }
   function updateConnectivityNotice(phase){
@@ -172,8 +205,10 @@ export function bootstrapAftergraph(){
     updateConnectivityNotice(phase);
     refreshActiveContextStrip();
     refreshGeneratedSurfaces();
+    if(phase==='current')startVerificationRefresh();else stopVerificationRefresh();
   }
   function backendFailed(error){
+    stopVerificationRefresh();
     backendConnected=false;backendRuntimes={};backendSession?.stop?.();backendSession=null;
     ui.backendStatus='offline';document.documentElement.dataset.backend='local';
     if(error?.code!=='backend_unavailable')console.warn('Aftergraph backend degraded to local mode',error?.code||error);
@@ -240,9 +275,9 @@ export function bootstrapAftergraph(){
       if(conversationId)state.activeConversationId=conversationId;
     }
     if(id==='space'){state.primaryMode='space';state.activeDomain='work';ui.activeSurface=null;ui.mobileSidebarOpen=false;saveState();try{history.pushState({},'',withAppBase('/space',routeBase))}catch{};render();return}
-    state.primaryMode=id;navigateDomain(canonicalDomainForNav(id)||id)
+    state.primaryMode=id;navigateDomain(canonicalDomainForNav(id)||id);if(id==='chat'&&backendConnected)void refreshVerificationProjection()
   }
-  function navigateObject(type,id){state.activeDomain=domainForObject(type);ui.activeSurface=null;selectObject(type,id);try{history.pushState({},'',withAppBase(buildDeepLink(state.activeDomain,type,id),routeBase))}catch{};saveState();render()}
+  function navigateObject(type,id){state.activeDomain=domainForObject(type);ui.activeSurface=null;selectObject(type,id);try{history.pushState({},'',withAppBase(buildDeepLink(state.activeDomain,type,id),routeBase))}catch{};saveState();render();if(state.activeDomain==='chat'&&backendConnected)void refreshVerificationProjection()}
   function navigateSurface(id){
     const surface=SIDEBAR_DESTINATIONS.find(item=>item.id===id);if(!surface)return;
     if(surface.kind==='mode'){navigateHuman(surface.id);return}
@@ -396,7 +431,9 @@ export function bootstrapAftergraph(){
     const linked=state.artifacts.find(a=>a.missionId===mission?.id)||currentArtifact();
     if(linked)ui.selectedArtifactId=linked.id;
     const layout=composeLivingLayout({device:ui.device,artifactOpen:ui.artifactOpen,inspectorOpen:ui.inspectorOpen,takeover:mission?.controlMode==='takeover'});
-    const header=`<header class="ag-conversation-head"><div><div class="ag-crumbs"><span>Project</span><i></i><span>Growth & Strategy</span></div><h1>${escapeHtml(conv.title)}</h1><p>${escapeHtml(mission?.objective||'Ask anything. Start work when you want an outcome carried through.')}</p></div><div class="ag-context-actions">${mission?.controlMode==='takeover'?`<button class="ag-button active-control" data-action="handback" data-id="${mission.id}">${AGIcon('shield',{size:14})} Human control</button>`:`<button class="ag-button" data-action="takeover" data-id="${mission?.id||''}">${AGIcon('shield',{size:14})} Take over</button>`}<button class="ag-icon-button" data-action="open-artifact" aria-label="Open artifact">${AGIcon('artifact',{size:16})}</button></div></header>`;
+    const verification=ui.verificationConversationId===conv.id?ui.verificationProjection:null;
+    const verificationProvenance=backendConnected&&verification?AGVerificationProvenance({verification}):'';
+    const header=`<header class="ag-conversation-head"><div><div class="ag-crumbs"><span>Project</span><i></i><span>Growth & Strategy</span></div><h1>${escapeHtml(conv.title)}</h1><p>${escapeHtml(mission?.objective||'Ask anything. Start work when you want an outcome carried through.')}</p>${verificationProvenance}</div><div class="ag-context-actions">${mission?.controlMode==='takeover'?`<button class="ag-button active-control" data-action="handback" data-id="${mission.id}">${AGIcon('shield',{size:14})} Human control</button>`:`<button class="ag-button" data-action="takeover" data-id="${mission?.id||''}">${AGIcon('shield',{size:14})} Take over</button>`}<button class="ag-icon-button" data-action="open-artifact" aria-label="Open artifact">${AGIcon('artifact',{size:16})}</button></div></header>`;
     const takeover=mission?.controlMode==='takeover'?`<div class="ag-takeover-ribbon"><span>${AGIcon('shield',{size:15})}<strong>You are driving.</strong> Agent execution is paused until you hand control back.</span><button data-action="handback" data-id="${mission.id}">Hand back</button></div>`:'';
     const messages=conv.messages.map(renderMessage).join('')+renderInsightBlock(mission)+renderOutcome(mission);
     const actions=AGActionDock({actions:[{label:'Artifact',action:'open-artifact',icon:'artifact'},{label:'Delegate',action:'delegate',icon:'agents'},{label:'Context',action:'context-preview',icon:'inspect'},{label:'Needs you',action:'show-control',icon:'approval',meta:String(attentionCount(state))}]});
@@ -429,7 +466,10 @@ export function bootstrapAftergraph(){
     const proposals=upstream.workIntelligence?.workItems||[];
     const truth=(canonicalWorks.length||proposals.length)?`<div class="ag-polyrepo-work"><div class="ag-section-heading"><span>Source truth</span><small>Read-only projections</small></div>${canonicalWorks.slice(0,3).map(work=>AGExternalWorkRow({work})).join('')}${proposals.slice(0,3).map(item=>AGDetectionProposalRow({item})).join('')}</div>`:'';
     const rail=`<div><span>Work</span><button data-action="new-goal" aria-label="New mission">+</button></div>${state.missions.map(m=>`<button class="${m.id===mission.id?'active':''}" data-mission="${m.id}"><span class="ag-mission-state ${escapeHtml(m.state)}"></span><span><strong>${escapeHtml(m.title)}</strong><small>${escapeHtml(m.agent)} · ${m.progress}%</small></span>${m.state==='awaiting_approval'?'<b>Needs you</b>':''}</button>`).join('')}${truth}`;
-    const header=`<header><div><small>Mission</small><h1>${escapeHtml(mission.title)}</h1><p>${escapeHtml(mission.objective)}</p></div><div><button class="ag-button" data-action="${mission.controlMode==='takeover'?'handback':'takeover'}" data-id="${mission.id}">${AGIcon('shield',{size:14})} ${mission.controlMode==='takeover'?'Hand back':'Take over'}</button><button class="ag-button primary" data-action="${runtimeFor(mission.id)?.status==='running'?'pause-live':'run-live'}">${AGIcon(runtimeFor(mission.id)?.status==='running'?'pause':'play',{size:14})} ${runtimeFor(mission.id)?.status==='running'?'Pause':'Run'}</button></div></header>`;
+    const verificationConversationId=conversationIdForMission(state,mission.id)||null;
+    const verification=ui.verificationConversationId===verificationConversationId?ui.verificationProjection:null;
+    const verificationProvenance=backendConnected&&verification?AGVerificationProvenance({verification}):'';
+    const header=`<header><div><small>Mission</small><h1>${escapeHtml(mission.title)}</h1><p>${escapeHtml(mission.objective)}</p>${verificationProvenance}</div><div><button class="ag-button" data-action="${mission.controlMode==='takeover'?'handback':'takeover'}" data-id="${mission.id}">${AGIcon('shield',{size:14})} ${mission.controlMode==='takeover'?'Hand back':'Take over'}</button><button class="ag-button primary" data-action="${runtimeFor(mission.id)?.status==='running'?'pause-live':'run-live'}">${AGIcon(runtimeFor(mission.id)?.status==='running'?'pause':'play',{size:14})} ${runtimeFor(mission.id)?.status==='running'?'Pause':'Run'}</button></div></header>`;
     const attention=mission.state==='awaiting_approval'?AGNeedYou({id:'need_prod_inline',type:'approval',title:'Production action needs approval',severity:'high',detail:'Inspect risk, rollback and evidence before execution.'}):'';
     const artifact=ui.artifactOpen?`<div class="ag-resize-handle" role="separator" tabindex="0" aria-label="Resize artifact" aria-valuemin="34" aria-valuemax="56" aria-valuenow="${ui.artifactWidth}"><i></i></div>${renderArtifactSurface('split')}`:'';
     return renderWorkView({rail,header,summary:AGWorkSummary({mission,compact:true}),attention,outcome:renderOutcome(mission),trajectory:AGTrajectory({steps:mission.steps}),composer:renderSharedComposer({mode:state.composerMode}),artifact,artifactOpen:ui.artifactOpen});
@@ -927,8 +967,8 @@ export function bootstrapAftergraph(){
     if(el.dataset.composerAction){if(el.dataset.composerAction==='attach'){document.querySelector('.ag-intent-composer [data-intent-files]')?.click();return}if(el.dataset.composerAction==='context-picker'){ui.inspectorKind='context';ui.inspectorOpen=true;render();return}if(el.dataset.composerAction==='capability-picker'){document.querySelector('.ag-intent-capabilities button')?.focus();toast('Choose a capability above');return}}
     if(el.dataset.vizAction==='inspect-node'){ui.inspectorOpen=true;ui.inspectorKind='context';render();return}
     if(el.dataset.humanNav){ui.mobileSidebarOpen=false;navigateHuman(el.dataset.humanNav);return}
-    if(el.dataset.conversation){ui.mobileSidebarOpen=false;ui.activeSurface=null;ui.followLatest=true;ui.forceFollowLatest=true;ui.messageScrollTop=0;state.activeConversationId=el.dataset.conversation;const conv=state.conversations.find(c=>c.id===el.dataset.conversation);if(conv?.missionId)ui.selectedMissionId=conv.missionId;state.activeDomain=conv?.missionId?'work':'chat';state.primaryMode=conv?.missionId?'work':'chat';ui.artifactOpen=false;saveState();render();return}
-    if(el.dataset.mission){ui.mobileSidebarOpen=false;ui.activeSurface=null;ui.selectedMissionId=el.dataset.mission;state.activeDomain='work';state.primaryMode='work';ui.artifactOpen=false;render();return}
+    if(el.dataset.conversation){ui.mobileSidebarOpen=false;ui.activeSurface=null;ui.followLatest=true;ui.forceFollowLatest=true;ui.messageScrollTop=0;state.activeConversationId=el.dataset.conversation;const conv=state.conversations.find(c=>c.id===el.dataset.conversation);if(conv?.missionId)ui.selectedMissionId=conv.missionId;state.activeDomain=conv?.missionId?'work':'chat';state.primaryMode=conv?.missionId?'work':'chat';ui.artifactOpen=false;saveState();render();if(backendConnected)void refreshVerificationProjection();return}
+    if(el.dataset.mission){ui.mobileSidebarOpen=false;ui.activeSurface=null;ui.selectedMissionId=el.dataset.mission;state.activeDomain='work';state.primaryMode='work';ui.artifactOpen=false;render();if(backendConnected)void refreshVerificationProjection();return}
     if(el.dataset.agent){ui.selectedAgentId=el.dataset.agent;ui.inspectorKind='agent';ui.inspectorOpen=true;render();return}
     if(el.dataset.connection){ui.selectedConnectionId=el.dataset.connection;ui.inspectorKind='connection';ui.inspectorOpen=true;render();return}
     if(el.dataset.artifact){ui.selectedArtifactId=el.dataset.artifact;ui.artifactOpen=true;render();return}
@@ -1048,7 +1088,7 @@ export function bootstrapAftergraph(){
   };
   render();
   void connectBackend();
-  window.addEventListener('beforeunload',()=>{backendSession?.stop?.();stopReplay()},{once:true});
+  window.addEventListener('beforeunload',()=>{stopVerificationRefresh();backendSession?.stop?.();stopReplay()},{once:true});
 
   // Pointer-reactive depth is intentionally decorative. State and controls never depend on it.
   let agPointerFrame=0;
@@ -1064,5 +1104,5 @@ export function bootstrapAftergraph(){
       root.style.setProperty('--pointer-y',`${Math.round(y/window.innerHeight*100)}%`);
     });
   });
-  return ()=>{try{backendSession?.stop?.()}catch{};try{stopReplay()}catch{};try{stopRuntimeTimer()}catch{}};
+  return ()=>{try{stopVerificationRefresh()}catch{};try{backendSession?.stop?.()}catch{};try{stopReplay()}catch{};try{stopRuntimeTimer()}catch{}};
 }
