@@ -20,7 +20,14 @@ test('verification provenance renders durable Sentinel receipt semantics fail-cl
 test('bootstrap treats verification as ephemeral GET context projection, never persisted business truth',async()=>{
   const source=await readFile(new URL('../src/app/bootstrap.mjs',import.meta.url),'utf8');
   assert.match(source,/apiClient\.context\(/);
+  assert.match(source,/payload\?\.outcomeVerification/);
+  assert.doesNotMatch(source,/payload\?\.verification\b/);
   assert.match(source,/verificationProjection/);
   assert.match(source,/AGVerificationProvenance/);
+  assert.match(source,/VERIFICATION_REFRESH_MS/);
+  assert.match(source,/startVerificationRefresh/);
+  assert.match(source,/stopVerificationRefresh/);
+  assert.match(source,/function renderWork\(\)[\s\S]*AGVerificationProvenance/);
+  assert.doesNotMatch(source,/conversationIdForMission\(state,mission\.id\)\|\|state\.activeConversationId/);
   assert.doesNotMatch(source,/verificationProjection[^\n]{0,80}saveState\(/);
 });
