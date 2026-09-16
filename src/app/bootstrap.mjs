@@ -9,7 +9,7 @@ import { PRIMARY_NAV, MOBILE_PRIMARY_MODES, SIDEBAR_DESTINATIONS, canonicalDomai
 import { deriveActiveContext, alignModeToActiveContext, conversationIdForMission } from '../workspace/active-context.mjs';
 import { icon } from '../icons.mjs';
 import { AGIcon } from '../../packages/icons/index.mjs';
-import { AGTrajectory, AGArtifact, AGApproval, AGAuthPanel, AGUserInvite, AGNeedYou, AGComposer, AGAgentPresence, AGAgentCluster, AGActionDock, AGOutcomeReceipt, AGCommandPalette, AGPulseRail, AGContextSummary, AGMemoryItem, AGWorkSummary, AGTelemetryStrip, AGAgentCard, AGDelegationStrip, AGConnectionRow, AGArtifactRow, AGEventRow, AGUpstreamServiceRow, AGExternalWorkRow, AGDetectionProposalRow, AGSourceTruthBadge, AGActiveContextBar } from '../../packages/ui/index.mjs';
+import { AGTrajectory, AGArtifact, AGApproval, AGAuthPanel, AGUserInvite, AGNeedYou, AGComposer, AGAgentPresence, AGAgentCluster, AGActionDock, AGOutcomeReceipt, AGCommandPalette, AGPulseRail, AGContextSummary, AGMemoryItem, AGWorkSummary, AGTelemetryStrip, AGAgentCard, AGDelegationStrip, AGConnectionRow, AGArtifactRow, AGEventRow, AGUpstreamServiceRow, AGExternalWorkRow, AGDetectionProposalRow, AGSourceTruthBadge, AGVerificationProvenance, AGActiveContextBar } from '../../packages/ui/index.mjs';
 import { composeLivingLayout } from '../../packages/runtime-ui/index.mjs';
 import { animateElement, morphSurface, prefersReducedMotion } from '../../packages/motion/index.mjs';
 import { createLiveRuntime, stepMission, pauseMission, resumeMission } from '../live-runtime.mjs';
@@ -102,6 +102,23 @@ export function bootstrapAftergraph(){
   function currentArtifact(){return state.artifacts.find(a=>a.id===ui.selectedArtifactId)||state.artifacts[0]}
   function currentApproval(){return state.approvals.find(a=>a.id===ui.selectedApprovalId)||state.approvals[0]}
   function currentConversation(){return state.conversations.find(c=>c.id===state.activeConversationId)||state.conversations[0]}
+  async function refreshVerificationProjection(){
+    if(!backendConnected){ui.verificationProjection=null;ui.verificationConversationId=null;return null}
+    const conversationId=state.activeConversationId;if(!conversationId)return null;
+    if(ui.verificationRefreshInFlight===conversationId)return null;
+    ui.verificationRefreshInFlight=conversationId;
+    try{
+      const payload=await apiClient.context(conversationId);
+      if(state.activeConversationId!==conversationId)return null;
+      ui.verificationProjection=payload?.verification||{status:'unknown'};
+      ui.verificationConversationId=conversationId;
+      render();
+      return ui.verificationProjection;
+    }catch{
+      if(state.activeConversationId===conversationId){ui.verificationProjection={status:'unknown'};ui.verificationConversationId=conversationId;render()}
+      return null;
+    }finally{if(ui.verificationRefreshInFlight===conversationId)ui.verificationRefreshInFlight=null}
+  }
   function currentAgent(){return state.agents.find(a=>a.id===ui.selectedAgentId)||state.agents[0]}
   function currentSpace(){return (state.spaces||[]).find(space=>space.id===state.activeSpaceId)||(state.spaces||[])[0]}
   function activeMode(){if(ui.activeSurface){const surface=SIDEBAR_DESTINATIONS.find(item=>item.id===ui.activeSurface);return surface?.domain==='work'?'work':null}if(state.primaryMode==='space'&&state.activeDomain==='work')return 'space';if(state.activeDomain==='work')return 'work';if(state.activeDomain==='chat')return 'chat';return null}
@@ -115,6 +132,7 @@ export function bootstrapAftergraph(){
     if(payload?.runtimes)backendRuntimes=payload.runtimes;
     saveState();
     if(renderNow)render();
+    if(backendConnected)void refreshVerificationProjection();
   }
   function applyUpstreamPayload(payload,{renderNow=true}={}){
     state=reconcileUpstreamSync(state,payload);
@@ -152,6 +170,7 @@ export function bootstrapAftergraph(){
       backendRuntimes=nextRuntimes;saveState();renderScheduler?.update(state,backendRuntimes);return;
     }
     state=nextState;backendRuntimes=nextRuntimes;saveState();
+    if(backendConnected)void refreshVerificationProjection();
     if(renderScheduler)renderScheduler.update(nextState,nextRuntimes);else render();
   }
   function updateConnectivityNotice(phase){
@@ -172,6 +191,7 @@ export function bootstrapAftergraph(){
     updateConnectivityNotice(phase);
     refreshActiveContextStrip();
     refreshGeneratedSurfaces();
+    if(phase==='current')void refreshVerificationProjection();
   }
   function backendFailed(error){
     backendConnected=false;backendRuntimes={};backendSession?.stop?.();backendSession=null;
@@ -240,9 +260,9 @@ export function bootstrapAftergraph(){
       if(conversationId)state.activeConversationId=conversationId;
     }
     if(id==='space'){state.primaryMode='space';state.activeDomain='work';ui.activeSurface=null;ui.mobileSidebarOpen=false;saveState();try{history.pushState({},'',withAppBase('/space',routeBase))}catch{};render();return}
-    state.primaryMode=id;navigateDomain(canonicalDomainForNav(id)||id)
+    state.primaryMode=id;navigateDomain(canonicalDomainForNav(id)||id);if(id==='chat'&&backendConnected)void refreshVerificationProjection()
   }
-  function navigateObject(type,id){state.activeDomain=domainForObject(type);ui.activeSurface=null;selectObject(type,id);try{history.pushState({},'',withAppBase(buildDeepLink(state.activeDomain,type,id),routeBase))}catch{};saveState();render()}
+  function navigateObject(type,id){state.activeDomain=domainForObject(type);ui.activeSurface=null;selectObject(type,id);try{history.pushState({},'',withAppBase(buildDeepLink(state.activeDomain,type,id),routeBase))}catch{};saveState();render();if(state.activeDomain==='chat'&&backendConnected)void refreshVerificationProjection()}
   function navigateSurface(id){
     const surface=SIDEBAR_DESTINATIONS.find(item=>item.id===id);if(!surface)return;
     if(surface.kind==='mode'){navigateHuman(surface.id);return}
@@ -396,7 +416,9 @@ export function bootstrapAftergraph(){
     const linked=state.artifacts.find(a=>a.missionId===mission?.id)||currentArtifact();
     if(linked)ui.selectedArtifactId=linked.id;
     const layout=composeLivingLayout({device:ui.device,artifactOpen:ui.artifactOpen,inspectorOpen:ui.inspectorOpen,takeover:mission?.controlMode==='takeover'});
-    const header=`<header class="ag-conversation-head"><div><div class="ag-crumbs"><span>Project</span><i></i><span>Growth & Strategy</span></div><h1>${escapeHtml(conv.title)}</h1><p>${escapeHtml(mission?.objective||'Ask anything. Start work when you want an outcome carried through.')}</p></div><div class="ag-context-actions">${mission?.controlMode==='takeover'?`<button class="ag-button active-control" data-action="handback" data-id="${mission.id}">${AGIcon('shield',{size:14})} Human control</button>`:`<button class="ag-button" data-action="takeover" data-id="${mission?.id||''}">${AGIcon('shield',{size:14})} Take over</button>`}<button class="ag-icon-button" data-action="open-artifact" aria-label="Open artifact">${AGIcon('artifact',{size:16})}</button></div></header>`;
+    const verification=ui.verificationConversationId===conv.id?ui.verificationProjection:null;
+    const verificationProvenance=backendConnected?AGVerificationProvenance({verification}):'';
+    const header=`<header class="ag-conversation-head"><div><div class="ag-crumbs"><span>Project</span><i></i><span>Growth & Strategy</span></div><h1>${escapeHtml(conv.title)}</h1><p>${escapeHtml(mission?.objective||'Ask anything. Start work when you want an outcome carried through.')}</p>${verificationProvenance}</div><div class="ag-context-actions">${mission?.controlMode==='takeover'?`<button class="ag-button active-control" data-action="handback" data-id="${mission.id}">${AGIcon('shield',{size:14})} Human control</button>`:`<button class="ag-button" data-action="takeover" data-id="${mission?.id||''}">${AGIcon('shield',{size:14})} Take over</button>`}<button class="ag-icon-button" data-action="open-artifact" aria-label="Open artifact">${AGIcon('artifact',{size:16})}</button></div></header>`;
     const takeover=mission?.controlMode==='takeover'?`<div class="ag-takeover-ribbon"><span>${AGIcon('shield',{size:15})}<strong>You are driving.</strong> Agent execution is paused until you hand control back.</span><button data-action="handback" data-id="${mission.id}">Hand back</button></div>`:'';
     const messages=conv.messages.map(renderMessage).join('')+renderInsightBlock(mission)+renderOutcome(mission);
     const actions=AGActionDock({actions:[{label:'Artifact',action:'open-artifact',icon:'artifact'},{label:'Delegate',action:'delegate',icon:'agents'},{label:'Context',action:'context-preview',icon:'inspect'},{label:'Needs you',action:'show-control',icon:'approval',meta:String(attentionCount(state))}]});

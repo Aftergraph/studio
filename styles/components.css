@@ -139,3 +139,6 @@ html[data-theme="dark"] .send-button{background:#fff;color:#111}
 .toast-region{position:fixed;z-index:200;right:18px;bottom:18px;display:flex;flex-direction:column;gap:8px;pointer-events:none}.toast{background:var(--text);color:var(--canvas);padding:9px 11px;border-radius:9px;font-size:10px;box-shadow:var(--shadow-soft)}
 .mobile-bottom-nav{display:none}
 
+
+.ag-verification-provenance{display:inline-flex;align-items:center;gap:.45rem;margin-top:.65rem;padding:.3rem .55rem;border:1px solid var(--ag-border-subtle);border-radius:999px;font-size:.72rem;line-height:1.2}
+.ag-verification-provenance small,.ag-verification-provenance code{opacity:.68;font-size:.68rem}.ag-verification-provenance.passed strong{font-weight:650}.ag-verification-provenance.failed{border-style:dashed}.ag-verification-provenance.unknown,.ag-verification-provenance.pending{opacity:.78}
