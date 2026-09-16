@@ -15,7 +15,7 @@ Core Law:
 | Service / Participant | Canonical Role | Default Branch | Pinned Revision (SHA) | Authority Boundary |
 |---|---|---|---|---|
 | **Trust Gateway** (`trust-gateway`) | Runtime enforcement, policy, RBAC, audit, approval | `main` | `515f8f744ff9b0a14df7398e38693fd3ac7ab667` | Authorization truth for consequential writes |
-| **WORKS** (`works`) | Durable execution, Work, WorkGraph, Brain | `main` | `3ea1a80494c38f3e422339db6efbf5a7935a48be` | Execution state, recovery, leases, execution evidence |
+| **WORKS** (`works`) | Durable execution, Work, WorkGraph, Brain | `main` | `f69e5182f9d3d7e74817ec8ec2cee52ba2f9c62d` | Execution state, recovery, leases, execution evidence |
 | **AIE** (`aie`) | Institutional authority, delegation, lifecycle | `main` | `3432834afd80e60009f1252a1801f21feb551b9b` | Normative authority & delegation contracts |
 | **Work Intelligence V2** (`work-intelligence`) | Observation, WorkItems, proposals | `main` | `f5cd61ef02b858bcc31f2bb25a0bb792a3b46eeb` | Proposal-only. `WorkItem != WORKS Work` |
 | **Governance** (`governance`) | Canonical contracts, schemas, mission states | `main` | `40226ebd03ef4c6f081229cce393b231009f0e18` | Organization-wide cross-repo contracts |

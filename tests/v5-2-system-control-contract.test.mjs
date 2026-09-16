@@ -5,7 +5,7 @@ import * as controlView from '../src/views/control-view.mjs';
 
 const services={
   trustGateway:{configured:true,online:true,role:'runtime-enforcement',repo:'Aftergraph/trust-gateway',headSha:'515f8f744ff9b0a14df7398e38693fd3ac7ab667'},
-  works:{configured:true,online:false,role:'durable-execution',repo:'Aftergraph/works-execution',headSha:'3ea1a80494c38f3e422339db6efbf5a7935a48be'},
+  works:{configured:true,online:false,role:'durable-execution',repo:'Aftergraph/works-execution',headSha:'f69e5182f9d3d7e74817ec8ec2cee52ba2f9c62d'},
 };
 
 test('System surface collapses exact-head provenance and represents degraded service state in text',()=>{

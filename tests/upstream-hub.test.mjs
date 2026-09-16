@@ -46,7 +46,7 @@ function config(base){return {
 
 test('upstream manifest pins exact reviewed heads and semantic roles',()=>{
   assert.equal(UPSTREAM_REVISIONS.trustGateway.sha,'515f8f744ff9b0a14df7398e38693fd3ac7ab667');
-  assert.equal(UPSTREAM_REVISIONS.works.sha,'3ea1a80494c38f3e422339db6efbf5a7935a48be');
+  assert.equal(UPSTREAM_REVISIONS.works.sha,'f69e5182f9d3d7e74817ec8ec2cee52ba2f9c62d');
   assert.equal(UPSTREAM_REVISIONS.aie.sha,'3432834afd80e60009f1252a1801f21feb551b9b');
   assert.equal(UPSTREAM_REVISIONS.workIntelligence.sha,'f5cd61ef02b858bcc31f2bb25a0bb792a3b46eeb');
   assert.equal(UPSTREAM_REVISIONS.governance.sha,'40226ebd03ef4c6f081229cce393b231009f0e18');

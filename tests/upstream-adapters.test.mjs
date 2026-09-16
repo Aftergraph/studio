@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { once } from 'node:events';
 import { createTrustGatewayAdapter } from '../src/integrations/trust-gateway.mjs';
-import { createWorksAdapter } from '../src/integrations/works.mjs';
+import { createWorksAdapter, projectWorksOutcomeVerification } from '../src/integrations/works.mjs';
 import { createAieAdapter } from '../src/integrations/aie.mjs';
 import { createWorkIntelligenceAdapter } from '../src/integrations/work-intelligence.mjs';
 import { createGovernanceAdapter } from '../src/integrations/governance.mjs';
@@ -81,6 +81,17 @@ test('WORKS adapter reads durable work, journal, evidence and bridge control sur
     assert.equal((await works.suspend('wrk_0123456789abcdef0123456789abcdef')).state,'WAITING_HUMAN');
     assert.equal((await works.brainPrefix('/org/acme/')).objects[0].path,'/org/acme/notes/x');
   });
+});
+
+
+test('WORKS outcome verification projection preserves independent provenance and fails closed',()=>{
+  const workId='wrk_0123456789abcdef0123456789abcdef';
+  const receipt='dvr_'+ 'a'.repeat(64);
+  assert.deepEqual(projectWorksOutcomeVerification({outcome_verification:{status:'pending'}},workId),{source:'works-execution',workId,status:'pending'});
+  assert.deepEqual(projectWorksOutcomeVerification({outcome_verification:{status:'passed',verifier_id:'sentinel:domain-verifier',evidence_ref:receipt,verified_at:'2026-09-16T06:00:00Z'}},workId),{source:'works-execution',workId,status:'passed',verifierRef:'sentinel:domain-verifier',receiptRef:receipt,verifiedAt:'2026-09-16T06:00:00Z'});
+  assert.equal(projectWorksOutcomeVerification({outcome_verification:{status:'passed',verifier_id:'agent:self',evidence_ref:receipt,verified_at:'2026-09-16T06:00:00Z'}},workId).status,'unknown');
+  assert.equal(projectWorksOutcomeVerification({outcome_verification:{status:'failed',verifier_id:'sentinel:domain-verifier',evidence_ref:'not-a-receipt',verified_at:'2026-09-16T06:00:00Z'}},workId).status,'unknown');
+  assert.equal(projectWorksOutcomeVerification({},workId).status,'unknown');
 });
 
 test('AIE adapter uses only documented A2A HTTP+JSON operations and requires stable messageId', async()=>{

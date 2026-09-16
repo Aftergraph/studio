@@ -51,6 +51,15 @@ function contextProjection(state, conversationId) {
   };
 }
 
+function correlatedWorksMissionId(conversation){
+  const messages=Array.isArray(conversation?.messages)?conversation.messages:[];
+  for(let i=messages.length-1;i>=0;i-=1){
+    const proposal=messages[i]?.trustProposal;
+    if(proposal?.status==='approved'&&typeof proposal.missionId==='string'&&proposal.missionId.trim())return proposal.missionId.trim();
+  }
+  return null;
+}
+
 export function upstreamConfigFromEnv(env=process.env) {
   const clean=value=>typeof value==='string'&&value.trim()?value.trim():undefined;
   return {
@@ -370,6 +379,8 @@ export function createAppServer({
           const conversationId = url.searchParams.get('conversationId') || store.snapshot().activeConversationId;
           const projection = contextProjection(store.snapshot(), conversationId);
           if (!projection.conversation) { sendJson(res, 404, { error:'conversation_not_found' }); return; }
+          const workId=correlatedWorksMissionId(projection.conversation);
+          if(workId)projection.outcomeVerification=await upstreamHub.workVerification(workId);
           sendJson(res, 200, projection);
           return;
         }
