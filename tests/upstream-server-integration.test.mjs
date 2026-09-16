@@ -22,6 +22,7 @@ async function withSystem(fn){
     if(req.url==='/tg/v1/approvals/apr_remote/approve'&&req.method==='POST')return send(res,200,{status:'approved'});
     if(req.url==='/works/healthz')return send(res,200,{status:'ok'});
     if(req.url==='/works/v1/works')return send(res,200,{works:[{id:'wrk_0123456789abcdef0123456789abcdef',state:'RUNNING',objective:'Canonical work'}]});
+    if(req.url==='/works/v1/works/wrk_0123456789abcdef0123456789abcdef/evidence')return send(res,200,{bundle_id:'evb_1',outcome_verification:{status:'passed',verifier_id:'sentinel:domain-verifier',evidence_ref:'dvr_'+ 'a'.repeat(64),verified_at:'2026-09-16T06:00:00Z'}});
     if(req.url==='/works/v1/brain/objects?prefix=%2Forg%2Facme%2F')return send(res,200,{objects:[{path:'/org/acme/notes/runtime'}]});
     if(req.url==='/aie/tasks')return send(res,200,{tasks:[{id:'task_remote',state:'working'}]});
     if(req.url==='/wi/healthz')return send(res,200,{status:'ok'});
@@ -40,7 +41,7 @@ async function withSystem(fn){
     },
   });
   const appBase=await listen(app);
-  try{await fn({appBase,upstreamCalls})}finally{
+  try{await fn({appBase,upstreamCalls,app})}finally{
     app.close();upstream.close();await Promise.all([once(app,'close'),once(upstream,'close')]);await rm(dir,{recursive:true,force:true});
   }
 }
@@ -52,7 +53,7 @@ test('GET upstream status exposes exact source provenance but never credentials'
     const {response,body}=await req(appBase,'/api/v1/upstreams');
     assert.equal(response.status,200);
     assert.equal(body.services.trustGateway.online,true);
-    assert.equal(body.services.works.headSha,'3ea1a80494c38f3e422339db6efbf5a7935a48be');
+    assert.equal(body.services.works.headSha,'f69e5182f9d3d7e74817ec8ec2cee52ba2f9c62d');
     const text=JSON.stringify(body);
     assert.equal(text.includes('PRIVATE_TOKEN'),false);
   });
@@ -88,5 +89,38 @@ test('WI promotion proxy fails closed without explicit confirmation and human ac
     const result=await req(appBase,'/api/v1/upstreams/work-intelligence/wi_remote/promote',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({actor:'jonas'})});
     assert.equal(result.response.status,422);
     assert.equal(result.body.error,'explicit_confirmation_required');
+  });
+});
+
+
+test('GET context projects correlated WORKS verification read-only without minting authority',async()=>{
+  await withSystem(async({appBase,upstreamCalls,app})=>{
+    await app.workspace.store.mutate(draft=>{
+      const conv=draft.conversations.find(c=>c.id==='conv_q4')||draft.conversations[0];
+      conv.messages.push({id:'msg_verified',author:'Friday',type:'agent_run',text:'done',trustProposal:{source:'trust-gateway',id:'proposal_1',status:'approved',missionId:'wrk_0123456789abcdef0123456789abcdef'}});
+      return draft;
+    });
+    upstreamCalls.length=0;
+    const result=await req(appBase,'/api/v1/context?conversationId=conv_q4');
+    assert.equal(result.response.status,200);
+    assert.deepEqual(result.body.outcomeVerification,{source:'works-execution',workId:'wrk_0123456789abcdef0123456789abcdef',status:'passed',verifierRef:'sentinel:domain-verifier',receiptRef:'dvr_'+ 'a'.repeat(64),verifiedAt:'2026-09-16T06:00:00Z'});
+    assert.equal('authorityGranted' in result.body.outcomeVerification,false);
+    assert.deepEqual(upstreamCalls,['GET /works/v1/works/wrk_0123456789abcdef0123456789abcdef/evidence']);
+  });
+});
+
+
+test('GET context never treats an unapproved Trust correlation as verified work',async()=>{
+  await withSystem(async({appBase,upstreamCalls,app})=>{
+    await app.workspace.store.mutate(draft=>{
+      const conv=draft.conversations.find(c=>c.id==='conv_q4')||draft.conversations[0];
+      conv.messages.push({id:'msg_submitted',author:'Friday',type:'agent_run',text:'pending',trustProposal:{source:'trust-gateway',id:'proposal_pending',status:'submitted',missionId:'wrk_0123456789abcdef0123456789abcdef'}});
+      return draft;
+    });
+    upstreamCalls.length=0;
+    const result=await req(appBase,'/api/v1/context?conversationId=conv_q4');
+    assert.equal(result.response.status,200);
+    assert.equal(result.body.outcomeVerification,undefined);
+    assert.equal(upstreamCalls.some(call=>call.includes('/evidence')),false);
   });
 });

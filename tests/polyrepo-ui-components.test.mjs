@@ -10,10 +10,10 @@ test('inhouse UI includes source-truth primitives for polyrepo runtime',()=>{
 });
 
 test('upstream service row exposes runtime state and exact-head provenance without credentials',()=>{
-  const html=AGUpstreamServiceRow({id:'works',label:'WORKS',service:{configured:true,online:true,headSha:'3ea1a80494c38f3e422339db6efbf5a7935a48be',role:'durable-execution'}});
+  const html=AGUpstreamServiceRow({id:'works',label:'WORKS',service:{configured:true,online:true,headSha:'f69e5182f9d3d7e74817ec8ec2cee52ba2f9c62d',role:'durable-execution'}});
   assert.match(html,/data-upstream="works"/);
   assert.match(html,/online/);
-  assert.match(html,/3ea1a804/);
+  assert.match(html,/f69e5182/);
   assert.match(html,/durable-execution/);
 });
 

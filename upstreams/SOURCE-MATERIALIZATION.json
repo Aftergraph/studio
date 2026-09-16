@@ -42,9 +42,9 @@
     {
       "kind": "reviewed-interface-notes",
       "repo": "Aftergraph/works-execution",
-      "head": "3ea1a80494c38f3e422339db6efbf5a7935a48be",
+      "head": "f69e5182f9d3d7e74817ec8ec2cee52ba2f9c62d",
       "local_path": "source-seams/works-execution/HTTP-SURFACES.md",
-      "sha256": "459489dca3ba7ec19b9aabc563a3a9ed1c33568acb3e86d2385900998e0aeccd"
+      "sha256": "295d57ffed56d1504d0d791f8a654f7feb2dabe9df142b59324facff54515e97"
     },
     {
       "kind": "reviewed-interface-notes",

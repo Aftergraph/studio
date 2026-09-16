@@ -1,12 +1,12 @@
 import { createTrustGatewayAdapter } from './trust-gateway.mjs';
-import { createWorksAdapter } from './works.mjs';
+import { createWorksAdapter, projectWorksOutcomeVerification } from './works.mjs';
 import { createAieAdapter } from './aie.mjs';
 import { createWorkIntelligenceAdapter } from './work-intelligence.mjs';
 import { createGovernanceAdapter } from './governance.mjs';
 
 export const UPSTREAM_REVISIONS=Object.freeze({
   trustGateway:Object.freeze({repo:'Aftergraph/trust-gateway',branch:'main',sha:'515f8f744ff9b0a14df7398e38693fd3ac7ab667',role:'runtime-enforcement'}),
-  works:Object.freeze({repo:'Aftergraph/works-execution',branch:'main',sha:'3ea1a80494c38f3e422339db6efbf5a7935a48be',role:'durable-execution'}),
+  works:Object.freeze({repo:'Aftergraph/works-execution',branch:'main',sha:'f69e5182f9d3d7e74817ec8ec2cee52ba2f9c62d',role:'durable-execution'}),
   aie:Object.freeze({repo:'Aftergraph/aie',branch:'main',sha:'3432834afd80e60009f1252a1801f21feb551b9b',role:'normative-authority'}),
   workIntelligence:Object.freeze({repo:'Aftergraph/work-intelligence-v2',branch:'main',sha:'f5cd61ef02b858bcc31f2bb25a0bb792a3b46eeb',role:'detection/observation/proposal-only'}),
   governance:Object.freeze({repo:'Aftergraph/after-graph-governance',branch:'main',sha:'40226ebd03ef4c6f081229cce393b231009f0e18',role:'canonical-contracts'}),
@@ -102,6 +102,12 @@ export function createUpstreamHub(config={}, {fetchImpl=globalThis.fetch}={}){
       if(['approve','approved'].includes(String(decision||''))) return adapter.approveProposal(id,{});
       if(['reject','rejected','deny','denied'].includes(String(decision||''))) return adapter.rejectProposal(id,reason||'rejected');
       throw new Error('proposal decision must be approve or reject');
+    },
+    async workVerification(id){
+      if(!works)return Object.freeze({source:'works-execution',workId:String(id||'')||null,status:'unknown'});
+      const result=await safeCall(()=>works.evidence(id));
+      if(!result.ok)return Object.freeze({source:'works-execution',workId:String(id||'')||null,status:'unknown'});
+      return projectWorksOutcomeVerification(result.value,id);
     },
     async controlWork(id,action,body={}){
       const adapter=requireAdapter(works,'works-execution');
