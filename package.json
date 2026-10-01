@@ -22,7 +22,8 @@
     "verify:release": "npm test && npm run verify && npm run verify:platforms && npm run verify:browser && npm run verify:browser:v6 && npm run verify:fullstack && npm run verify:upstreams && npm run verify:polyrepo && npm run verify:perf && npm run verify:e2e && npm run verify:secrets && npm run verify:a11y",
     "verify:upstreams": "node scripts/verify-upstreams.mjs",
     "verify:polyrepo": "node --test tests/upstream-adapters.test.mjs tests/upstream-hub.test.mjs tests/upstream-server-integration.test.mjs tests/api-client-polyrepo.test.mjs tests/polyrepo-ui-components.test.mjs tests/polyrepo-reconciliation.test.mjs tests/source-truth-bundle.test.mjs tests/polyrepo-verifier-contract.test.mjs && python scripts/polyrepo_bridge_smoke_v5.py",
-    "verify:a11y": "python scripts/a11y_smoke.py"
+    "verify:a11y": "python scripts/a11y_smoke.py",
+    "benchmark:openui": "node scripts/openui-interaction-benchmark.mjs"
   },
   "engines": {
     "node": ">=22"
