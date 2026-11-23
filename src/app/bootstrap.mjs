@@ -1,4 +1,5 @@
 import { DOMAINS, getDomain, domainForObject } from '../domain.mjs';
+import { projectConversationMessages } from '../conversation-message-projection.mjs';
 import { routeFromLocation, buildDeepLink, appBasePath, withAppBase } from '../router.mjs';
 import { createInitialState, resolveNeed, decideApproval, setTakeover, appendChatMessage, conversationMissionId } from '../state.mjs';
 import { searchIndex } from '../search.mjs';
@@ -435,7 +436,7 @@ export function bootstrapAftergraph(){
     const verificationProvenance=backendConnected&&verification?AGVerificationProvenance({verification}):'';
     const header=`<header class="ag-conversation-head"><div><div class="ag-crumbs"><span>Project</span><i></i><span>Growth & Strategy</span></div><h1>${escapeHtml(conv.title)}</h1><p>${escapeHtml(mission?.objective||'Ask anything. Start work when you want an outcome carried through.')}</p>${verificationProvenance}</div><div class="ag-context-actions">${mission?.controlMode==='takeover'?`<button class="ag-button active-control" data-action="handback" data-id="${mission.id}">${AGIcon('shield',{size:14})} Human control</button>`:`<button class="ag-button" data-action="takeover" data-id="${mission?.id||''}">${AGIcon('shield',{size:14})} Take over</button>`}<button class="ag-icon-button" data-action="open-artifact" aria-label="Open artifact">${AGIcon('artifact',{size:16})}</button></div></header>`;
     const takeover=mission?.controlMode==='takeover'?`<div class="ag-takeover-ribbon"><span>${AGIcon('shield',{size:15})}<strong>You are driving.</strong> Agent execution is paused until you hand control back.</span><button data-action="handback" data-id="${mission.id}">Hand back</button></div>`:'';
-    const messages=conv.messages.map(renderMessage).join('')+renderInsightBlock(mission)+renderOutcome(mission);
+    const messages=projectConversationMessages(conv.messages).map(renderMessage).join('')+renderInsightBlock(mission)+renderOutcome(mission);
     const actions=AGActionDock({actions:[{label:'Artifact',action:'open-artifact',icon:'artifact'},{label:'Delegate',action:'delegate',icon:'agents'},{label:'Context',action:'context-preview',icon:'inspect'},{label:'Needs you',action:'show-control',icon:'approval',meta:String(attentionCount(state))}]});
     const composer=renderSharedComposer({mode:state.composerMode});
     const meta=`<div class="ag-composer-meta"><span>${mission?.controlMode==='takeover'?'Human-controlled':'Ready'}</span><span>${mission?.evidenceCount||0} evidence${mission?.budget?` · ${compactMoney(mission.budget.used,mission.budget.currency)} used`:''}</span></div>`;
