@@ -1,3 +1,5 @@
+import { projectConversationMessages } from './conversation-message-projection.mjs';
+
 export function validateWorkspacePayload(payload) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new TypeError('invalid workspace payload');
   const state=payload.state;
@@ -23,7 +25,7 @@ function stableMission(mission={}) {
 function stableConversation(conversation={}) {
   return {
     id:conversation.id,missionId:conversation.missionId,title:conversation.title,status:conversation.status,
-    messages:(conversation.messages||[]).map(message=>({
+    messages:projectConversationMessages(conversation.messages).map(message=>({
       id:message.id,type:message.type,author:message.author,text:message.text,time:message.time,
       missionId:message.missionId,agentId:message.agentId,state:message.state,mode:message.mode,
     })),

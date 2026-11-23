@@ -35,6 +35,8 @@ export function createUIState(state={},device='desktop') {
     verificationConversationId:null,
     verificationRefreshInFlight:null,
     generatedInteractions:{},
+    composerDrafts:{},
+    activeComposerDraftKey:null,
     controlError:'',
     resyncMetric:null,
     auth:{ open:false, panel:'request', userId:'', token:'', error:'' },
