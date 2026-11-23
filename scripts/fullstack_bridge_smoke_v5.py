@@ -9,7 +9,7 @@ MODULES=[
     'src/domain.mjs','src/router.mjs','src/billing/fixtures.mjs','src/state.mjs','src/search.mjs','src/economy/currency.mjs','src/auth/ui-actions.mjs','src/ui-helpers.mjs','src/workspace-shell.mjs','src/workspace/active-context.mjs','src/icons.mjs',
     'packages/tokens/index.mjs','packages/icons/index.mjs','packages/motion/index.mjs','packages/runtime-ui/index.mjs',
     'packages/ui/shared.mjs','packages/ui/primitives/button.mjs','packages/ui/primitives/icon-button.mjs','packages/ui/primitives/input.mjs','packages/ui/primitives/menu.mjs','packages/ui/primitives/notice.mjs','packages/ui/conversation/turn.mjs','packages/ui/conversation/composer.mjs','packages/ui/conversation/response-status.mjs','packages/ui/work/work-summary.mjs','packages/ui/work/outcome-receipt.mjs','packages/ui/work/artifact.mjs','packages/ui/trust/approval.mjs','packages/ui/trust/auth-panel.mjs','packages/ui/trust/user-invite.mjs','packages/ui/trust/need-you.mjs','packages/ui/trust/evidence.mjs','packages/ui/trust/risk.mjs','packages/ui/agents/agent-card.mjs','packages/ui/agents/agent-presence.mjs','packages/ui/system/upstream-service-row.mjs','packages/ui/system/source-truth-badge.mjs','packages/ui/system/event-row.mjs','packages/ui/system/active-context-bar.mjs','packages/ui/index.mjs',
-    'src/live-runtime.mjs','src/api-routes.mjs','src/storage-adapter.mjs','src/api-client.mjs','src/surface-lifecycle.mjs','src/backend-reconciliation.mjs','src/action-guard.mjs',
+    'src/live-runtime.mjs','src/api-routes.mjs','src/storage-adapter.mjs','src/api-client.mjs','src/surface-lifecycle.mjs','src/conversation-message-projection.mjs','src/backend-reconciliation.mjs','src/action-guard.mjs',
     'packages/spatial/index.mjs','packages/presence/index.mjs','packages/interaction/index.mjs','packages/visualization/index.mjs','packages/composer/index.mjs',
     'src/replay.mjs','src/spatial-lifecycle.mjs','src/genui/component-registry.mjs','src/genui/action-catalog.mjs','src/genui/interaction-envelope.mjs','src/genui/aftergraph-registry.mjs','src/genui/chat-surface.mjs','src/app/ui-state.mjs','src/app/render-scheduler.mjs','src/runtime/backend-session.mjs','src/runtime/background-reconciliation.mjs','src/federation/browser-client.mjs','src/runtime/federation-session.mjs','src/views/chat-view.mjs','src/views/work-view.mjs','src/views/space-view.mjs','src/views/system-view.mjs','src/views/control-view.mjs','src/views/research-view.mjs','src/views/capabilities-view.mjs','src/app/bootstrap.mjs','src/main.mjs'
 ]
@@ -111,9 +111,27 @@ with tempfile.TemporaryDirectory(prefix='aftergraph-v5-bridge-') as td:
             check(page.locator('.ag-app').get_attribute('data-backend-state')=='connected','browser connects to real V5 durable backend through sandbox bridge')
 
             unique='V5 bridge '+str(int(time.time()*1000))
-            page.locator('.ag-composer textarea').fill(unique);page.locator('.ag-composer .ag-send').click();page.wait_for_timeout(180)
-            snap=api(base,'/api/v1/state')['state']
-            check(any(m.get('text')==unique for c in snap['conversations'] for m in c.get('messages',[])),'Chat write persists to real V5 backend')
+            page.locator('.ag-composer textarea').fill(unique)
+            # A separate source-of-truth update must not erase the user's unsent draft.
+            trigger=unique+' source-sync'
+            api(base,'/api/v1/conversations/conv_q4/messages','POST',{'text':trigger,'actor':'demo-user'})
+            page.locator('#message-list').get_by_text(trigger).wait_for(state='visible',timeout=5000)
+            check(page.locator('.ag-composer textarea').input_value()==unique,
+                  'unsent composer draft survives an authoritative server rerender')
+            check(page.locator('.ag-composer textarea').evaluate('el=>document.activeElement===el'),
+                  'server rerender preserves composer keyboard focus')
+            check(page.locator('.ag-composer textarea').evaluate('el=>el.selectionStart===el.value.length'),
+                  'server rerender preserves composer cursor position')
+            page.locator('.ag-composer .ag-send').click()
+            # A click starts asynchronous browser->bridge->backend work.
+            # Wait for authoritative server read-back, never assume a 180 ms fixed latency.
+            persisted=False;deadline=time.monotonic()+5
+            while time.monotonic()<deadline:
+                snap=api(base,'/api/v1/state')['state']
+                persisted=any(m.get('text')==unique for c in snap['conversations'] for m in c.get('messages',[]))
+                if persisted:break
+                page.wait_for_timeout(50)
+            check(persisted,'Chat write persists to real V5 backend')
 
             page.locator('.ag-mode-nav [data-human-nav="space"]').click();page.wait_for_timeout(130)
             check(page.locator('.ag-space-stage').is_visible(),'connected browser enters V5 Space')
