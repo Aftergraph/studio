@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { projectConversationMessages } from '../src/conversation-message-projection.mjs';
 import { isRuntimePatchOnly } from '../src/backend-reconciliation.mjs';
@@ -8,6 +9,7 @@ test('conversation: intentional text, plans and agent progress stay visible', ()
     { id:'u', author:'user', type:'text', text:'Run this' },
     { id:'p', author:'Friday', type:'plan', text:'I will investigate' },
     { id:'r', author:'system', type:'agent_run', text:'Agent working' },
+    { id:'g', author:'Friday', type:'generated', text:'Generated workspace view', generatedUI:[{kind:'text'}] },
   ];
   assert.deepEqual(projectConversationMessages(messages), messages);
 });
@@ -71,4 +73,25 @@ test('conversation: internal-only messages do not force a structural chat rerend
     id:'visible-1', author:'Friday', type:'text', text:'Ready',
   });
   assert.equal(isRuntimePatchOnly(previous,next),false);
+});
+
+test('conversation: browser harnesses declare projection module before dependent modules', () => {
+  const harnesses = [
+    'scripts/browser_smoke.py',
+    'scripts/browser_smoke_v5.py',
+    'scripts/capture_v5_2_visuals.py',
+    'scripts/fullstack_bridge_smoke.py',
+    'scripts/fullstack_bridge_smoke_v5.py',
+    'scripts/polyrepo_bridge_smoke_v5.py',
+    'scripts/v5_2_browser_qa.py',
+  ];
+  for (const file of harnesses) {
+    const content=readFileSync(new URL('../'+file,import.meta.url),'utf8');
+    const projection=content.indexOf("'src/conversation-message-projection.mjs'");
+    const reconciliation=content.indexOf("'src/backend-reconciliation.mjs'");
+    assert.ok(projection>=0, file+' must bundle the projection module');
+    assert.ok(projection<reconciliation, file+' must load projection before backend reconciliation');
+  }
+  const verify=readFileSync(new URL('../scripts/verify.mjs',import.meta.url),'utf8');
+  assert.ok(verify.includes("'src/conversation-message-projection.mjs'"),'release verifier includes projection syntax');
 });

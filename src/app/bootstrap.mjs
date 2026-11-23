@@ -744,8 +744,18 @@ export function bootstrapAftergraph(){
     return composeLivingLayout({device:ui.device,artifactOpen:ui.artifactOpen,inspectorOpen:ui.inspectorOpen,risk:approval?.risk||mission?.risk||'low',approvalPending:Boolean(approval&&approval.state==='pending'),takeover:mission?.controlMode==='takeover',attention:state.needsYou.length?'needs-you':'normal'});
   }
 
+  function composerDraftKey(conversationId){
+    const userId=state.user?.id;
+    return userId&&conversationId?`${userId}:${conversationId}`:null;
+  }
+
   function render(){
     if(qaMetrics)qaMetrics.shellRenders++;
+    const previousComposer=app.querySelector('.ag-composer textarea[name="message"]');
+    const previousDraftKey=ui.activeComposerDraftKey;
+    const composerHadFocus=Boolean(previousComposer&&document.activeElement===previousComposer);
+    const cursor=composerHadFocus?{start:previousComposer.selectionStart,end:previousComposer.selectionEnd}:null;
+    if(previousComposer&&previousDraftKey)ui.composerDrafts[previousDraftKey]=previousComposer.value;
     const existingList=document.querySelector('#message-list');
     if(existingList&&!ui.forceFollowLatest){ui.messageScrollTop=existingList.scrollTop;ui.followLatest=(existingList.scrollHeight-existingList.clientHeight-existingList.scrollTop)<32}
     ui.device=detectDevice();
@@ -755,6 +765,18 @@ export function bootstrapAftergraph(){
     const shellClass=[ui.immersive?'is-immersive':'',layout.gravity.mode==='approval-focus'?'attention-gravity':'',mission?.verified?'has-settled-outcome':''].filter(Boolean).join(' ');
     const globalPulse=activeMode()==='space'?'':renderPulseRail(mission);
     app.innerHTML=`<div class="ag-app ${shellClass}" data-backend-state="${backendConnected?'connected':'local'}" data-attention="${layout.gravity.mode}" data-theme-state="${layout.ambient.mode}" style="--artifact-width:${ui.artifactWidth}%">${renderAmbient(layout,mission)}${ui.mobileSidebarOpen?'<button class="ag-mobile-backdrop" data-action="toggle-sidebar" aria-label="Close workspace navigation"></button>':''}${renderSidebar()}<section class="ag-frame">${renderTopbar()}${renderActiveContextStrip()}<div class="ag-body">${renderView()}</div></section>${artifactMobile?renderArtifactSurface('fullscreen'):''}${globalPulse}${renderContextInspector()}${renderApprovalFocus()}${renderAuthFocus()}${renderPalette()}</div>`;
+    const nextDraftKey=state.activeDomain==='chat'
+      ?composerDraftKey(conversationIdForMission(state,ui.selectedMissionId)||state.activeConversationId)
+      :null;
+    ui.activeComposerDraftKey=nextDraftKey;
+    const nextComposer=app.querySelector('.ag-composer textarea[name="message"]');
+    if(nextComposer&&nextDraftKey){
+      nextComposer.value=ui.composerDrafts[nextDraftKey]||'';
+      if(composerHadFocus&&nextDraftKey===previousDraftKey){
+        nextComposer.focus();
+        if(cursor)nextComposer.setSelectionRange(Math.min(cursor.start,nextComposer.value.length),Math.min(cursor.end,nextComposer.value.length));
+      }
+    }
     postRender(mission,layout);
   }
 
@@ -784,6 +806,9 @@ export function bootstrapAftergraph(){
     const input=form.querySelector('textarea[name="message"]');const text=input?.value.trim();if(!text)return;
     ui.followLatest=true;ui.forceFollowLatest=true;
     const conversationId=conversationIdForMission(state,ui.selectedMissionId)||state.activeConversationId;
+    const draftKey=composerDraftKey(conversationId);
+    if(draftKey)delete ui.composerDrafts[draftKey];
+    input.value='';
     const mode=state.composerMode||'Ask';
     const reply={
       type:mode==='Goal'?'plan':'agent_run',
@@ -1002,7 +1027,15 @@ export function bootstrapAftergraph(){
 
   app.addEventListener('submit',event=>{if(event.target.matches('.ag-composer')){event.preventDefault();handleComposerSubmit(event.target);return}if(event.target.matches('.ag-intent-composer')){event.preventDefault();handleIntentSubmit(event.target)}});
   app.addEventListener('change',event=>{if(event.target.matches('[data-intent-files]')){ui.intentAttachments=[...event.target.files].slice(0,8).map(file=>({name:file.name,kind:file.type||'file'}));render()}});
-  app.addEventListener('input',event=>{if(event.target.id==='palette-input'){ui.paletteQuery=event.target.value;ui.paletteIndex=0;render();return}if(event.target.dataset.replayAction==='scrub'){const cursor=Number(event.target.value);state.replay={...state.replay,cursor};saveState();if(backendConnected)void apiClient.replay({cursor});render()}});
+  app.addEventListener('input',event=>{
+    if(event.target.matches('.ag-composer textarea[name="message"]')){
+      const key=composerDraftKey(conversationIdForMission(state,ui.selectedMissionId)||state.activeConversationId);
+      if(key)ui.composerDrafts[key]=event.target.value;
+      return;
+    }
+    if(event.target.id==='palette-input'){ui.paletteQuery=event.target.value;ui.paletteIndex=0;render();return}
+    if(event.target.dataset.replayAction==='scrub'){const cursor=Number(event.target.value);state.replay={...state.replay,cursor};saveState();if(backendConnected)void apiClient.replay({cursor});render()}
+  });
 
   let resizeState=null;
   let spaceDragState=null;

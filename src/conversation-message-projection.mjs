@@ -3,7 +3,7 @@
  * Internal runtime tool/session/trace events remain available to their owners
  * and are not implicitly promoted to messages in the conversation.
  */
-const VISIBLE_TYPES=new Set(['text','plan','agent_run','artifact','notice','response']);
+const VISIBLE_TYPES=new Set(['text','plan','agent_run','artifact','notice','response','generated']);
 
 export function projectConversationMessages(messages){
   if(!Array.isArray(messages))return [];
